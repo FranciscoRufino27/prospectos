@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, Check, ChevronDown, Info, Lock, MapPin, Plus, Save, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import SeletorEstados from './SeletorEstados';
+import SeletorMunicipios from './SeletorMunicipios';
 import {
   PORTES_PROSPECCAO,
   PROSPECCAO_LIMITES,
@@ -17,7 +18,7 @@ import s from './Prospeccao.module.css';
 // Perfil de busca editado na própria tela de Prospecção (painel lateral). Grava
 // o mesmo organizacoes.configuracoes.prospeccao da aba de Configurações, pelo
 // mesmo PUT (exige workspace.configure). O objeto é SUBSTITUÍDO no servidor,
-// então campos que o painel não edita (municípios) voltam como vieram.
+// então o painel manda o perfil inteiro, como veio mais o que foi editado.
 
 const LIMITE = PROSPECCAO_LIMITES.cnaes;
 
@@ -61,6 +62,7 @@ export default function PerfilBuscaPainel({
 
   const cnaes = perfil.cnaes ?? [];
   const ufs = perfil.ufs ?? [];
+  const municipios = perfil.municipios ?? [];
   const portes = perfil.portes ?? [];
   const outras = cnaes.filter((c) => !nichoDaAtividade(c));
   const foraDoCatalogo = catalogoCnaes ? cnaes.filter((c) => !catalogoCnaes.includes(c)) : [];
@@ -247,11 +249,27 @@ export default function PerfilBuscaPainel({
                 desabilitado={!podeEditar}
                 onChange={(novas) => setPerfil((p) => ({ ...p, ufs: novas }))}
               />
-              {(perfil.municipios?.length ?? 0) > 0 && (
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
-                  <Info size={12} /> Também restrito a {perfil.municipios!.length} município{perfil.municipios!.length === 1 ? '' : 's'} (mantido ao salvar).
-                </p>
-              )}
+            </section>
+
+            {/* Municípios */}
+            <section className={s.drawerSection}>
+              <div className={s.drawerSectionTitle}>
+                <h3>Municípios</h3>
+                <span className="text-slate-400">
+                  {municipios.length === 0
+                    ? (ufs.length === 0 ? 'Todos' : 'Todos dos estados')
+                    : `${municipios.length} selecionado${municipios.length === 1 ? '' : 's'}`}
+                </span>
+              </div>
+              <SeletorMunicipios
+                selecionados={municipios}
+                ufs={ufs}
+                desabilitado={!podeEditar}
+                onChange={(novos) => setPerfil((p) => ({ ...p, municipios: novos }))}
+              />
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
+                <Info size={12} /> Aparecem as cidades com empresas no catálogo. Tirar um estado tira as cidades dele.
+              </p>
             </section>
 
             {/* Porte e opções */}

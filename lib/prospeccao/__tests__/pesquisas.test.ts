@@ -75,4 +75,10 @@ describe('operações das pesquisas salvas', () => {
     expect(resumoPesquisa({ ...pesquisa('a', 'A'), filtros: { cnaes: ['5510801'], ufs: ['SP'] }, quantidade: 40 }))
       .toBe('1 atividade · São Paulo · até 40 empresas')
   })
+
+  it('cita os municípios quando a pesquisa se restringe a eles', () => {
+    expect(nomeSugerido({ cnaes: ['5510801'], ufs: ['SP'], municipios: ['7107', '6291'] }, null)).toBe('Hotelaria SP (2 cidades)')
+    expect(resumoPesquisa({ ...pesquisa('a', 'A'), filtros: { cnaes: ['5510801'], ufs: ['SP'], municipios: ['7107'] }, quantidade: null }))
+      .toBe('1 atividade · São Paulo · 1 município · sem limite')
+  })
 })

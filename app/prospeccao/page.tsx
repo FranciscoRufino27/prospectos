@@ -19,6 +19,7 @@ import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoM
 import CaixaSelecao from '@/components/prospeccao/CaixaSelecao';
 import PerfilBuscaPainel from '@/components/prospeccao/PerfilBuscaPainel';
 import SeletorEstados from '@/components/prospeccao/SeletorEstados';
+import SeletorMunicipios from '@/components/prospeccao/SeletorMunicipios';
 import PesquisasSalvas, { SalvarPesquisa } from '@/components/prospeccao/PesquisasSalvas';
 import { iconeDoNicho } from '@/components/prospeccao/iconesNicho';
 import s from '@/components/prospeccao/Prospeccao.module.css';
@@ -441,6 +442,7 @@ export default function ProspeccaoPage() {
     return [
       !igual(filtros.cnaes, perfil.cnaes),
       !igual(filtros.ufs, perfil.ufs),
+      !igual(filtros.municipios, perfil.municipios),
       !igual(filtros.portes, perfil.portes),
       filtros.soComEmail !== perfil.soComEmail,
       filtros.excluirMei !== perfil.excluirMei,
@@ -617,6 +619,10 @@ export default function ProspeccaoPage() {
 
                     <Campo rotulo="Estado">
                       <SeletorEstados selecionadas={filtros.ufs} onChange={(ufs) => atualizar({ ufs })} />
+                    </Campo>
+
+                    <Campo rotulo="Município">
+                      <SeletorMunicipios selecionados={filtros.municipios} ufs={filtros.ufs} onChange={(municipios) => atualizar({ municipios })} />
                     </Campo>
 
                     <Campo rotulo="Porte">

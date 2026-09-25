@@ -181,7 +181,7 @@
 /* Campos dos filtros */
 .filterGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) repeat(3, minmax(0, 1fr)) minmax(0, 0.7fr);
+  grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)) minmax(0, 0.7fr);
   gap: 12px;
   margin-top: 12px;
 }
@@ -749,6 +749,10 @@
   gap: 8px;
 }
 .inlineForm .field { width: 300px; max-width: 100%; }
+
+@media (max-width: 1536px) {
+  .filterGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 @media (max-width: 1280px) {
   .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
