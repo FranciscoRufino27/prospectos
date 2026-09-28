@@ -1,14 +1,19 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Check, Loader2, MessageCircle, Save } from 'lucide-react';
+import { Users, Check, Loader2, MessageCircle, Save, BellRing } from 'lucide-react';
 
-// Distribuição comercial (handoff): quem participa do round-robin e o grupo do
-// WhatsApp que recebe o aviso. Dado real de /api/configuracoes/distribuicao-
-// comercial (participantes) e /api/configuracoes/workspace (grupo). Só liga/
-// desliga a participação — não mexe em leads já atribuídos.
+// Distribuição comercial (handoff): quem participa do round-robin, o grupo do
+// WhatsApp que recebe o aviso e para onde vai o aviso de "cliente respondeu".
+// Dado real de /api/configuracoes/distribuicao-comercial (participantes) e
+// /api/configuracoes/workspace (grupo, aviso). Só liga/desliga a participação
+// — não mexe em leads já atribuídos.
 
 interface Participante { usuarioId: string; nome: string; email: string | null; participa: boolean }
+
+// '' = desligado (a config não guarda a chave).
+type ModoAviso = '' | 'responsavel' | 'grupo' | 'ambos'
+const lerModoAviso = (v: unknown): ModoAviso => (v === 'responsavel' || v === 'grupo' || v === 'ambos' ? v : '')
 
 export default function DistribuicaoComercialPanel() {
   const [participantes, setParticipantes] = useState<Participante[] | null>(null);
@@ -31,6 +36,9 @@ export default function DistribuicaoComercialPanel() {
   // Campanha de follow-up de retorno (Fase 4). Vazio = única ativa da org.
   const [campanhaRetorno, setCampanhaRetorno] = useState('');
   const [campanhaRetornoSalva, setCampanhaRetornoSalva] = useState('');
+  const [avisoResposta, setAvisoResposta] = useState<ModoAviso>('');
+  const [salvandoAviso, setSalvandoAviso] = useState(false);
+  const [erroAviso, setErroAviso] = useState<string | null>(null);
   const [campanhasFollowup, setCampanhasFollowup] = useState<{ id: string; nome: string; status: string; dry_run: boolean }[]>([]);
 
   const carregar = useCallback(async () => {
@@ -53,7 +61,22 @@ export default function DistribuicaoComercialPanel() {
     setJanela(jm); setJanelaSalva(jm);
     const cr = typeof cfg?.config?.comercial?.campanhaRetornoId === 'string' ? cfg.config.comercial.campanhaRetornoId : '';
     setCampanhaRetorno(cr); setCampanhaRetornoSalva(cr);
+    setAvisoResposta(lerModoAviso(cfg?.config?.comercial?.avisoResposta));
   }, []);
+
+  async function salvarAvisoResposta(modo: ModoAviso) {
+    if (salvandoAviso || !podeEditar || modo === avisoResposta) return;
+    setSalvandoAviso(true); setErroAviso(null);
+    try {
+      const res = await fetch('/api/configuracoes/workspace', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comercialAvisoResposta: modo || null }),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) { setErroAviso(j?.erro ?? 'Não foi possível salvar.'); return; }
+      setAvisoResposta(lerModoAviso(j?.config?.comercial?.avisoResposta));
+    } finally { setSalvandoAviso(false); }
+  }
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -279,6 +302,56 @@ export default function DistribuicaoComercialPanel() {
         </p>
         {erroGrupo && <div className="text-xs text-red-400">{erroGrupo}</div>}
       </div>
+
+      <div className="pt-4 border-t border-[var(--border)] space-y-2">
+        <div className="text-sm font-semibold text-slate-200 inline-flex items-center gap-2">
+          <BellRing size={14} className="text-green-400" /> Aviso quando o cliente responde
+        </div>
+        <p className="text-xs text-slate-500">
+          Qualquer resposta de cliente (e-mail ou WhatsApp) gera uma mensagem no WhatsApp da equipe, com o trecho da
+          resposta e a leitura automática quando houver. No máximo um aviso por lead por minuto (mensagens seguidas viram um aviso só). Envio pela Z-API.
+        </p>
+        <div role="radiogroup" aria-label="Destino do aviso de resposta" className="flex flex-wrap gap-1.5">
+          {OPCOES_AVISO.map((o) => (
+            <button
+              key={o.id || 'desligado'}
+              type="button"
+              role="radio"
+              aria-checked={avisoResposta === o.id}
+              onClick={() => salvarAvisoResposta(o.id)}
+              disabled={!podeEditar || salvandoAviso}
+              className={`text-xs px-2.5 py-1.5 rounded-lg border inline-flex items-center gap-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                avisoResposta === o.id
+                  ? 'border-indigo-400 bg-indigo-500/15 text-indigo-200'
+                  : 'border-[var(--border)] text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {avisoResposta === o.id && <Check size={12} />}
+              {o.label}
+            </button>
+          ))}
+          {salvandoAviso && <Loader2 size={14} className="animate-spin text-slate-500 self-center" />}
+        </div>
+        <p className="text-xs text-slate-500">
+          {avisoResposta === ''
+            ? 'Desligado: ninguém é avisado no WhatsApp.'
+            : [
+                avisoResposta !== 'grupo' && 'O responsável recebe no número que cadastrou em Meu perfil > Avisos no WhatsApp (quem não cadastrou fica sem aviso).',
+                avisoResposta !== 'responsavel' && (grupoSalvo
+                  ? 'O grupo acima recebe, com menção ao responsável.'
+                  : 'Configure o grupo acima para o aviso ao grupo sair.'),
+                avisoResposta !== 'responsavel' && rodizio && 'Resposta positiva com rodízio já avisa o grupo pelo handoff — não duplica.',
+              ].filter(Boolean).join(' ')}
+        </p>
+        {erroAviso && <div className="text-xs text-red-400">{erroAviso}</div>}
+      </div>
     </div>
   );
 }
+
+const OPCOES_AVISO: { id: '' | 'responsavel' | 'grupo' | 'ambos'; label: string }[] = [
+  { id: '', label: 'Desligado' },
+  { id: 'responsavel', label: 'WhatsApp do responsável' },
+  { id: 'grupo', label: 'Grupo comercial' },
+  { id: 'ambos', label: 'Responsável e grupo' },
+];

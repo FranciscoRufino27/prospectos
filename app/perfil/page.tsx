@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Camera, Save, Lock, User } from 'lucide-react';
+import { Camera, Save, Lock, User, Palette } from 'lucide-react';
 import { estilosModulo as m, PaginaModulo, TituloSecao } from '@/components/tema/Modulo';
+import SeletorTema from '@/components/tema/SeletorTema';
+import AvisosWhatsapp from '@/components/perfil/AvisosWhatsapp';
 // (Lock também usado no campo de nicho travado para usuário comum — item 1.)
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
@@ -132,7 +134,7 @@ export default function PerfilPage() {
               <img
                 src={fotoExibida}
                 alt="Avatar"
-                className="w-20 h-20 rounded-full object-cover border-4 border-[#1b68a8] shadow-none"
+                className="w-20 h-20 rounded-full object-cover border-4 border-[var(--m-border,#1b68a8)] shadow-none"
               />
               <button
                 type="button"
@@ -227,6 +229,20 @@ export default function PerfilPage() {
         </form>
       </section>
 
+      <div className="grid gap-4">
+      {/* Avisos de resposta do cliente no WhatsApp */}
+      <AvisosWhatsapp />
+
+      {/* Aparência (por usuário, neste navegador) */}
+      <section className={m.painel}>
+        <div className={m.painelBarra}>
+          <TituloSecao icone={Palette} titulo="Aparência" subtitulo="Tema das telas. Aplica na hora e vale para este navegador." />
+        </div>
+        <div className="p-5">
+          <SeletorTema />
+        </div>
+      </section>
+
       {/* Alterar senha */}
       <section className={m.painel}>
         <div className={m.painelBarra}>
@@ -266,6 +282,7 @@ export default function PerfilPage() {
           </button>
         </form>
       </section>
+      </div>
     </div>
     </PaginaModulo>
   );

@@ -7,7 +7,7 @@
 // partir do client admin (service role) e chama o bridge. Nunca é importado no
 // browser — depende do admin client.
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { vincularResponsavel, type MembroEquipe, type UsuarioRef, type VinculoResponsavel } from './responsavel'
+import { membroDoUsuario, vincularResponsavel, type MembroEquipe, type UsuarioRef, type VinculoResponsavel } from './responsavel'
 
 // Carrega os membros de AUTH da organização (mesma composição do
 // /api/equipe/listar: usuários de auth cujo perfil pertence à org).
@@ -48,4 +48,21 @@ export async function resolverResponsavelPorAuthId(
   const alvo = equipe.find((m) => m.authId === authId)
   if (!alvo) return { ok: false, motivo: 'nao_encontrado' }
   return vincularResponsavel(alvo, usuarios, equipe)
+}
+
+/**
+ * Inverso de `resolverResponsavelPorAuthId`: o `usuarios` de
+ * leads.responsavel_id → o authId (= perfis.id) do membro da equipe. null quando
+ * nenhum ou mais de um membro corresponde.
+ */
+export async function resolverAuthIdDoResponsavel(
+  admin: SupabaseClient,
+  organizacaoId: string,
+  usuarioId: string,
+): Promise<string | null> {
+  const [equipe, usuarios] = await Promise.all([
+    carregarEquipe(admin, organizacaoId),
+    carregarUsuarios(admin, organizacaoId),
+  ])
+  return membroDoUsuario(usuarioId, usuarios, equipe)?.authId ?? null
 }

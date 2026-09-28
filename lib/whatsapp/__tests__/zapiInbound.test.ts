@@ -166,7 +166,8 @@ describe('persistirMensagemZapi', () => {
   it('lead único → grava com lead_id + organizacao_id do LEAD (nunca do callback)', async () => {
     const { client, upserts } = adminFake([{ id: 'L1', organizacao_id: 'org-A', contato_telefone: '11999998888' }])
     const r = await persistirMensagemZapi(client, mensagem())
-    expect(r).toEqual({ status: 'nova', id: 'ROW-1', vinculo: 'vinculado' })
+    // lead/org devolvidos para o webhook avisar a equipe — os do LEAD, não do callback.
+    expect(r).toEqual({ status: 'nova', id: 'ROW-1', vinculo: 'vinculado', leadId: 'L1', organizacaoId: 'org-A' })
 
     expect(upserts).toHaveLength(1)
     const { row, opts } = upserts[0]

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { avisarRespostaWhatsapp } from '@/lib/comercial/avisosResposta/composicao'
 import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { interpretarReceivedCallback, persistirMensagemZapi, validarSegredoWebhook } from '@/lib/whatsapp/zapiInbound'
 import { interpretarCallbackGrupo } from '@/lib/comercial/grupo/callbackGrupo'
@@ -85,6 +86,13 @@ export async function POST(req: NextRequest) {
       whatsappMessageId: leitura.mensagem.whatsappMessageId, direcao: leitura.mensagem.direcao,
       ...(r.status === 'nova' ? { vinculo: r.vinculo } : {}),
     }))
+    // Cliente escreveu (não fomos nós): avisa a equipe no WhatsApp, depois de
+    // responder à Z-API. Só mensagem NOVA de lead vinculado — callback repetido
+    // não avisa de novo. Falha no aviso não afeta o webhook (outbox reprocessa).
+    if (r.status === 'nova' && leitura.mensagem.direcao === 'inbound' && r.leadId && r.organizacaoId) {
+      const aviso = { organizacaoId: r.organizacaoId, leadId: r.leadId, whatsappMessageId: leitura.mensagem.whatsappMessageId, texto: leitura.mensagem.conteudo }
+      after(() => avisarRespostaWhatsapp(createSupabaseAdminClient(), aviso))
+    }
     return NextResponse.json({ ok: true, resultado: r.status })
   } catch (e) {
     console.error(JSON.stringify({

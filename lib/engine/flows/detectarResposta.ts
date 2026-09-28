@@ -9,6 +9,8 @@
 //      negativo      → 'perdido' (sem handoff, sem closer)
 //      neutro/indet. → 'respondeu' (pendente de tratamento; sem handoff, sem closer)
 //    Sem os hooks (scripts locais/testes antigos) toda resposta vale como interesse.
+//  - avisa a equipe no WhatsApp (responsável/grupo, conforme a org) de TODA
+//    resposta humana registrada — lib/comercial/avisosResposta
 // Quando um BOUNCE SMTP é detectado (migration 0027):
 //  - marca o lead como bounced=true
 //  - cancela todas as workflow_execucoes ativas do lead
@@ -22,6 +24,7 @@ import type { Queue } from '../queue'
 import type { ContextoCampanhaResposta, MensagemRecebida, Lead, UsuarioBasico } from '../types'
 import type { RespostaParaClassificar, ResultadoClassificacao } from '@/lib/comercial/respostas/classificarResposta'
 import type { EntradaGatilhoProspeccao, ResultadoGatilhoProspeccao } from '@/lib/comercial/handoff/gatilhoProspeccao'
+import type { ClassificacaoAviso, EntradaAvisoResposta } from '@/lib/comercial/avisosResposta/types'
 import { ehCicloDeRetornoHandoff } from '@/lib/comercial/followup/retornoFollowup'
 
 // Heurística de auto-resposta: além da dica do provedor (msg.automatica),
@@ -81,6 +84,23 @@ export interface DetectarRespostaOpts {
   // scripts locais) → o motor se comporta como antes: pausa e avisa o closer.
   classificarResposta?: (resposta: RespostaParaClassificar) => Promise<ResultadoClassificacao>
   handoffProspeccao?: (entrada: EntradaGatilhoProspeccao) => Promise<ResultadoGatilhoProspeccao>
+  // AVISO DE RESPOSTA (migration 0053): avisa o responsável/grupo no WhatsApp
+  // de QUALQUER resposta humana registrada. Best-effort — falhar aqui nunca
+  // interrompe a detecção (a resposta já está persistida).
+  avisarResposta?: (entrada: EntradaAvisoResposta) => Promise<unknown>
+}
+
+// Chama o aviso sem deixar a falha escapar: o aviso é efeito secundário e
+// tem outbox próprio para reprocessar.
+async function avisarRespostaSemFalhar(opts: DetectarRespostaOpts, entrada: EntradaAvisoResposta): Promise<void> {
+  if (!opts.avisarResposta || !entrada.organizacaoId) return
+  try {
+    await opts.avisarResposta(entrada)
+  } catch (e) {
+    log.aviso('Falha ao avisar a resposta no WhatsApp da equipe.', {
+      leadId: entrada.leadId, erro: e instanceof Error ? e.message : String(e),
+    })
+  }
 }
 
 // Origem da resposta é PROSPECÇÃO (entra no handoff)? Usa o contexto REAL da
@@ -317,10 +337,27 @@ export async function detectarResposta(
       // distribuição automática, não a leitura da resposta.
       const deProspeccao = respostaVemDeProspeccao(emCadencia, contextoCampanha, retomandoEncaminhamento || pendenteDeTratamento)
       let classificacao: ResultadoClassificacao = { classificacao: 'positivo', via: 'regra', motivo: 'sem classificador' }
+      let classificou = false
       if (opts.classificarResposta && deProspeccao && !retomandoEncaminhamento) {
         classificacao = await opts.classificarResposta({ assunto: msg.assunto, corpo: msg.corpo })
+        classificou = true
       }
       const positiva = classificacao.classificacao === 'positivo'
+      // Identidade estável desta resposta (handoff e aviso são idempotentes por ela).
+      const eventoResposta = chaveMensagem
+        ? `email:${chaveMensagem}`
+        : `email:${lead.id}:${new Date(msg.em).toISOString()}`
+      // O aviso só diz a classificação quando ela foi de fato feita agora — o
+      // "positivo" padrão de quem não classifica não é leitura da resposta.
+      const avisoDaResposta = (grupoJaAvisado: boolean): EntradaAvisoResposta => ({
+        organizacaoId: store.organizacaoId ?? '',
+        leadId: lead.id,
+        eventoId: eventoResposta,
+        canal: 'email',
+        classificacao: classificou ? (classificacao.classificacao as ClassificacaoAviso) : null,
+        texto: msg.corpo,
+        grupoJaAvisado,
+      })
 
       // Estado do lead conforme a classificação — SEMPRE fora da cadência:
       //   positivo      → 'interessado' + aguardando_closer (Fluxo 3 + handoff)
@@ -360,16 +397,19 @@ export async function detectarResposta(
 
       if (!positiva) {
         // Negativo/neutro/indeterminado: histórico preservado (interação +
-        // nota), mas NÃO é oportunidade — sem handoff, sem rodízio, sem grupo,
-        // sem Fluxo 3.
+        // nota), mas NÃO é oportunidade — sem handoff, sem rodízio, sem
+        // Fluxo 3. Só o aviso de resposta (se a org ligou) sai.
         await store.registrarInteracao({
           lead_id: lead.id, tipo: 'nota', canal: 'sistema', origem_acao: 'ia',
           descricao: descreverRespostaSemInteresse(classificacao),
           responsavel_id: lead.responsavel_id ?? null,
         })
-        log.info('Resposta de prospecção sem interesse positivo — sem handoff nem aviso.', {
+        log.info('Resposta de prospecção sem interesse positivo — sem handoff nem closer.', {
           leadId: lead.id, classificacao: classificacao.classificacao, via: classificacao.via,
         })
+        // O responsável é avisado mesmo assim (se a org ligou o aviso): quem
+        // decide o que fazer com a resposta é ele.
+        await avisarRespostaSemFalhar(opts, avisoDaResposta(false))
         continue
       }
 
@@ -380,9 +420,7 @@ export async function detectarResposta(
       // pelo eventoId = identidade estável da mensagem.
       let responsavelHandoff: UsuarioBasico | null = null
       if (opts.handoffProspeccao && deProspeccao) {
-        const eventoId = chaveMensagem
-          ? `email:${chaveMensagem}`
-          : `email:${lead.id}:${new Date(msg.em).toISOString()}`
+        const eventoId = eventoResposta
         const etapa = descreverEtapaCadencia(
           await store.contarInteracoes(lead.id, 'follow_up'), contextoCampanha, emCadencia,
         )
@@ -412,6 +450,10 @@ export async function detectarResposta(
           })
         }
       }
+
+      // 5.2) Aviso no WhatsApp da equipe. Depois do handoff, para já nomear o
+      // responsável sorteado. Com handoff, o grupo já recebeu o aviso dele.
+      await avisarRespostaSemFalhar(opts, avisoDaResposta(!!opts.handoffProspeccao && deProspeccao))
 
       // 6) Enfileirar o Fluxo 3 (direcionar ao closer), uma vez por lead — SÓ
       // para resposta positiva. Se o handoff atribuiu um comercial, o aviso vai

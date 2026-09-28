@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase-admin'
+import { avisarRespostaWhatsapp } from '@/lib/comercial/avisosResposta/composicao'
 import { extrairMensagensInbound, persistirMensagensInbound } from '@/lib/whatsapp/inbound'
 
 export const runtime = 'nodejs'
@@ -82,7 +83,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const resumo = await persistirMensagensInbound(createSupabaseAdminClient(), mensagens)
+    const admin = createSupabaseAdminClient()
+    // Cliente escreveu: avisa a equipe no WhatsApp depois de responder à Meta.
+    // Falha no aviso não afeta o webhook (o outbox reprocessa).
+    const resumo = await persistirMensagensInbound(admin, mensagens, (m) => {
+      after(() => avisarRespostaWhatsapp(admin, {
+        organizacaoId: m.organizacaoId, leadId: m.leadId, whatsappMessageId: m.whatsappMessageId, texto: m.conteudo,
+      }))
+    })
     console.log(JSON.stringify({
       ts: new Date().toISOString(), nivel: 'info', escopo: 'webhook.whatsapp',
       msg: 'Mensagens inbound processadas.', ...resumo,

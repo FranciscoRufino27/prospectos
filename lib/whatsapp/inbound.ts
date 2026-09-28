@@ -246,6 +246,9 @@ export async function resolverVinculoPorTelefone(
 export async function persistirMensagensInbound(
   admin: SupabaseClient,
   mensagens: MensagemInbound[],
+  // Chamado para cada mensagem NOVA vinculada a um lead (quem chama avisa a
+  // equipe). Reenvio duplicado não chama.
+  aoGravarVinculada?: (m: { leadId: string; organizacaoId: string; whatsappMessageId: string; conteudo: string }) => void,
 ): Promise<ResultadoPersistencia> {
   const resultado: ResultadoPersistencia = {
     recebidas: mensagens.length, novas: 0, duplicadas: 0, erros: 0,
@@ -301,6 +304,10 @@ export async function persistirMensagensInbound(
 
       if (vinculo.status === 'vinculado') {
         resultado.vinculadas += 1
+        aoGravarVinculada?.({
+          leadId: vinculo.leadId, organizacaoId: vinculo.organizacaoId,
+          whatsappMessageId: m.whatsappMessageId, conteudo: m.conteudo ?? '',
+        })
         console.log(JSON.stringify({
           ts: new Date().toISOString(), nivel: 'info', escopo: 'webhook.whatsapp',
           msg: 'Mensagem inbound vinculada a lead.',

@@ -19,6 +19,7 @@ import { extrairContatosAlternativos } from '@/lib/ia/contatosAlternativos'
 import { classificarResposta } from '@/lib/comercial/respostas/classificarResposta'
 import { criarClassificadorIa } from '@/lib/comercial/respostas/classificadorIa'
 import { montarHookHandoffProspeccao, reprocessarAlertasHandoff, rodizioHandoffLigadoNaOrg } from '@/lib/comercial/handoff/composicao'
+import { montarHookAvisoResposta, reprocessarAvisosRespostaDaOrg } from '@/lib/comercial/avisosResposta/composicao'
 
 export interface Motor {
   store: Store
@@ -87,6 +88,9 @@ async function detectarEEncaminharRespostas(motor: Motor) {
     adiarConfirmacaoLeitura: true,
     classificarResposta: (r) => classificarResposta(r, classificadorIa),
     handoffProspeccao: admin && rodizioLigado ? montarHookHandoffProspeccao(admin) : undefined,
+    // Aviso de resposta no WhatsApp da equipe: o hook consulta a config da
+    // org e não faz nada quando ela não ligou o aviso.
+    avisarResposta: admin ? montarHookAvisoResposta(admin) : undefined,
   })
   await motor.fila.processar()
   const jobsComErro = motor.fila.escaninhoErro().length
@@ -106,7 +110,17 @@ async function detectarEEncaminharRespostas(motor: Motor) {
       log.aviso('Falha ao reprocessar avisos pendentes do handoff.', { erro: e instanceof Error ? e.message : String(e) })
     }
   }
-  return { ...resultado, jobsComErro, alertasReprocessados }
+  // Mesma recuperação para os avisos de resposta do cliente (Z-API fora,
+  // número ou grupo ainda não configurados).
+  let avisosRespostaReprocessados: unknown = null
+  if (admin && motor.store.organizacaoId) {
+    try {
+      avisosRespostaReprocessados = await reprocessarAvisosRespostaDaOrg(admin, motor.store.organizacaoId)
+    } catch (e) {
+      log.aviso('Falha ao reprocessar avisos de resposta do cliente.', { erro: e instanceof Error ? e.message : String(e) })
+    }
+  }
+  return { ...resultado, jobsComErro, alertasReprocessados, avisosRespostaReprocessados }
 }
 
 // Organizações ativas (para o cron varrer todas). service_role: bypassa RLS,

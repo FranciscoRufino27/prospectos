@@ -105,3 +105,30 @@ describe('workspaceConfig.comercial.rodizioHandoff', () => {
     expect(rodizioHandoffAtivo(mesclarWorkspaceConfig(ligado, { comercialRodizioHandoff: null }))).toBe(false)
   })
 })
+
+// Aviso de "cliente respondeu" no WhatsApp: DESLIGADO por padrão; só os três
+// modos válidos ficam no blob.
+import { modoAvisoResposta } from '../workspaceConfig'
+
+describe('workspaceConfig.comercial.avisoResposta', () => {
+  it('ausente/inválido → desligado (null); modos válidos são lidos', () => {
+    expect(modoAvisoResposta(parseWorkspaceConfig({}))).toBeNull()
+    expect(modoAvisoResposta(null)).toBeNull()
+    expect(modoAvisoResposta(parseWorkspaceConfig({ comercial: { avisoResposta: 'todos' } }))).toBeNull()
+    expect(modoAvisoResposta(parseWorkspaceConfig({ comercial: { avisoResposta: true } }))).toBeNull()
+    for (const m of ['responsavel', 'grupo', 'ambos'] as const) {
+      expect(modoAvisoResposta(parseWorkspaceConfig({ comercial: { avisoResposta: m } }))).toBe(m)
+    }
+  })
+
+  it('mesclar liga, troca e desliga sem mexer no resto do comercial', () => {
+    const base = parseWorkspaceConfig({ comercial: { grupoWhatsappId: '120363019502650977-group', rodizioHandoff: true } })
+    const ligado = mesclarWorkspaceConfig(base, { comercialAvisoResposta: 'ambos' })
+    expect(ligado.comercial).toEqual({ grupoWhatsappId: '120363019502650977-group', rodizioHandoff: true, avisoResposta: 'ambos' })
+    expect(mesclarWorkspaceConfig(ligado, { comercialAvisoResposta: 'grupo' }).comercial?.avisoResposta).toBe('grupo')
+    const desligado = mesclarWorkspaceConfig(ligado, { comercialAvisoResposta: null })
+    expect(desligado.comercial).toEqual({ grupoWhatsappId: '120363019502650977-group', rodizioHandoff: true })
+    // Valor inválido vindo da API também desliga, nunca grava lixo.
+    expect(mesclarWorkspaceConfig(ligado, { comercialAvisoResposta: 'x' as never }).comercial?.avisoResposta).toBeUndefined()
+  })
+})

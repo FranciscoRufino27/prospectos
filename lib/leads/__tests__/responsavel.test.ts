@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vincularResponsavel, type MembroEquipe, type UsuarioRef } from '../responsavel'
+import { membroDoUsuario, vincularResponsavel, type MembroEquipe, type UsuarioRef } from '../responsavel'
 
 // Cenário-base: os 3 membros/usuários reais depois da correção de raiz em
 // `usuarios` (Rufs ganhou linha própria; e-mail da Silmara alinhado ao login).
@@ -132,5 +132,29 @@ describe('responsável vindo da planilha de importação', () => {
   it('usuário sem e-mail cadastrado ainda resolve pelo nome', () => {
     const semEmail = [{ id: 'u9', nome: 'Carla Dias', email: null }]
     expect(resolverResponsavelDaPlanilha('Carla Dias', semEmail)).toMatchObject({ ok: true, via: 'nome' })
+  })
+})
+
+// Caminho inverso (aviso de resposta no WhatsApp): o `usuarios` do lead → o
+// membro de login, pela MESMA regra; ambíguo ou ausente = ninguém.
+describe('membroDoUsuario', () => {
+  it('acha o membro de cada usuário real por e-mail', () => {
+    expect(membroDoUsuario('u-francisco', USUARIOS, EQUIPE)?.authId).toBe('a-rufino')
+    expect(membroDoUsuario('u-silmara', USUARIOS, EQUIPE)?.authId).toBe('a-silmara')
+    expect(membroDoUsuario('u-rufs', USUARIOS, EQUIPE)?.authId).toBe('a-rufs')
+  })
+
+  it('usuário sem membro correspondente → null', () => {
+    expect(membroDoUsuario('u-inexistente', USUARIOS, EQUIPE)).toBeNull()
+    const semEmail: MembroEquipe[] = [{ authId: 'a-x', nome: 'Outra Pessoa', email: 'x@y.com' }]
+    expect(membroDoUsuario('u-francisco', USUARIOS, semEmail)).toBeNull()
+  })
+
+  it('resolve por nome quando não há e-mail, e recusa quando dois membros caem no mesmo usuário', () => {
+    const usuarios: UsuarioRef[] = [{ id: 'u-tester', nome: 'Tester', email: null }]
+    const um: MembroEquipe[] = [{ authId: 'a-t', nome: 'Tester', email: 'teste@prospectos.local' }]
+    expect(membroDoUsuario('u-tester', usuarios, um)?.authId).toBe('a-t')
+    const dois: MembroEquipe[] = [...um, { authId: 'a-t2', nome: 'Tester Dois', email: 'outro@x.com' }]
+    expect(membroDoUsuario('u-tester', usuarios, dois)).toBeNull()
   })
 })

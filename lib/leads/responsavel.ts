@@ -103,6 +103,24 @@ export function vincularResponsavel(
   return { ok: true, usuario: alvoUsuario, via: 'nome' }
 }
 
+/**
+ * Caminho INVERSO do bridge: dado um `usuarios` (o que está em
+ * leads.responsavel_id), qual membro de auth/perfil ele é? Aplica a MESMA
+ * regra de `vincularResponsavel` a cada membro e aceita só quando exatamente
+ * um membro cai neste usuário — ambiguidade devolve null, nunca um chute.
+ */
+export function membroDoUsuario(
+  usuarioId: string,
+  usuarios: UsuarioRef[],
+  equipe: MembroEquipe[],
+): MembroEquipe | null {
+  const donos = equipe.filter((m) => {
+    const v = vincularResponsavel(m, usuarios, equipe)
+    return v.ok && v.usuario.id === usuarioId
+  })
+  return donos.length === 1 ? donos[0] : null
+}
+
 // --- Responsável vindo de uma PLANILHA --------------------------------------
 // Aqui a entrada não é um membro de auth: é texto cru de uma célula ("Aline
 // Muller", "aline@empresa.com", "ALINE"). Mesma filosofia do bridge acima —

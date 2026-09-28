@@ -132,7 +132,8 @@ export function interpretarReceivedCallback(payload: unknown, instanceIdEsperado
 // --- Persistência ------------------------------------------------------------
 
 export type ResultadoPersistenciaZapi =
-  | { status: 'nova'; id: string; vinculo: VinculoLead['status'] }
+  // leadId/organizacaoId só quando o vínculo é único (quem chama avisa a equipe).
+  | { status: 'nova'; id: string; vinculo: VinculoLead['status']; leadId?: string; organizacaoId?: string }
   | { status: 'duplicada' } // whatsapp_message_id já existia — linha original preservada
   | { status: 'erro'; mensagem: string }
 
@@ -187,5 +188,8 @@ export async function persistirMensagemZapi(
       whatsappMessageId: m.whatsappMessageId, leadIds: vinculo.leadIds, organizacaoIds: vinculo.organizacaoIds,
     }))
   }
-  return { status: 'nova', id: linha.id, vinculo: vinculo.status }
+  return {
+    status: 'nova', id: linha.id, vinculo: vinculo.status,
+    ...(vinculo.status === 'vinculado' ? { leadId: vinculo.leadId, organizacaoId: vinculo.organizacaoId } : {}),
+  }
 }

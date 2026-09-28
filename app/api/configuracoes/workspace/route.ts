@@ -54,6 +54,10 @@ export async function PUT(req: Request) {
     comercialRodizioHandoff: typeof b.comercialRodizioHandoff === 'boolean' || b.comercialRodizioHandoff === null
       ? b.comercialRodizioHandoff
       : undefined,
+    // Aviso de resposta do cliente no WhatsApp; null desliga (validado na mescla).
+    comercialAvisoResposta: typeof b.comercialAvisoResposta === 'string' || b.comercialAvisoResposta === null
+      ? b.comercialAvisoResposta
+      : undefined,
     camposUI: Array.isArray(b.camposUI) ? b.camposUI : undefined,
     operacao: b.operacao && typeof b.operacao === 'object' ? b.operacao : undefined,
     // Perfil de busca da prospecção: objeto substitui (validado no parse); null limpa.

@@ -124,6 +124,19 @@ export interface ComercialConfig {
   // `rodizioHandoffAtivo`) — a distribuição passou a ser por carteira do lead.
   // Só quem marcar explicitamente volta a ter o rodízio.
   rodizioHandoff?: boolean
+  // Aviso de "cliente respondeu" no WhatsApp da equipe (migration 0053):
+  // 'responsavel' (WhatsApp pessoal de quem cuida do lead), 'grupo' (o grupo
+  // acima) ou 'ambos'. Ausente = DESLIGADO — nenhuma org passa a receber
+  // mensagem sem escolher.
+  avisoResposta?: ModoAvisoResposta
+}
+
+export const MODOS_AVISO_RESPOSTA = ['responsavel', 'grupo', 'ambos'] as const
+export type ModoAvisoResposta = (typeof MODOS_AVISO_RESPOSTA)[number]
+
+export function modoAvisoResposta(cfg: WorkspaceConfig | null | undefined): ModoAvisoResposta | null {
+  const m = cfg?.comercial?.avisoResposta
+  return m && (MODOS_AVISO_RESPOSTA as readonly string[]).includes(m) ? m : null
 }
 
 export const HANDOFF_REVISAO_MINUTOS_PADRAO = 10080 // 7 dias
@@ -341,6 +354,9 @@ export function parseWorkspaceConfig(bruto: unknown): WorkspaceConfig {
     }
     if (typeof c.campanhaRetornoId === 'string' && c.campanhaRetornoId.trim()) comercial.campanhaRetornoId = c.campanhaRetornoId.trim()
     if (typeof c.rodizioHandoff === 'boolean') comercial.rodizioHandoff = c.rodizioHandoff
+    if (typeof c.avisoResposta === 'string' && (MODOS_AVISO_RESPOSTA as readonly string[]).includes(c.avisoResposta)) {
+      comercial.avisoResposta = c.avisoResposta as ModoAvisoResposta
+    }
     if (Object.keys(comercial).length > 0) out.comercial = comercial
   }
   if (Array.isArray(obj.camposUI)) {
@@ -441,6 +457,8 @@ export interface WorkspaceConfigEditavel {
   comercialCampanhaRetornoId?: string | null
   // Rodízio automático do handoff. false/null volta ao padrão (desligado).
   comercialRodizioHandoff?: boolean | null
+  // Aviso de resposta do cliente. null (ou valor inválido) DESLIGA.
+  comercialAvisoResposta?: ModoAvisoResposta | null
   camposUI?: CampoUI[]
   operacao?: OperacaoConfig
   // Perfil de busca da prospecção. Substitui o perfil inteiro; null LIMPA.
@@ -479,6 +497,11 @@ export function mesclarWorkspaceConfig(atual: WorkspaceConfig, patch: WorkspaceC
     // Só `true` grava a chave; false/null a remove e o padrão (desligado) volta
     // a valer — o blob não guarda o valor padrão.
     next.comercial = patch.comercialRodizioHandoff === true ? { ...resto, rodizioHandoff: true } : resto
+  }
+  if (patch.comercialAvisoResposta !== undefined) {
+    const { avisoResposta: _anterior, ...resto } = next.comercial ?? atual.comercial ?? {}
+    const modo = patch.comercialAvisoResposta
+    next.comercial = modo && (MODOS_AVISO_RESPOSTA as readonly string[]).includes(modo) ? { ...resto, avisoResposta: modo } : resto
   }
   if (Array.isArray(patch.camposUI)) next.camposUI = patch.camposUI
   if (patch.operacao) next.operacao = patch.operacao
