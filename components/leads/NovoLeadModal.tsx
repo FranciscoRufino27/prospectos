@@ -24,7 +24,7 @@ function rotuloSegmento(nicho: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 const inputCls =
-  'w-full bg-[#0f1117] border border-[#2a3147] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50'
+  'w-full bg-[var(--t-bg-base,#0f1117)] border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50'
 const labelCls = 'block text-sm text-slate-400 mb-1.5'
 
 export default function NovoLeadModal({
@@ -110,7 +110,7 @@ export default function NovoLeadModal({
       onClick={() => !salvando && onClose()}
     >
       <div
-        className="bg-[#1a1f2e] rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-auto"
+        className="bg-[var(--t-bg-card,#1a1f2e)] rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="Novo lead"
@@ -198,7 +198,7 @@ export default function NovoLeadModal({
         {erro && <p className="text-sm text-rose-400 mt-4">{erro}</p>}
 
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} disabled={salvando} className="text-sm px-4 py-2 rounded-lg text-slate-300 hover:bg-[#0f1117]">Cancelar</button>
+          <button onClick={onClose} disabled={salvando} className="text-sm px-4 py-2 rounded-lg text-slate-300 hover:bg-[var(--t-bg-base,#0f1117)]">Cancelar</button>
           <button
             onClick={salvar}
             disabled={!valido || salvando}

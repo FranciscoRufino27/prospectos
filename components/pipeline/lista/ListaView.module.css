@@ -9,8 +9,8 @@
   overflow: hidden;
   background:
     radial-gradient(circle at 88% 3%, rgba(62, 84, 180, 0.1), transparent 27rem),
-    #041524;
-  color: #f4f7ff;
+    var(--m-bg-base, #041524);
+  color: var(--m-title, #f4f7ff);
 }
 
 .pageHeader {
@@ -43,7 +43,7 @@
 
 .headingBlock h1 {
   margin: 0;
-  color: #f7f8ff;
+  color: var(--m-title, #f7f8ff);
   font-size: 1.5rem;
   font-weight: 720;
   letter-spacing: -0.025em;
@@ -52,7 +52,7 @@
 
 .headingBlock p {
   margin: 0.35rem 0 0;
-  color: #8794ab;
+  color: var(--m-text-muted, #8794ab);
   font-size: 0.82rem;
   line-height: 1.4;
 }
@@ -89,7 +89,7 @@
 
 .toolbar {
   flex-shrink: 0;
-  border-bottom: 1px solid #092f4f;
+  border-bottom: 1px solid var(--m-border, #092f4f);
   padding: 0 1.5rem 1rem;
 }
 
@@ -113,19 +113,19 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  border: 1px solid #0b3962;
+  border: 1px solid var(--m-border, #0b3962);
   border-radius: 0.5rem;
   padding: 0.45rem 0.85rem;
-  background: #061f34;
-  color: #a9b4c8;
+  background: var(--m-bg-elevated, #061f34);
+  color: var(--m-text-soft, #a9b4c8);
   font-size: 0.78rem;
   font-weight: 590;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .tabs button:hover {
-  border-color: #0f4e86;
-  color: #eef2ff;
+  border-color: var(--m-border, #0f4e86);
+  color: var(--m-title, #eef2ff);
 }
 
 .tabs .tabActive {
@@ -136,13 +136,13 @@
 }
 
 .total {
-  color: #8896ad;
+  color: var(--m-text-muted, #8896ad);
   font-size: 0.75rem;
   white-space: nowrap;
 }
 
 .total strong {
-  color: #dbe3f3;
+  color: var(--m-title, #dbe3f3);
   font-weight: 620;
 }
 
@@ -155,10 +155,10 @@
 .filters select,
 .search {
   height: 2.35rem;
-  border: 1px solid #0a365d;
+  border: 1px solid var(--m-border, #0a365d);
   border-radius: 0.48rem;
-  background: #051d31;
-  color: #cbd4e5;
+  background: var(--m-bg-elevated, #051d31);
+  color: var(--m-text, #cbd4e5);
   font-size: 0.76rem;
 }
 
@@ -181,7 +181,7 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0 0.7rem;
-  color: #77869e;
+  color: var(--m-text-muted, #77869e);
 }
 
 .search input {
@@ -190,7 +190,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #dce4f4;
+  color: var(--m-title, #dce4f4);
   font: inherit;
 }
 
@@ -206,11 +206,11 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  border: 1px solid #0b3c66;
+  border: 1px solid var(--m-border, #0b3c66);
   border-radius: 0.48rem;
   padding: 0 0.8rem;
-  background: #061f34;
-  color: #c1cbda;
+  background: var(--m-bg-elevated, #061f34);
+  color: var(--m-text, #c1cbda);
   font-size: 0.76rem;
   font-weight: 560;
 }
@@ -218,16 +218,16 @@
 .moreButton:hover,
 .moreButtonActive {
   border-color: rgba(99, 102, 241, 0.58);
-  color: #c8caff;
+  color: var(--m-text, #c8caff);
 }
 
 .clearButton {
-  color: #93a0b5;
+  color: var(--m-text-soft, #93a0b5);
 }
 
 .clearButton:hover {
   border-color: rgba(99, 102, 241, 0.58);
-  color: #c8caff;
+  color: var(--m-text, #c8caff);
 }
 
 /* --- Tabela ---------------------------------------------------------------
@@ -246,9 +246,9 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
-  border: 1px solid #082c4b;
+  border: 1px solid var(--m-border, #082c4b);
   border-radius: 0.7rem;
-  background: rgba(5, 29, 49, 0.6);
+  background: var(--m-surface-inset, rgba(5, 29, 49, 0.6));
   scrollbar-color: #0e477a transparent;
   scrollbar-width: thin;
 }
@@ -263,8 +263,8 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  border-bottom: 1px solid #0a3459;
-  background: #051c30;
+  border-bottom: 1px solid var(--m-border, #0a3459);
+  background: var(--m-bg-elevated, #051c30);
   padding: 0.7rem 0.9rem;
   color: #6e7d95;
   font-size: 0.68rem;
@@ -287,7 +287,7 @@
 }
 
 .sortButton:hover {
-  color: #c3cde0;
+  color: var(--m-text, #c3cde0);
 }
 
 .sortInativo {
@@ -295,9 +295,9 @@
 }
 
 .table tbody td {
-  border-bottom: 1px solid rgba(9, 47, 81, 0.72);
+  border-bottom: 1px solid var(--m-border, rgba(9, 47, 81, 0.72));
   padding: 0.72rem 0.9rem;
-  color: #aab6c9;
+  color: var(--m-text-soft, #aab6c9);
   font-size: 0.76rem;
   vertical-align: middle;
 }
@@ -312,7 +312,7 @@
 }
 
 .row:hover td {
-  background: rgba(9, 46, 79, 0.55);
+  background: var(--m-surface-inset, rgba(9, 46, 79, 0.55));
 }
 
 .rowSelected td {
@@ -323,7 +323,7 @@
 .empresa {
   display: block;
   overflow: hidden;
-  color: #f1f4fb;
+  color: var(--m-title, #f1f4fb);
   font-size: 0.8rem;
   font-weight: 650;
   line-height: 1.25;
@@ -335,7 +335,7 @@
   display: block;
   overflow: hidden;
   margin-top: 0.16rem;
-  color: #8494ab;
+  color: var(--m-text-muted, #8494ab);
   font-size: 0.72rem;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -350,7 +350,7 @@
 /* Valor principal + apoio, para Último contato e Próxima ação. */
 .principal {
   display: block;
-  color: #cfd8e8;
+  color: var(--m-text, #cfd8e8);
   font-size: 0.75rem;
   line-height: 1.25;
   white-space: nowrap;
@@ -360,7 +360,7 @@
   display: block;
   overflow: hidden;
   margin-top: 0.16rem;
-  color: #74849c;
+  color: var(--m-text-muted, #74849c);
   font-size: 0.7rem;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -397,7 +397,7 @@
   min-width: 0;
   align-items: center;
   gap: 0.45rem;
-  color: #c3cddd;
+  color: var(--m-text, #c3cddd);
   white-space: nowrap;
 }
 
@@ -426,7 +426,7 @@
   justify-content: space-between;
   gap: 0.85rem;
   padding: 0.85rem 0 1rem;
-  color: #74849c;
+  color: var(--m-text-muted, #74849c);
   font-size: 0.72rem;
 }
 
@@ -438,11 +438,11 @@
 
 .porPagina select {
   height: 1.95rem;
-  border: 1px solid #0a365d;
+  border: 1px solid var(--m-border, #0a365d);
   border-radius: 0.42rem;
   padding: 0 1.7rem 0 0.55rem;
-  background: #051d31;
-  color: #cbd4e5;
+  background: var(--m-bg-elevated, #051d31);
+  color: var(--m-text, #cbd4e5);
   font-size: 0.72rem;
   outline: none;
 }
@@ -459,11 +459,11 @@
   height: 1.85rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid #0a365d;
+  border: 1px solid var(--m-border, #0a365d);
   border-radius: 0.42rem;
   padding: 0 0.35rem;
-  background: #051d31;
-  color: #aab6c9;
+  background: var(--m-bg-elevated, #051d31);
+  color: var(--m-text-soft, #aab6c9);
   font: inherit;
   font-size: 0.72rem;
   font-weight: 600;
@@ -472,7 +472,7 @@
 
 .paginas button:hover:not(:disabled) {
   border-color: rgba(99, 102, 241, 0.55);
-  color: #c8caff;
+  color: var(--m-text, #c8caff);
 }
 
 .paginas button:disabled {
@@ -493,7 +493,7 @@
 
 .estadoLinha {
   padding: 3.5rem 1rem;
-  color: #74849c;
+  color: var(--m-text-muted, #74849c);
   font-size: 0.76rem;
   text-align: center;
 }
@@ -529,4 +529,50 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Tema Escuro: menos brilho e acentos mais apagados (gerado a partir das regras acima:
+   brilhos externos saem, cores fortes perdem saturação/luz). */
+:global([data-tema='escuro']) .headingIcon {
+  background: rgba(64, 67, 208, 0.13);
+  color: #4d55e2;
+}
+:global([data-tema='escuro']) .primaryButton {
+  background: linear-gradient(135deg, #4437d3, #4036b8);
+}
+:global([data-tema='escuro']) .tabs .tabActive {
+  border-color: rgba(70, 55, 222, 0.55);
+  background: linear-gradient(135deg, #453acb, #443ca8);
+}
+:global([data-tema='escuro']) .filters select:focus,
+:global([data-tema='escuro']) .search:focus-within {
+  border-color: rgba(64, 67, 208, 0.72);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .moreButton:hover,
+:global([data-tema='escuro']) .moreButtonActive {
+  border-color: rgba(64, 67, 208, 0.58);
+}
+:global([data-tema='escuro']) .clearButton:hover {
+  border-color: rgba(64, 67, 208, 0.58);
+}
+:global([data-tema='escuro']) .rowSelected td {
+  background: rgba(64, 67, 208, 0.11);
+}
+:global([data-tema='escuro']) .paginas button:hover:not(:disabled) {
+  border-color: rgba(64, 67, 208, 0.55);
+}
+:global([data-tema='escuro']) .paginaAtiva {
+  border-color: rgba(70, 55, 222, 0.55) !important;
+  background: linear-gradient(135deg, #453acb, #443ca8) !important;
+}
+
+/* Tema Claro: acentos escurecidos para contraste no fundo branco (gerado a partir das
+   regras acima: brilhos externos saem, cores claras de destaque escurecem). */
+:global([data-tema='claro']) .headingIcon {
+  color: #0611e0;
+}
+:global([data-tema='claro']) .filters select:focus,
+:global([data-tema='claro']) .search:focus-within {
+  box-shadow: none;
 }

@@ -14,7 +14,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <AppProvider>
-      <div className="flex h-screen overflow-hidden bg-[#0f1117]">
+      <div className="flex h-screen overflow-hidden bg-[var(--bg-base)]">
         <Sidebar />
         <main className="flex-1 overflow-y-auto">
           {children}

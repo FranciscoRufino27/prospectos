@@ -178,7 +178,7 @@ export default function MoverLeadModal({
                       aria-checked={ativo}
                       onClick={() => setModo(o.id)}
                       className={`flex items-start gap-3 rounded-[11px] border px-3 py-2.5 text-left transition-colors focus-ring ${
-                        ativo ? 'border-[#6979ff] bg-indigo-500/15' : 'border-[#155987] bg-[rgba(3,24,45,0.6)] hover:border-[#2286cf]'
+                        ativo ? 'border-[#6979ff] bg-indigo-500/15' : 'border-[var(--m-border,#155987)] bg-[rgba(3,24,45,0.6)] hover:border-[var(--m-border-strong,#2286cf)]'
                       }`}
                     >
                       <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] ${ativo ? 'bg-indigo-500/30 text-indigo-100' : 'bg-slate-500/10 text-slate-400'}`}>

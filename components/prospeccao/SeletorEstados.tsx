@@ -84,7 +84,7 @@ export default function SeletorEstados({
                 aria-label={`Remover ${NOME_UF[uf as Uf] ?? uf}`}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={() => onChange(selecionadas.filter((u) => u !== uf))}
-                className="text-indigo-200 hover:text-white"
+                className="text-indigo-200 hover:text-[var(--t-strong,#fff)]"
               >
                 <X size={11} />
               </button>

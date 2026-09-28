@@ -72,8 +72,8 @@ export default function DefinirSenhaPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1117] flex items-center justify-center">
-      <div className="bg-[#1a1f2e] rounded-2xl shadow-lg p-8 w-full max-w-md">
+    <div className="min-h-screen bg-[var(--t-bg-base,#0f1117)] flex items-center justify-center">
+      <div className="bg-[var(--t-bg-card,#1a1f2e)] rounded-2xl shadow-lg p-8 w-full max-w-md">
         {/* Logo / Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-100">ProspectOS</h1>
@@ -93,7 +93,7 @@ export default function DefinirSenhaPage() {
                 required
                 minLength={6}
                 placeholder="••••••••"
-                className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 

@@ -49,8 +49,8 @@ export default function CriarOrganizacaoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1117] flex items-center justify-center p-4">
-      <div className="bg-[#1a1f2e] rounded-2xl shadow-lg p-8 w-full max-w-md">
+    <div className="min-h-screen bg-[var(--t-bg-base,#0f1117)] flex items-center justify-center p-4">
+      <div className="bg-[var(--t-bg-card,#1a1f2e)] rounded-2xl shadow-lg p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-100">Criar organização</h1>
           <p className="text-slate-400 text-sm mt-1">Comece uma nova conta no ProspectOS</p>
@@ -65,7 +65,7 @@ export default function CriarOrganizacaoPage() {
               onChange={(e) => setNomeOrg(e.target.value)}
               required
               placeholder="Ex.: Minha Empresa Ltda"
-              className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -77,7 +77,7 @@ export default function CriarOrganizacaoPage() {
               onChange={(e) => setNome(e.target.value)}
               required
               placeholder="Nome completo"
-              className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -89,7 +89,7 @@ export default function CriarOrganizacaoPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="seu@email.com"
-              className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -102,7 +102,7 @@ export default function CriarOrganizacaoPage() {
               required
               minLength={6}
               placeholder="Mínimo 6 caracteres"
-              className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -114,7 +114,7 @@ export default function CriarOrganizacaoPage() {
               onChange={(e) => setCodigo(e.target.value)}
               required
               placeholder="Código fornecido pela InovaCode"
-              className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm bg-transparent text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 

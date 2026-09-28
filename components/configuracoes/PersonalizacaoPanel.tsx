@@ -4,17 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Columns3, SlidersHorizontal, Kanban, Type, PanelLeft,
   Save, Check, ToggleLeft, ToggleRight, Lock,
-  Info, Plus, Trash2, ChevronUp, ChevronDown,
+  Info, Plus, Trash2, ChevronUp, ChevronDown, Palette,
 } from 'lucide-react';
 import { CAMPOS_UI_PADRAO, camposUIEfetivos, type CampoUI } from '@/lib/config/workspaceConfig';
 import MenuPersonalizacaoPanel from './MenuPersonalizacaoPanel';
+import SeletorTema from '@/components/tema/SeletorTema';
 
-// Personalização por workspace: 5 abas (Campos / Filtros e visualizações /
-// Pipeline / Terminologia / Menu). A aba Campos é funcional e reflete em Base de Leads
+// Personalização por workspace: 6 abas (Campos / Filtros e visualizações /
+// Pipeline / Terminologia / Menu / Tema). A aba Campos é funcional e reflete em Base de Leads
 // e Pipeline. As demais abas expõem os mesmos dados do ProcessoComercialPanel
 // para que o usuário tenha tudo num lugar só.
 
-type Aba = 'campos' | 'filtros' | 'pipeline' | 'terminologia' | 'menu';
+type Aba = 'campos' | 'filtros' | 'pipeline' | 'terminologia' | 'menu' | 'tema';
 
 interface PipelineEstagio { id: string; chave: string; nome: string; papel: string; cor: string | null; ordem: number }
 interface Pipeline { id: string; nome: string; tipo: string; ativo: boolean; estagios: PipelineEstagio[] }
@@ -302,6 +303,7 @@ export default function PersonalizacaoPanel() {
     { id: 'pipeline', label: 'Pipeline', Icon: Kanban },
     { id: 'terminologia', label: 'Terminologia', Icon: Type },
     { id: 'menu', label: 'Menu', Icon: PanelLeft },
+    { id: 'tema', label: 'Tema', Icon: Palette },
   ];
 
   const input = 'w-full bg-[var(--bg-base)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 disabled:opacity-50';
@@ -424,6 +426,14 @@ export default function PersonalizacaoPanel() {
 
       {/* --- Aba Menu --- */}
       {aba === 'menu' && <MenuPersonalizacaoPanel />}
+
+      {/* --- Aba Tema (escolha pessoal, não do workspace) --- */}
+      {aba === 'tema' && (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">Aparência das telas. Aplica na hora, vale só para você e neste navegador — não muda o tema dos outros usuários.</p>
+          <div className="max-w-3xl"><SeletorTema /></div>
+        </div>
+      )}
 
       {/* --- Aba Terminologia --- */}
       {aba === 'terminologia' && (

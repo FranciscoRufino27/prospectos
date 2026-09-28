@@ -564,7 +564,7 @@ export default function LeadPanel({
     ? 'max-w-full sm:max-w-[520px]'
     : 'max-w-md lg:max-w-[32rem] xl:max-w-[38rem] 2xl:max-w-[44rem]';
   // Divisor mais discreto e blocos com mais respiro só no Pipeline.
-  const divisor = noPipeline ? 'border-b border-[#212a3c]' : 'border-b border-[var(--border)]';
+  const divisor = noPipeline ? 'border-b border-[var(--t-bg-card-hover,#212a3c)]' : 'border-b border-[var(--border)]';
   const secao = noPipeline ? 'px-4 py-4' : 'px-5 py-3';
 
   return (
@@ -742,7 +742,7 @@ export default function LeadPanel({
                  sólida) para não pesarem igual ao bloco de Próxima ação. */
               <div
                 key={card.label}
-                className={noPipeline ? 'rounded-lg px-2.5 py-1.5 border border-[#212a3c]' : 'bg-[var(--bg-base)] rounded-xl px-3 py-2'}
+                className={noPipeline ? 'rounded-lg px-2.5 py-1.5 border border-[var(--t-bg-card-hover,#212a3c)]' : 'bg-[var(--bg-base)] rounded-xl px-3 py-2'}
                 style={{ maxHeight: 80 }}
               >
                 <div className="text-xs text-slate-500 mb-1 leading-none">{card.label}</div>
@@ -757,7 +757,7 @@ export default function LeadPanel({
               <button
                 type="button"
                 onClick={() => setEditandoDados(true)}
-                className={`w-full flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-left hover:border-indigo-500/40 hover:bg-indigo-500/5 ${noPipeline ? 'border border-[#212a3c]' : 'border border-[var(--border)] bg-[var(--bg-base)]'}`}
+                className={`w-full flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-left hover:border-indigo-500/40 hover:bg-indigo-500/5 ${noPipeline ? 'border border-[var(--t-bg-card-hover,#212a3c)]' : 'border border-[var(--border)] bg-[var(--bg-base)]'}`}
               >
                 <span>
                   <span className="block text-xs text-slate-500">Validade do laudo</span>
@@ -842,7 +842,7 @@ export default function LeadPanel({
                 onClick={handleGerarMensagem}
                 disabled={mensagemLoading}
                 className={`flex-1 text-xs font-medium text-slate-300 rounded-lg border hover:bg-[var(--bg-base)] transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-1 ${
-                  noPipeline ? 'py-2 border-[#2f3a52]' : 'py-1.5 border-[var(--border)]'
+                  noPipeline ? 'py-2 border-[var(--t-border-strong,#2f3a52)]' : 'py-1.5 border-[var(--border)]'
                 }`}
               >
                 {mensagemLoading ? <Loader2 size={12} className="animate-spin" /> : null}

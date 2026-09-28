@@ -42,7 +42,7 @@ function CardInterno({ leadId }: { leadId: string }) {
   const decisores = dados.decisores ?? [];
 
   return (
-    <div className="px-5 py-2.5 border-b border-[#2a3147] bg-[#151a27]">
+    <div className="px-5 py-2.5 border-b border-[var(--t-border,#2a3147)] bg-[var(--t-bg-subtle,#151a27)]">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-slate-300">
           <Building2 size={13} className="text-indigo-400 shrink-0" />

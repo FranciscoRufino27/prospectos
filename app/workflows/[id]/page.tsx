@@ -87,7 +87,7 @@ function CamposEditor({ def, config, onChange, blocoTipo, condicoes }: {
               <select
                 value={String(valor ?? '')}
                 onChange={e => onChange(campo.nome, e.target.value)}
-                className="bg-[#0f1117] border border-[#2a3147] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[12rem]"
+                className="bg-[var(--t-bg-base,#0f1117)] border border-[var(--t-border,#2a3147)] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[12rem]"
               >
                 <option value="">— selecione —</option>
                 {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
@@ -96,7 +96,7 @@ function CamposEditor({ def, config, onChange, blocoTipo, condicoes }: {
               <select
                 value={String(valor ?? campo.padrao)}
                 onChange={e => onChange(campo.nome, campo.tipo === 'booleano' ? e.target.value === 'true' : e.target.value)}
-                className="bg-[#0f1117] border border-[#2a3147] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[10rem]"
+                className="bg-[var(--t-bg-base,#0f1117)] border border-[var(--t-border,#2a3147)] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[10rem]"
               >
                 {opcoesDeTemplate(campo, templates, String(valor ?? campo.padrao)).map(o => <option key={o.valor} value={o.valor}>{o.label}</option>)}
               </select>
@@ -106,14 +106,14 @@ function CamposEditor({ def, config, onChange, blocoTipo, condicoes }: {
                 value={Number(valor ?? campo.padrao)}
                 min={0}
                 onChange={e => onChange(campo.nome, e.target.value === '' ? 0 : Number(e.target.value))}
-                className="bg-[#0f1117] border border-[#2a3147] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 w-24"
+                className="bg-[var(--t-bg-base,#0f1117)] border border-[var(--t-border,#2a3147)] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 w-24"
               />
             ) : (
               <input
                 type="text"
                 value={String(valor ?? campo.padrao)}
                 onChange={e => onChange(campo.nome, e.target.value)}
-                className="bg-[#0f1117] border border-[#2a3147] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[14rem]"
+                className="bg-[var(--t-bg-base,#0f1117)] border border-[var(--t-border,#2a3147)] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[14rem]"
               />
             )}
             {campo.dica && <span className="text-[11px] text-slate-600">{campo.dica}</span>}
@@ -155,7 +155,7 @@ function LinhaBloco({ opcoes, bloco, onChange, onRemover, controles, extra, cond
 }) {
   const def = acharBlocoDef(bloco.tipo) ?? opcoes[0];
   return (
-    <div className="bg-[#0f1117]/60 rounded-lg border border-[#2a3147] p-3">
+    <div className="bg-[var(--t-bg-base,#0f1117)]/60 rounded-lg border border-[var(--t-border,#2a3147)] p-3">
       <div className="flex items-center gap-2">
         <select
           value={bloco.tipo}
@@ -164,7 +164,7 @@ function LinhaBloco({ opcoes, bloco, onChange, onRemover, controles, extra, cond
             // Preserva o id estável do passo ao trocar o tipo (saltar_se aponta p/ ele).
             onChange({ id: bloco.id, tipo: novoDef.tipo, config: configPadrao(novoDef) });
           }}
-          className="bg-[#1a1f2e] border border-[#2a3147] rounded-lg px-2.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50"
+          className="bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded-lg px-2.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50"
         >
           {opcoes.map(o => <option key={o.tipo} value={o.tipo}>{o.label}</option>)}
         </select>
@@ -206,7 +206,7 @@ function SaltarSeEditor({ bloco, acoes, onChange }: {
         <select
           value={cond.tipo}
           onChange={e => { const d = acharBlocoDef(e.target.value)!; setCond({ tipo: d.tipo, config: configPadrao(d) }); }}
-          className="bg-[#0f1117] border border-[#2a3147] rounded-lg px-2.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50"
+          className="bg-[var(--t-bg-base,#0f1117)] border border-[var(--t-border,#2a3147)] rounded-lg px-2.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50"
         >
           {CONDICOES.map(c => <option key={c.tipo} value={c.tipo}>{c.label}</option>)}
         </select>
@@ -221,7 +221,7 @@ function SaltarSeEditor({ bloco, acoes, onChange }: {
         <select
           value={destino}
           onChange={e => onChange({ ...bloco, config: { ...bloco.config, destino: e.target.value } })}
-          className="bg-[#0f1117] border border-[#2a3147] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[16rem]"
+          className="bg-[var(--t-bg-base,#0f1117)] border border-[var(--t-border,#2a3147)] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[16rem]"
         >
           <option value="">— escolha um passo —</option>
           {acoes.map((a, idx) => (
@@ -589,7 +589,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
       <div className="flex items-center gap-1 mt-5">
         {(['lista', 'fluxo'] as const).map(v => (
           <button key={v} onClick={() => setVista(v)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 transition-colors ${vista === v ? 'bg-[#1a1f2e] text-slate-100 border border-[#3f4d6b]' : 'text-slate-500 hover:text-slate-300'}`}>
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 transition-colors ${vista === v ? 'bg-[var(--t-bg-card,#1a1f2e)] text-slate-100 border border-[var(--t-border-strong,#3f4d6b)]' : 'text-slate-500 hover:text-slate-300'}`}>
             {v === 'lista' ? <><List size={13} /> Ver como lista</> : <><GitBranch size={13} /> Ver como fluxo</>}
           </button>
         ))}
@@ -754,7 +754,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
       {/* Trava de segurança (Fase 5): confirmação de disparo amplo antes de publicar. */}
       {confirmPub && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !ocupado && setConfirmPub(null)}>
-          <div className="bg-[#1a1f2e] rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--t-bg-card,#1a1f2e)] rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2.5 mb-3">
               <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500/15 text-amber-400 shrink-0"><AlertTriangle size={18} /></span>
               <h3 className="font-bold text-lg text-slate-100">Confirmar publicação</h3>
@@ -766,7 +766,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
               Acima do limite de segurança de {LIMITE_TRAVA}. Se não era essa a intenção, revise o gatilho/condições antes de publicar.
             </p>
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setConfirmPub(null)} disabled={ocupado} className="text-sm px-4 py-2 rounded-lg text-slate-300 hover:bg-[#0f1117] disabled:opacity-50 focus-ring">Cancelar</button>
+              <button onClick={() => setConfirmPub(null)} disabled={ocupado} className="text-sm px-4 py-2 rounded-lg text-slate-300 hover:bg-[var(--t-bg-base,#0f1117)] disabled:opacity-50 focus-ring">Cancelar</button>
               <button
                 onClick={executarPublicacao}
                 disabled={ocupado}
@@ -820,7 +820,7 @@ function InscricaoManual({ workflowId, leads }: { workflowId: string; leads: Lea
   }
 
   return (
-    <section className="bg-[#1a1f2e] rounded-xl border border-[#2a3147] p-4 space-y-2">
+    <section className="bg-[var(--t-bg-card,#1a1f2e)] rounded-xl border border-[var(--t-border,#2a3147)] p-4 space-y-2">
       <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
         <UserPlus size={15} className="text-indigo-400" /> Inscrever um lead manualmente
         <span className="text-xs font-normal text-slate-500">— sem esperar o cron</span>
@@ -831,15 +831,15 @@ function InscricaoManual({ workflowId, leads }: { workflowId: string; leads: Lea
           value={selecionado ? `${selecionado.empresa}${selecionado.contato_nome ? ' · ' + selecionado.contato_nome : ''}` : busca}
           onChange={e => { setSelecionado(null); setBusca(e.target.value); setFeedback(null); }}
           placeholder="Buscar lead por empresa ou contato..."
-          className="w-full bg-[#0f1117] border border-[#2a3147] rounded-lg pl-8 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50"
+          className="w-full bg-[var(--t-bg-base,#0f1117)] border border-[var(--t-border,#2a3147)] rounded-lg pl-8 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50"
         />
         {filtrados.length > 0 && !selecionado && (
-          <div className="absolute z-10 mt-1 w-full bg-[#1a1f2e] border border-[#2a3147] rounded-lg shadow-xl max-h-56 overflow-y-auto">
+          <div className="absolute z-10 mt-1 w-full bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded-lg shadow-xl max-h-56 overflow-y-auto">
             {filtrados.map(l => (
               <button
                 key={l.id}
                 onClick={() => { setSelecionado(l); setBusca(''); }}
-                className="block w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-[#0f1117]"
+                className="block w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-[var(--t-bg-base,#0f1117)]"
               >
                 {l.empresa}
                 {l.contato_nome && <span className="text-slate-500"> · {l.contato_nome}</span>}

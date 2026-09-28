@@ -152,7 +152,7 @@ function getStyle(n: CNode): NS {
         return { border: 'border-purple-500/40',  bg: 'bg-purple-500/10',  Icon: UserPlus,    iconCls: 'text-purple-400',  textCls: 'text-purple-200'  };
       if (t === 'notificar')
         return { border: 'border-amber-500/40',   bg: 'bg-amber-500/10',   Icon: Bell,        iconCls: 'text-amber-400',   textCls: 'text-amber-200'   };
-      return   { border: 'border-[#2a3147]',      bg: 'bg-[#0f1117]/60',   Icon: PlayCircle,  iconCls: 'text-slate-400',   textCls: 'text-slate-300'   };
+      return   { border: 'border-[var(--t-border,#2a3147)]',      bg: 'bg-[var(--t-bg-base,#0f1117)]/60',   Icon: PlayCircle,  iconCls: 'text-slate-400',   textCls: 'text-slate-300'   };
     }
   }
 }
@@ -216,7 +216,7 @@ export default function WorkflowCanvas({
   );
 
   return (
-    <div className="bg-[#0d1117] border border-[#2a3147] rounded-xl overflow-auto">
+    <div className="bg-[var(--t-bg-subtle,#0d1117)] border border-[var(--t-border,#2a3147)] rounded-xl overflow-auto">
       <div style={{ position: 'relative', width: totalW, minHeight: totalH }}>
         {/* SVG overlay: arrows + edge paths (pointer-events off — não bloqueia interação) */}
         <svg

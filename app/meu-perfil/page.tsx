@@ -83,15 +83,15 @@ export default function MeuPerfilPage() {
 
   if (carregando) {
     return (
-      <div className="min-h-screen bg-[#0f1117] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--t-bg-base,#0f1117)] flex items-center justify-center">
         <p className="text-slate-500 text-sm">Carregando...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1117] flex items-center justify-center p-4">
-      <div className="bg-[#1a1f2e] rounded-2xl shadow-lg p-8 w-full max-w-md">
+    <div className="min-h-screen bg-[var(--t-bg-base,#0f1117)] flex items-center justify-center p-4">
+      <div className="bg-[var(--t-bg-card,#1a1f2e)] rounded-2xl shadow-lg p-8 w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-xl font-bold text-slate-100">Configure seu perfil</h1>
@@ -128,7 +128,7 @@ export default function MeuPerfilPage() {
             <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
             <input
               type="email" value={email} disabled
-              className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm bg-[#0f1117] text-slate-400 cursor-not-allowed"
+              className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm bg-[var(--t-bg-base,#0f1117)] text-slate-400 cursor-not-allowed"
             />
           </div>
 
@@ -138,7 +138,7 @@ export default function MeuPerfilPage() {
             <input
               type="text" value={nome} onChange={e => setNome(e.target.value)} required
               placeholder="Seu nome"
-              className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -148,14 +148,14 @@ export default function MeuPerfilPage() {
             <input
               type="tel" value={telefone} onChange={e => setTelefone(e.target.value)}
               placeholder="(11) 90000-0000"
-              className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           {/* Nicho — travado: definido pela organização que convidou (item 1) */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">Nicho / Segmento</label>
-            <div className="w-full border border-[#2a3147] rounded-lg px-3 py-2 text-sm bg-[#0f1117] text-slate-400 flex items-center gap-2 cursor-not-allowed">
+            <div className="w-full border border-[var(--t-border,#2a3147)] rounded-lg px-3 py-2 text-sm bg-[var(--t-bg-base,#0f1117)] text-slate-400 flex items-center gap-2 cursor-not-allowed">
               <Lock size={13} className="text-slate-500 shrink-0" />
               <span>{nicho || 'Definido pela sua organização'}</span>
             </div>

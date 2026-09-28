@@ -87,7 +87,7 @@ function CardInterno({ leadId }: { leadId: string }) {
   const previewVenc = calcularVencimento(form.realizado_em, form.periodicidade_valor ? Number(form.periodicidade_valor) : null, form.periodicidade_unidade as UnidadePeriodicidade);
 
   return (
-    <div className="px-5 py-2.5 border-b border-[#2a3147] bg-[#151a27]">
+    <div className="px-5 py-2.5 border-b border-[var(--t-border,#2a3147)] bg-[var(--t-bg-subtle,#151a27)]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
           <FileCheck2 size={13} className="text-indigo-400" /> Laudos / serviços recorrentes
@@ -109,7 +109,7 @@ function CardInterno({ leadId }: { leadId: string }) {
                 <span className="text-slate-300 truncate">{s.tipo || 'serviço'}</span>
                 <span className="text-slate-500">· {s.periodicidade_valor ?? '?'} {s.periodicidade_unidade ?? ''}</span>
                 <span className={cor}>· vence {s.vencimento_em ?? '—'}{dias != null ? ` (${dias}d)` : ''}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#252b3b] text-slate-400">{s.status}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--t-bg-input,#252b3b)] text-slate-400">{s.status}</span>
                 <span className="ml-auto flex items-center gap-1 shrink-0">
                   <button onClick={() => editar(s)} title="Editar" className="text-slate-500 hover:text-slate-200"><Pencil size={12} /></button>
                   <button onClick={() => arquivar(s.id)} title="Arquivar" className="text-slate-500 hover:text-amber-400"><Archive size={12} /></button>
@@ -121,37 +121,37 @@ function CardInterno({ leadId }: { leadId: string }) {
       )}
 
       {aberto && (
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs bg-[#0f1117] p-2 rounded-lg border border-[#2a3147]">
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs bg-[var(--t-bg-base,#0f1117)] p-2 rounded-lg border border-[var(--t-border,#2a3147)]">
           <label className="flex flex-col gap-0.5">Tipo do laudo
-            <input value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="bg-[#1a1f2e] border border-[#2a3147] rounded px-2 py-1" />
+            <input value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded px-2 py-1" />
           </label>
           <label className="flex flex-col gap-0.5">Data do último laudo
-            <input type="date" value={form.realizado_em} onChange={(e) => setForm({ ...form, realizado_em: e.target.value })} className="bg-[#1a1f2e] border border-[#2a3147] rounded px-2 py-1" />
+            <input type="date" value={form.realizado_em} onChange={(e) => setForm({ ...form, realizado_em: e.target.value })} className="bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded px-2 py-1" />
           </label>
           <label className="flex flex-col gap-0.5">Periodicidade / validade
             <div className="flex gap-1">
-              <input type="number" min={1} value={form.periodicidade_valor} onChange={(e) => setForm({ ...form, periodicidade_valor: e.target.value })} className="bg-[#1a1f2e] border border-[#2a3147] rounded px-2 py-1 w-16" />
-              <select value={form.periodicidade_unidade} onChange={(e) => setForm({ ...form, periodicidade_unidade: e.target.value })} className="bg-[#1a1f2e] border border-[#2a3147] rounded px-1 py-1 flex-1">
+              <input type="number" min={1} value={form.periodicidade_valor} onChange={(e) => setForm({ ...form, periodicidade_valor: e.target.value })} className="bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded px-2 py-1 w-16" />
+              <select value={form.periodicidade_unidade} onChange={(e) => setForm({ ...form, periodicidade_unidade: e.target.value })} className="bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded px-1 py-1 flex-1">
                 {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
           </label>
           <label className="flex flex-col gap-0.5">Próximo vencimento (calculado)
-            <input value={previewVenc ?? '—'} readOnly className="bg-[#12151f] border border-[#2a3147] rounded px-2 py-1 text-slate-400" />
+            <input value={previewVenc ?? '—'} readOnly className="bg-[var(--t-bg-subtle,#12151f)] border border-[var(--t-border,#2a3147)] rounded px-2 py-1 text-slate-400" />
           </label>
           <label className="flex flex-col gap-0.5">Status
-            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="bg-[#1a1f2e] border border-[#2a3147] rounded px-2 py-1">
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded px-2 py-1">
               {STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
           <label className="flex flex-col gap-0.5">Responsável
-            <select value={form.responsavel_id} onChange={(e) => setForm({ ...form, responsavel_id: e.target.value })} className="bg-[#1a1f2e] border border-[#2a3147] rounded px-2 py-1">
+            <select value={form.responsavel_id} onChange={(e) => setForm({ ...form, responsavel_id: e.target.value })} className="bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded px-2 py-1">
               <option value="">—</option>
               {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome ?? u.id}</option>)}
             </select>
           </label>
           <label className="col-span-2 flex flex-col gap-0.5">Observações
-            <textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} rows={2} className="bg-[#1a1f2e] border border-[#2a3147] rounded px-2 py-1" />
+            <textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} rows={2} className="bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded px-2 py-1" />
           </label>
           <div className="col-span-2 flex justify-end">
             <button onClick={salvar} disabled={salvando} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-1.5 rounded text-xs font-medium">

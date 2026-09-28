@@ -5,10 +5,10 @@
 .page {
   min-height: 100%;
   padding: 20px 24px 24px;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   background:
-    radial-gradient(circle at 42% -12%, rgba(37, 99, 235, 0.12), transparent 35%),
-    radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.055), transparent 32%);
+    var(--m-page-bg, radial-gradient(circle at 42% -12%, rgba(37, 99, 235, 0.12), transparent 35%),
+    radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.055), transparent 32%));
 }
 
 .content {
@@ -24,10 +24,10 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #93a4c0;
+  color: var(--m-text-soft, #93a4c0);
   font-size: 12px;
 }
-.breadcrumb strong { color: #e8eef9; font-weight: 500; }
+.breadcrumb strong { color: var(--m-title, #e8eef9); font-weight: 500; }
 
 .titleRow {
   display: flex;
@@ -37,13 +37,13 @@
 }
 .titleRow h1 {
   margin: 0;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   font-size: 1.5rem;
   font-weight: 720;
   letter-spacing: -0.025em;
   line-height: 1.15;
 }
-.titleRow p { margin-top: 4px; color: #c3cee0; font-size: 13px; }
+.titleRow p { margin-top: 4px; color: var(--m-text, #c3cee0); font-size: 13px; }
 
 .headerActions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
@@ -51,7 +51,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: #93a4c0;
+  color: var(--m-text-soft, #93a4c0);
   font-size: 12px;
 }
 
@@ -61,16 +61,16 @@
   gap: 9px;
   min-height: 36px;
   padding: 0 13px;
-  border: 1px solid #155b95;
+  border: 1px solid var(--m-border, #155b95);
   border-radius: 10px;
-  background: rgba(4, 28, 54, 0.72);
-  color: #d6e7fb;
+  background: var(--m-surface-inset, rgba(4, 28, 54, 0.72));
+  color: var(--m-title, #d6e7fb);
   font-size: 13px;
   white-space: nowrap;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
   transition: border-color 160ms ease, background 160ms ease;
 }
-.outlineButton:hover:not(:disabled) { border-color: #2286cf; background: rgba(7, 42, 76, 0.82); }
+.outlineButton:hover:not(:disabled) { border-color: #2286cf; background: var(--m-surface-inset, rgba(7, 42, 76, 0.82)); }
 .outlineButton:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* Nichos: controle segmentado, como as abas do Dashboard */
@@ -88,9 +88,9 @@
   gap: 2px;
   min-height: 38px;
   padding: 3px;
-  border: 1px solid #145b94;
+  border: 1px solid var(--m-border, #145b94);
   border-radius: 10px;
-  background: rgba(3, 30, 57, 0.74);
+  background: var(--m-surface-inset, rgba(3, 30, 57, 0.74));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
 }
 
@@ -102,13 +102,13 @@
   padding: 0 13px;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #bdc9db;
+  color: var(--m-text, #bdc9db);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
-.nichoTabs button:hover { color: #f8fafc; background: rgba(18, 67, 108, 0.35); }
+.nichoTabs button:hover { color: var(--m-title, #f8fafc); background: var(--m-surface-hover, rgba(18, 67, 108, 0.35)); }
 
 .nichoTabs .nichoAtivo,
 .nichoTabs .nichoAtivo:hover {
@@ -126,13 +126,13 @@
   font-size: 12px;
   transition: color 150ms ease;
 }
-.addNicho:hover { color: #e4d8ff; }
+.addNicho:hover { color: var(--m-text, #e4d8ff); }
 
 /* Painéis */
 .panel {
-  border: 1px solid #155987;
+  border: 1px solid var(--m-border, #155987);
   border-radius: 11px;
-  background: linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98));
+  background: var(--m-surface, linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98)));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.04), 0 12px 30px rgba(0, 0, 0, 0.09);
 }
 
@@ -147,7 +147,7 @@
 
 .panelHeaderBar {
   padding: 11px 15px;
-  border-bottom: 1px solid #17496e;
+  border-bottom: 1px solid var(--m-border, #17496e);
 }
 
 .sectionHeading { display: flex; min-width: 0; align-items: flex-start; gap: 10px; }
@@ -164,8 +164,8 @@
   box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.18), 0 0 12px rgba(14, 165, 233, 0.12);
 }
 
-.sectionHeading h2 { margin: 0; color: #f8fafc; font-size: 15px; font-weight: 700; line-height: 1.2; }
-.sectionHeading p { margin-top: 3px; color: #9dacbf; font-size: 11px; line-height: 1.35; }
+.sectionHeading h2 { margin: 0; color: var(--m-title, #f8fafc); font-size: 15px; font-weight: 700; line-height: 1.2; }
+.sectionHeading p { margin-top: 3px; color: var(--m-text-soft, #9dacbf); font-size: 11px; line-height: 1.35; }
 
 .linkAction {
   display: inline-flex;
@@ -176,7 +176,7 @@
   font-size: 12px;
   transition: color 150ms ease;
 }
-.linkAction:hover { color: #e4d8ff; }
+.linkAction:hover { color: var(--m-text, #e4d8ff); }
 
 /* Campos dos filtros */
 .filterGrid {
@@ -187,27 +187,27 @@
 }
 
 .fieldLabel { display: grid; gap: 6px; }
-.fieldLabel > span { color: #eef4ff; font-size: 12px; font-weight: 600; }
+.fieldLabel > span { color: var(--m-title, #eef4ff); font-size: 12px; font-weight: 600; }
 
 .field {
   height: 36px;
   width: 100%;
   border: 1px solid #1b68a8;
   border-radius: 10px;
-  background: rgba(4, 32, 61, 0.82);
-  color: #dce8f7;
+  background: var(--m-surface-inset, rgba(4, 32, 61, 0.82));
+  color: var(--m-title, #dce8f7);
   font-size: 13px;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
   transition: border-color 150ms ease;
 }
 .field:hover { border-color: #2286cf; }
 .field::placeholder { color: #7f93b0; }
-.field option { background: #0b1729; color: #e5edf8; }
+.field option { background: var(--m-bg-elevated, #0b1729); color: var(--m-title, #e5edf8); }
 
 .popover {
   border: 1px solid #1b68a8;
   border-radius: 12px;
-  background: #0b1729;
+  background: var(--m-bg-elevated, #0b1729);
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
 }
 
@@ -218,7 +218,7 @@
   gap: 10px 28px;
   margin-top: 12px;
   padding-top: 11px;
-  border-top: 1px solid #17496e;
+  border-top: 1px solid var(--m-border, #17496e);
 }
 
 /* Indicadores */
@@ -239,7 +239,7 @@
   border-radius: 11px;
   background:
     radial-gradient(circle at 8% 25%, rgba(var(--accent-rgb), 0.12), transparent 35%),
-    linear-gradient(145deg, rgba(5, 30, 56, 0.97), rgba(5, 17, 34, 0.98));
+    var(--m-kpi-bg, linear-gradient(145deg, rgba(5, 30, 56, 0.97), rgba(5, 17, 34, 0.98)));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.055), 0 0 21px rgba(var(--accent-rgb), 0.1);
 }
 
@@ -283,7 +283,7 @@
 
 .kpiLabel {
   overflow: hidden;
-  color: #f5f8fd;
+  color: var(--m-title, #f5f8fd);
   font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -291,7 +291,7 @@
 }
 
 .kpiIdentity strong {
-  color: #fff;
+  color: var(--m-title, #fff);
   font-size: 22px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -321,7 +321,7 @@
   z-index: 1;
   display: block;
   margin-top: 7px;
-  color: #bbc7d8;
+  color: var(--m-text-soft, #bbc7d8);
   font-size: 11px;
 }
 
@@ -329,22 +329,22 @@
 .table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .table th {
   padding: 9px 14px;
-  border-bottom: 1px solid #17496e;
-  color: #8fa3bf;
+  border-bottom: 1px solid var(--m-border, #17496e);
+  color: var(--m-text-soft, #8fa3bf);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-align: left;
   text-transform: uppercase;
 }
-.table td { border-bottom: 1px solid rgba(23, 73, 110, 0.7); }
+.table td { border-bottom: 1px solid var(--m-border, rgba(23, 73, 110, 0.7)); }
 .table tbody tr { transition: background 150ms ease; }
-.table tbody tr:hover { background: rgba(18, 67, 108, 0.28); }
+.table tbody tr:hover { background: var(--m-surface-hover, rgba(18, 67, 108, 0.28)); }
 
 .rowSelected,
 .table tbody tr.rowSelected:hover { background: rgba(79, 70, 229, 0.16); }
 .rowOpen,
-.table tbody tr.rowOpen:hover { background: rgba(18, 67, 108, 0.38); }
+.table tbody tr.rowOpen:hover { background: var(--m-surface-hover, rgba(18, 67, 108, 0.38)); }
 
 .activityTag {
   display: inline-flex;
@@ -362,7 +362,7 @@
   white-space: nowrap;
 }
 
-.loadMore { display: flex; justify-content: center; padding: 14px; border-top: 1px solid #17496e; }
+.loadMore { display: flex; justify-content: center; padding: 14px; border-top: 1px solid var(--m-border, #17496e); }
 
 /* Barra flutuante da seleção */
 .selectionBar {
@@ -370,9 +370,9 @@
   align-items: center;
   gap: 16px;
   padding: 10px 10px 10px 20px;
-  border: 1px solid #2c6fb0;
+  border: 1px solid var(--m-border, #2c6fb0);
   border-radius: 16px;
-  background: linear-gradient(145deg, rgba(6, 36, 66, 0.98), rgba(4, 21, 40, 0.98));
+  background: var(--m-surface, linear-gradient(145deg, rgba(6, 36, 66, 0.98), rgba(4, 21, 40, 0.98)));
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15), 0 20px 50px rgba(0, 0, 0, 0.55), 0 0 30px rgba(79, 70, 229, 0.18);
 }
 
@@ -405,7 +405,7 @@
   z-index: 60;
   display: flex;
   justify-content: flex-end;
-  background: rgba(2, 8, 18, 0.62);
+  background: var(--m-surface-inset, rgba(2, 8, 18, 0.62));
   backdrop-filter: blur(2px);
 }
 
@@ -417,7 +417,7 @@
   border-left: 1px solid #1b68a8;
   background:
     radial-gradient(circle at 20% -10%, rgba(37, 99, 235, 0.16), transparent 40%),
-    linear-gradient(160deg, #06213d, #04152a);
+    var(--m-kpi-bg, linear-gradient(160deg, #06213d, #04152a));
   box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45);
   animation: drawerIn 180ms ease-out;
 }
@@ -433,7 +433,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 18px;
-  border-bottom: 1px solid #17496e;
+  border-bottom: 1px solid var(--m-border, #17496e);
 }
 
 .drawerBody {
@@ -452,15 +452,15 @@
   gap: 10px;
   flex: 0 0 auto;
   padding: 12px 18px;
-  border-top: 1px solid #17496e;
-  background: rgba(3, 18, 36, 0.8);
+  border-top: 1px solid var(--m-border, #17496e);
+  background: var(--m-surface-inset, rgba(3, 18, 36, 0.8));
 }
 
 .drawerSection {
   padding: 12px;
-  border: 1px solid #155987;
+  border: 1px solid var(--m-border, #155987);
   border-radius: 11px;
-  background: rgba(3, 24, 45, 0.6);
+  background: var(--m-surface-inset, rgba(3, 24, 45, 0.6));
 }
 
 .drawerSectionTitle {
@@ -471,7 +471,7 @@
   margin-bottom: 12px;
   font-size: 12px;
 }
-.drawerSectionTitle h3 { margin: 0; color: #f8fafc; font-size: 14px; font-weight: 700; }
+.drawerSectionTitle h3 { margin: 0; color: var(--m-title, #f8fafc); font-size: 14px; font-weight: 700; }
 
 .nichoGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 
@@ -480,9 +480,9 @@
   min-width: 0;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #17557f;
+  border: 1px solid var(--m-border, #17557f);
   border-radius: 10px;
-  background: rgba(4, 28, 52, 0.8);
+  background: var(--m-surface-inset, rgba(4, 28, 52, 0.8));
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .nichoCard:hover { border-color: #2286cf; }
@@ -525,18 +525,18 @@
   justify-content: center;
   gap: 5px;
   padding: 6px;
-  border-top: 1px solid #17496e;
-  color: #9dacbf;
+  border-top: 1px solid var(--m-border, #17496e);
+  color: var(--m-text-soft, #9dacbf);
   font-size: 11px;
 }
-.nichoCardToggle:hover { color: #e8eef9; background: rgba(18, 67, 108, 0.28); }
+.nichoCardToggle:hover { color: var(--m-title, #e8eef9); background: var(--m-surface-hover, rgba(18, 67, 108, 0.28)); }
 
 .atividadeList {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding: 10px;
-  border-top: 1px solid #17496e;
+  border-top: 1px solid var(--m-border, #17496e);
 }
 
 .atividadeRow {
@@ -546,18 +546,18 @@
   align-items: flex-start;
   gap: 10px;
   padding: 9px 10px;
-  border: 1px solid #17496e;
+  border: 1px solid var(--m-border, #17496e);
   border-radius: 8px;
-  background: rgba(3, 20, 38, 0.6);
-  color: #c3cee0;
+  background: var(--m-surface-inset, rgba(3, 20, 38, 0.6));
+  color: var(--m-text, #c3cee0);
   font-size: 13px;
   line-height: 1.3;
   text-align: left;
   transition: border-color 150ms ease, background 150ms ease;
 }
 .atividadeRow .atividadeCheck { margin-top: 1px; }
-.atividadeRow:hover:not(:disabled) { border-color: #2286cf; background: rgba(18, 67, 108, 0.35); }
-.atividadeAtiva { border-color: rgba(25, 230, 180, 0.55); color: #f8fafc; }
+.atividadeRow:hover:not(:disabled) { border-color: #2286cf; background: var(--m-surface-hover, rgba(18, 67, 108, 0.35)); }
+.atividadeAtiva { border-color: rgba(25, 230, 180, 0.55); color: var(--m-title, #f8fafc); }
 
 .atividadeCheck {
   display: grid;
@@ -565,7 +565,7 @@
   height: 16px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid #2c6fb0;
+  border: 1px solid var(--m-border, #2c6fb0);
   border-radius: 4px;
   color: #04111f;
 }
@@ -580,15 +580,15 @@
   gap: 6px;
   min-height: 28px;
   padding: 0 9px;
-  border: 1px solid #17557f;
+  border: 1px solid var(--m-border, #17557f);
   border-radius: 8px;
-  background: rgba(4, 28, 52, 0.8);
-  color: #bdc9db;
+  background: var(--m-surface-inset, rgba(4, 28, 52, 0.8));
+  color: var(--m-text, #bdc9db);
   font-size: 12px;
   font-weight: 600;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
-.chip:hover:not(:disabled) { color: #f8fafc; border-color: #2286cf; }
+.chip:hover:not(:disabled) { color: var(--m-title, #f8fafc); border-color: #2286cf; }
 .chip:disabled { cursor: default; }
 
 .chipAtivo,
@@ -604,9 +604,9 @@
   align-items: flex-start;
   gap: 10px;
   padding: 8px 11px;
-  border: 1px solid #17557f;
+  border: 1px solid var(--m-border, #17557f);
   border-radius: 9px;
-  background: rgba(4, 28, 52, 0.6);
+  background: var(--m-surface-inset, rgba(4, 28, 52, 0.6));
   text-align: left;
   transition: border-color 150ms ease;
 }
@@ -647,7 +647,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #dce8f7;
+  color: var(--m-title, #dce8f7);
   font-size: 13px;
 }
 .comboInput::placeholder { color: #7f93b0; }
@@ -666,12 +666,12 @@
   display: block;
   width: 100%;
   padding: 8px 12px;
-  border-bottom: 1px solid #17496e;
+  border-bottom: 1px solid var(--m-border, #17496e);
   color: #c4a8ff;
   font-size: 12px;
   text-align: left;
 }
-.comboClear:hover { background: rgba(18, 67, 108, 0.35); color: #e4d8ff; }
+.comboClear:hover { background: var(--m-surface-hover, rgba(18, 67, 108, 0.35)); color: var(--m-text, #e4d8ff); }
 
 .comboList { max-height: 260px; overflow-y: auto; padding: 4px; }
 
@@ -681,7 +681,7 @@
   gap: 9px;
   padding: 7px 9px;
   border-radius: 7px;
-  color: #dce8f7;
+  color: var(--m-title, #dce8f7);
   font-size: 13px;
   cursor: pointer;
 }
@@ -700,7 +700,7 @@
   align-items: center;
   gap: 6px;
   margin-right: 2px;
-  color: #93a4c0;
+  color: var(--m-text-soft, #93a4c0);
   font-size: 12px;
 }
 
@@ -708,9 +708,9 @@
   display: inline-flex;
   max-width: 340px;
   align-items: center;
-  border: 1px solid #17557f;
+  border: 1px solid var(--m-border, #17557f);
   border-radius: 999px;
-  background: rgba(4, 28, 52, 0.8);
+  background: var(--m-surface-inset, rgba(4, 28, 52, 0.8));
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 .savedChip:hover { border-color: #2286cf; }
@@ -729,11 +729,11 @@
   height: 30px;
   padding: 0 12px;
   border-radius: 999px;
-  color: #dce8f7;
+  color: var(--m-title, #dce8f7);
   font-size: 12px;
   font-weight: 600;
 }
-.savedChipAtivo .savedChipMain { color: #b7f7e6; }
+.savedChipAtivo .savedChipMain { color: var(--m-title, #b7f7e6); }
 
 .savedActions {
   display: inline-flex;
@@ -766,4 +766,255 @@
   .titleRow { align-items: stretch; flex-direction: column; }
   .kpiGrid,
   .filterGrid { grid-template-columns: 1fr; }
+}
+
+/* Tema Claro: o selo do indicador fica escuro — ícone branco por cima. */
+:global([data-tema='claro']) .kpiIcon { color: #fff; }
+
+
+
+/* Tema Escuro: borda do indicador mais discreta. */
+:global([data-tema='escuro']) .kpiCard { border-color: rgba(var(--accent-rgb), 0.4); }
+
+/* Tema Escuro: menos brilho e acentos mais apagados (gerado a partir das regras acima:
+   brilhos externos saem, cores fortes perdem saturação/luz). */
+:global([data-tema='escuro']) .outlineButton:hover:not(:disabled) {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .nichoTabs .nichoAtivo,
+:global([data-tema='escuro']) .nichoTabs .nichoAtivo:hover {
+  border-color: #4051e0;
+  background: linear-gradient(135deg, #3a37bb, #2634b9);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .sectionIcon {
+  background: rgba(36, 123, 162, 0.13);
+  color: #209cc6;
+  box-shadow: inset 0 0 0 1px rgba(40, 153, 203, 0.18);
+}
+:global([data-tema='escuro']) .field {
+  border: 1px solid #255277;
+}
+:global([data-tema='escuro']) .field:hover {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .popover {
+  border: 1px solid #255277;
+}
+:global([data-tema='escuro']) .kpiCard {
+  --accent: #2a9eb0;
+  --accent-rgb: 42, 158, 176;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+:global([data-tema='escuro']) .kpiCyan {
+  --accent: #2a9eb0;
+  --accent-rgb: 42, 158, 176;
+}
+:global([data-tema='escuro']) .kpiViolet {
+  --accent: #9a3cdf;
+  --accent-rgb: 154, 60, 223;
+}
+:global([data-tema='escuro']) .kpiEmerald {
+  --accent: #2ba184;
+  --accent-rgb: 43, 161, 132;
+}
+:global([data-tema='escuro']) .kpiAmber {
+  --accent: #c39720;
+  --accent-rgb: 195, 151, 32;
+}
+:global([data-tema='escuro']) .kpiIcon {
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .kpiMeter span {
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .rowSelected,
+:global([data-tema='escuro']) .table tbody tr.rowSelected:hover {
+  background: rgba(62, 55, 184, 0.16);
+}
+:global([data-tema='escuro']) .activityTag {
+  border: 1px solid rgba(40, 153, 203, 0.22);
+  background: rgba(36, 123, 162, 0.08);
+}
+:global([data-tema='escuro']) .selectionBar {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+:global([data-tema='escuro']) .primaryButton {
+  border: 1px solid #4051e0;
+  background: linear-gradient(135deg, #3a37bb, #2634b9);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .drawer {
+  border-left: 1px solid #255277;
+}
+:global([data-tema='escuro']) .nichoCard:hover {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .nichoCardAtivo {
+  border-color: rgba(43, 161, 132, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(43, 161, 132, 0.15);
+}
+:global([data-tema='escuro']) .nichoCardIcon {
+  background: rgba(36, 123, 162, 0.13);
+  color: #209cc6;
+}
+:global([data-tema='escuro']) .nichoCardAtivo .nichoCardIcon {
+  background: #2ba184;
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .atividadeRow:hover:not(:disabled) {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .atividadeAtiva {
+  border-color: rgba(43, 161, 132, 0.55);
+}
+:global([data-tema='escuro']) .atividadeAtiva .atividadeCheck,
+:global([data-tema='escuro']) .optionRowAtivo .atividadeCheck,
+:global([data-tema='escuro']) .checkMarcado {
+  border-color: #2ba184;
+  background: #2ba184;
+}
+:global([data-tema='escuro']) .chip:hover:not(:disabled) {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .chipAtivo,
+:global([data-tema='escuro']) .chipAtivo:hover:not(:disabled) {
+  border-color: #4051e0;
+  background: linear-gradient(135deg, rgba(58, 55, 187, 0.85), rgba(38, 52, 185, 0.85));
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .optionRow:hover:not(:disabled) {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .optionRowAtivo {
+  border-color: rgba(43, 161, 132, 0.55);
+}
+:global([data-tema='escuro']) .comboField:focus-within {
+  border-color: #2f6892;
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .comboTag {
+  border: 1px solid #4051e0;
+  background: rgba(58, 55, 187, 0.55);
+}
+:global([data-tema='escuro']) .savedChip:hover {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .savedChipAtivo,
+:global([data-tema='escuro']) .savedChipAtivo:hover {
+  border-color: rgba(43, 161, 132, 0.7);
+  box-shadow: none;
+}
+
+/* Tema Claro: acentos escurecidos para contraste no fundo branco (gerado a partir das
+   regras acima: brilhos externos saem, cores claras de destaque escurecem). */
+:global([data-tema='claro']) .outlineButton:hover:not(:disabled) {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .nichoTabs .nichoAtivo,
+:global([data-tema='claro']) .nichoTabs .nichoAtivo:hover {
+  border-color: #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .sectionIcon {
+  background: rgba(15, 124, 174, 0.13);
+  color: #047ca4;
+  box-shadow: inset 0 0 0 1px rgba(11, 123, 173, 0.18);
+}
+:global([data-tema='claro']) .field:hover {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .kpiCard {
+  --accent: #0f7e8f;
+  --accent-rgb: 15, 126, 143;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+:global([data-tema='claro']) .kpiCyan {
+  --accent: #0f7e8f;
+  --accent-rgb: 15, 126, 143;
+}
+:global([data-tema='claro']) .kpiViolet {
+  --accent: #8406e0;
+  --accent-rgb: 132, 6, 224;
+}
+:global([data-tema='claro']) .kpiEmerald {
+  --accent: #118267;
+  --accent-rgb: 17, 130, 103;
+}
+:global([data-tema='claro']) .kpiAmber {
+  --accent: #956e04;
+  --accent-rgb: 149, 110, 4;
+}
+:global([data-tema='claro']) .kpiIcon {
+  box-shadow: none;
+}
+:global([data-tema='claro']) .kpiMeter span {
+  box-shadow: none;
+}
+:global([data-tema='claro']) .activityTag {
+  border: 1px solid rgba(11, 123, 173, 0.22);
+  background: rgba(15, 124, 174, 0.08);
+}
+:global([data-tema='claro']) .selectionBar {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+:global([data-tema='claro']) .primaryButton {
+  border: 1px solid #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .nichoCard:hover {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .nichoCardAtivo {
+  border-color: rgba(17, 130, 103, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(17, 130, 103, 0.15);
+}
+:global([data-tema='claro']) .nichoCardIcon {
+  background: rgba(15, 124, 174, 0.13);
+  color: #047ca4;
+}
+:global([data-tema='claro']) .nichoCardAtivo .nichoCardIcon {
+  background: #118267;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .atividadeRow:hover:not(:disabled) {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .atividadeAtiva {
+  border-color: rgba(17, 130, 103, 0.55);
+}
+:global([data-tema='claro']) .atividadeAtiva .atividadeCheck,
+:global([data-tema='claro']) .optionRowAtivo .atividadeCheck,
+:global([data-tema='claro']) .checkMarcado {
+  border-color: #118267;
+  background: #118267;
+}
+:global([data-tema='claro']) .chip:hover:not(:disabled) {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .chipAtivo,
+:global([data-tema='claro']) .chipAtivo:hover:not(:disabled) {
+  border-color: #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .optionRow:hover:not(:disabled) {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .optionRowAtivo {
+  border-color: rgba(17, 130, 103, 0.55);
+}
+:global([data-tema='claro']) .comboField:focus-within {
+  border-color: #2379b8;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .comboTag {
+  border: 1px solid #061de0;
+}
+:global([data-tema='claro']) .savedChip:hover {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .savedChipAtivo,
+:global([data-tema='claro']) .savedChipAtivo:hover {
+  border-color: rgba(17, 130, 103, 0.7);
+  box-shadow: none;
 }

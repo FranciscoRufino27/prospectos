@@ -17,7 +17,7 @@ const CLASSE_STATUS: Record<StatusLaudo, string> = {
   vigente: 'bg-emerald-500/15 text-emerald-400',
   proximo_vencimento: 'bg-amber-500/15 text-amber-400',
   vencido: 'bg-rose-500/15 text-rose-400',
-  renovado: 'bg-[#252b3b] text-slate-400',
+  renovado: 'bg-[var(--t-bg-input,#252b3b)] text-slate-400',
 };
 
 class Boundary extends Component<{ children: ReactNode }, { erro: boolean }> {
@@ -77,7 +77,7 @@ function CardInterno({
   const tam = compacto ? 'text-xs' : 'text-sm';
 
   return (
-    <div className={`${compacto ? 'px-4 py-3' : 'px-4 py-3'} border-b border-[#2a3147]`}>
+    <div className={`${compacto ? 'px-4 py-3' : 'px-4 py-3'} border-b border-[var(--t-border,#2a3147)]`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {atual?.status ? (
@@ -85,7 +85,7 @@ function CardInterno({
               {ROTULO_STATUS_LAUDO[atual.status]}
             </span>
           ) : (
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#252b3b] text-slate-500">Sem validade</span>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[var(--t-bg-input,#252b3b)] text-slate-500">Sem validade</span>
           )}
           {atual && atual.diasAteVencer !== null && (
             <span className="text-xs text-slate-500 truncate">
@@ -108,7 +108,7 @@ function CardInterno({
       </div>
 
       {aberto && (
-        <div className="mt-2 rounded-lg border border-[#2a3147] bg-[#0f1117] p-2.5">
+        <div className="mt-2 rounded-lg border border-[var(--t-border,#2a3147)] bg-[var(--t-bg-base,#0f1117)] p-2.5">
           <div className="flex items-center justify-between mb-1.5">
             <span className={`${tam} font-medium text-slate-300`}>Nova validade</span>
             <button type="button" onClick={() => { setAberto(false); setErro(null); }} className="text-slate-500 hover:text-slate-300"><X size={13} /></button>
@@ -118,7 +118,7 @@ function CardInterno({
               type="date"
               value={novaValidade}
               onChange={(e) => setNovaValidade(e.target.value)}
-              className="flex-1 text-xs bg-[#1a1f2e] border border-[#2a3147] rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              className="flex-1 text-xs bg-[var(--t-bg-card,#1a1f2e)] border border-[var(--t-border,#2a3147)] rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             />
             <button
               type="button"

@@ -20,9 +20,9 @@
   gap: 2px;
   min-height: 36px;
   padding: 3px;
-  border: 1px solid #145b94;
+  border: 1px solid var(--m-border, #145b94);
   border-radius: 10px;
-  background: rgba(3, 30, 57, 0.74);
+  background: var(--m-surface-inset, rgba(3, 30, 57, 0.74));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
 }
 .segmentado button {
@@ -33,13 +33,13 @@
   padding: 0 11px;
   border: 1px solid transparent;
   border-radius: 7px;
-  color: #bdc9db;
+  color: var(--m-text, #bdc9db);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
-.segmentado button:hover { color: #f8fafc; background: rgba(18, 67, 108, 0.35); }
+.segmentado button:hover { color: var(--m-title, #f8fafc); background: var(--m-surface-hover, rgba(18, 67, 108, 0.35)); }
 .segmentado button > b { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; }
 .segmentado .segmentoAtivo,
 .segmentado .segmentoAtivo:hover {
@@ -57,10 +57,10 @@
   gap: 7px;
   height: 36px;
   padding: 0 12px;
-  border: 1px solid #155b95;
+  border: 1px solid var(--m-border, #155b95);
   border-radius: 10px;
-  background: rgba(4, 28, 54, 0.72);
-  color: #d6e7fb;
+  background: var(--m-surface-inset, rgba(4, 28, 54, 0.72));
+  color: var(--m-title, #d6e7fb);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -68,9 +68,9 @@
   transition: border-color 160ms ease, background 160ms ease;
 }
 .botaoFiltros:hover,
-.limpar:hover { border-color: #2286cf; background: rgba(7, 42, 76, 0.82); }
-.botaoFiltrosAberto { border-color: #2286cf; background: rgba(7, 42, 76, 0.82); }
-.limpar { color: #aebdd2; font-weight: 500; }
+.limpar:hover { border-color: #2286cf; background: var(--m-surface-inset, rgba(7, 42, 76, 0.82)); }
+.botaoFiltrosAberto { border-color: #2286cf; background: var(--m-surface-inset, rgba(7, 42, 76, 0.82)); }
+.limpar { color: var(--m-text-soft, #aebdd2); font-weight: 500; }
 .botaoFiltros > em {
   display: grid;
   min-width: 18px;
@@ -95,7 +95,7 @@
   border: 1px solid rgba(105, 121, 255, 0.55);
   border-radius: 999px;
   background: rgba(77, 73, 230, 0.16);
-  color: #dfe4ff;
+  color: var(--m-title, #dfe4ff);
   font-size: 12px;
 }
 .etiqueta button {
@@ -115,7 +115,7 @@
   gap: 12px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #17496e;
+  border-top: 1px solid var(--m-border, #17496e);
   animation: abrir 160ms ease-out;
 }
 @keyframes abrir {
@@ -133,9 +133,9 @@
   gap: 10px;
   margin: 0;
   padding: 10px 12px 12px;
-  border: 1px solid #155987;
+  border: 1px solid var(--m-border, #155987);
   border-radius: 11px;
-  background: rgba(3, 24, 45, 0.6);
+  background: var(--m-surface-inset, rgba(3, 24, 45, 0.6));
 }
 .grupo > legend {
   display: inline-flex;
@@ -153,7 +153,7 @@
 
 /* Campos */
 .rotulo { display: grid; min-width: 0; gap: 6px; }
-.rotulo > span { color: #eef4ff; font-size: 12px; font-weight: 600; }
+.rotulo > span { color: var(--m-title, #eef4ff); font-size: 12px; font-weight: 600; }
 
 .campo {
   height: 36px;
@@ -162,8 +162,8 @@
   padding: 0 12px;
   border: 1px solid #1b68a8;
   border-radius: 10px;
-  background: rgba(4, 32, 61, 0.82);
-  color: #dce8f7;
+  background: var(--m-surface-inset, rgba(4, 32, 61, 0.82));
+  color: var(--m-title, #dce8f7);
   font-size: 13px;
   color-scheme: dark;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
@@ -171,7 +171,7 @@
 }
 .campo:hover { border-color: #2286cf; }
 .campo::placeholder { color: #7f93b0; }
-.campo option { background: #0b1729; color: #e5edf8; }
+.campo option { background: var(--m-bg-elevated, #0b1729); color: var(--m-title, #e5edf8); }
 .campoAtivo { border-color: #6979ff; }
 
 /* Espaço para ícone à esquerda / botão ou seta à direita (depois de .campo). */
@@ -203,4 +203,66 @@
   .acoesBarra { margin-left: 0; }
   .painelAvancado,
   .grupoFunil { grid-template-columns: 1fr; }
+}
+
+/* Tema Escuro: menos brilho e acentos mais apagados (gerado a partir das regras acima:
+   brilhos externos saem, cores fortes perdem saturação/luz). */
+:global([data-tema='escuro']) .segmentado .segmentoAtivo,
+:global([data-tema='escuro']) .segmentado .segmentoAtivo:hover {
+  border-color: #4051e0;
+  background: linear-gradient(135deg, #3a37bb, #2634b9);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .botaoFiltros:hover,
+:global([data-tema='escuro']) .limpar:hover {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .botaoFiltrosAberto {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .botaoFiltros > em {
+  background: #3a37bb;
+}
+:global([data-tema='escuro']) .etiqueta {
+  border: 1px solid rgba(64, 81, 224, 0.55);
+  background: rgba(58, 55, 187, 0.16);
+}
+:global([data-tema='escuro']) .grupo > legend {
+  color: #4fb0de;
+}
+:global([data-tema='escuro']) .campo {
+  border: 1px solid #255277;
+}
+:global([data-tema='escuro']) .campo:hover {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .campoAtivo {
+  border-color: #4051e0;
+}
+
+/* Tema Claro: acentos escurecidos para contraste no fundo branco (gerado a partir das
+   regras acima: brilhos externos saem, cores claras de destaque escurecem). */
+:global([data-tema='claro']) .segmentado .segmentoAtivo,
+:global([data-tema='claro']) .segmentado .segmentoAtivo:hover {
+  border-color: #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .botaoFiltros:hover,
+:global([data-tema='claro']) .limpar:hover {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .botaoFiltrosAberto {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .etiqueta {
+  border: 1px solid rgba(6, 29, 224, 0.55);
+}
+:global([data-tema='claro']) .grupo > legend {
+  color: #0979af;
+}
+:global([data-tema='claro']) .campo:hover {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .campoAtivo {
+  border-color: #061de0;
 }

@@ -4,21 +4,21 @@
    paleta azul-marinho sem precisar ser reescrito. */
 
 .cores {
-  --bg-base: #041326;
-  --bg-card: #06213d;
-  --bg-card-hover: #0a2b4d;
-  --bg-elevated: #0b2644;
-  --bg-subtle: #041a31;
-  --bg-input: #052543;
-  --border: #155987;
-  --border-strong: #2286cf;
-  --border-subtle: #17496e;
+  --bg-base: var(--m-bg-base, #041326);
+  --bg-card: var(--m-bg-card, #06213d);
+  --bg-card-hover: var(--m-bg-card-hover, #0a2b4d);
+  --bg-elevated: var(--m-bg-elevated, #0b2644);
+  --bg-subtle: var(--m-bg-subtle, #041a31);
+  --bg-input: var(--m-bg-input, #052543);
+  --border: var(--m-border, #155987);
+  --border-strong: var(--m-border-strong, #2286cf);
+  --border-subtle: var(--m-border-subtle, #17496e);
 
   min-height: 100%;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   background:
-    radial-gradient(circle at 42% -12%, rgba(37, 99, 235, 0.12), transparent 35%),
-    radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.055), transparent 32%);
+    var(--m-page-bg, radial-gradient(circle at 42% -12%, rgba(37, 99, 235, 0.12), transparent 35%),
+    radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.055), transparent 32%));
 }
 
 /* Página de módulo: cores + espaçamento. Subpáginas com cabeçalho próprio
@@ -27,17 +27,17 @@
 
 /* Cartões dos painéis: gradiente e brilho interno, como os do Dashboard. */
 .cores :global(.card) {
-  background: linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04), 0 12px 30px rgba(0, 0, 0, 0.09);
+  background: var(--m-surface, linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98)));
+  box-shadow: var(--m-shadow, inset 0 1px rgba(255, 255, 255, 0.04), 0 12px 30px rgba(0, 0, 0, 0.09));
 }
 
 .cores :global(input:not([type='checkbox']):not([type='radio'])),
 .cores :global(select),
 .cores :global(textarea) {
   background-color: var(--bg-input);
-  color: #dce8f7;
+  color: var(--m-text, #dce8f7);
 }
-.cores :global(option) { background: #0b1729; color: #e5edf8; }
+.cores :global(option) { background: var(--m-option-bg, #0b1729); color: var(--m-text, #e5edf8); }
 
 .content { display: grid; gap: 14px; margin-top: 14px; }
 
@@ -48,10 +48,10 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #93a4c0;
+  color: var(--m-text-muted, #93a4c0);
   font-size: 12px;
 }
-.breadcrumb strong { color: #e8eef9; font-weight: 500; }
+.breadcrumb strong { color: var(--m-title, #e8eef9); font-weight: 500; }
 
 .titleRow {
   display: flex;
@@ -61,13 +61,13 @@
 }
 .titleRow h1 {
   margin: 0;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   font-size: 1.5rem;
   font-weight: 720;
   letter-spacing: -0.025em;
   line-height: 1.15;
 }
-.titleRow p { margin-top: 4px; color: #c3cee0; font-size: 13px; }
+.titleRow p { margin-top: 4px; color: var(--m-text-soft, #c3cee0); font-size: 13px; }
 
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
@@ -80,9 +80,9 @@
   width: fit-content;
   min-height: 38px;
   padding: 3px;
-  border: 1px solid #145b94;
+  border: 1px solid var(--m-border, #145b94);
   border-radius: 10px;
-  background: rgba(3, 30, 57, 0.74);
+  background: var(--m-surface-inset, rgba(3, 30, 57, 0.74));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
 }
 
@@ -94,13 +94,13 @@
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #bdc9db;
+  color: var(--m-text-soft, #bdc9db);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
-.tabs button:hover { color: #f8fafc; background: rgba(18, 67, 108, 0.35); }
+.tabs button:hover { color: var(--m-title, #f8fafc); background: var(--m-surface-hover, rgba(18, 67, 108, 0.35)); }
 
 .tabs .tabAtiva,
 .tabs .tabAtiva:hover {
@@ -128,7 +128,7 @@
   border-radius: 11px;
   background:
     radial-gradient(circle at 8% 25%, rgba(var(--kpi-rgb), 0.12), transparent 35%),
-    linear-gradient(145deg, rgba(5, 30, 56, 0.97), rgba(5, 17, 34, 0.98));
+    var(--m-kpi-bg, linear-gradient(145deg, rgba(5, 30, 56, 0.97), rgba(5, 17, 34, 0.98)));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.055), 0 0 21px rgba(var(--kpi-rgb), 0.1);
 }
 
@@ -175,7 +175,7 @@
 
 .kpiLabel {
   overflow: hidden;
-  color: #f5f8fd;
+  color: var(--m-title, #f5f8fd);
   font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -183,7 +183,7 @@
 }
 
 .kpiIdentity strong {
-  color: #fff;
+  color: var(--m-title, #fff);
   font-size: 22px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -194,7 +194,7 @@
   z-index: 1;
   display: block;
   margin-top: 8px;
-  color: #bbc7d8;
+  color: var(--m-text-soft, #bbc7d8);
   font-size: 11px;
 }
 
@@ -224,24 +224,24 @@
   gap: 8px;
   height: 36px;
   padding: 0 13px;
-  border: 1px solid #155b95;
+  border: 1px solid var(--m-border, #155b95);
   border-radius: 10px;
-  background: rgba(4, 28, 54, 0.72);
-  color: #d6e7fb;
+  background: var(--m-surface-inset, rgba(4, 28, 54, 0.72));
+  color: var(--m-text, #d6e7fb);
   font-size: 13px;
   white-space: nowrap;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
   transition: border-color 160ms ease, background 160ms ease;
 }
-.outlineButton:hover:not(:disabled) { border-color: #2286cf; background: rgba(7, 42, 76, 0.82); }
+.outlineButton:hover:not(:disabled) { border-color: var(--m-border-strong, #2286cf); background: var(--m-surface-hover, rgba(7, 42, 76, 0.82)); }
 .outlineButton:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* Painel (filtros, tabela) com barra de título opcional */
 .painel {
-  border: 1px solid #155987;
+  border: 1px solid var(--m-border, #155987);
   border-radius: 11px;
-  background: linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04), 0 12px 30px rgba(0, 0, 0, 0.09);
+  background: var(--m-surface, linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98)));
+  box-shadow: var(--m-shadow, inset 0 1px rgba(255, 255, 255, 0.04), 0 12px 30px rgba(0, 0, 0, 0.09));
 }
 .painelBarra {
   display: flex;
@@ -249,7 +249,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 11px 15px;
-  border-bottom: 1px solid #17496e;
+  border-bottom: 1px solid var(--m-border-subtle, #17496e);
 }
 
 /* Gaveta lateral (painel do lead na Base de Leads), como o perfil de busca
@@ -257,15 +257,15 @@
 .gavetaFundo {
   position: fixed;
   inset: 0;
-  background: rgba(2, 8, 18, 0.62);
+  background: var(--m-overlay, rgba(2, 8, 18, 0.62));
   backdrop-filter: blur(2px);
   animation: gavetaFundoIn 180ms ease-out;
 }
 .gaveta {
-  border-left: 1px solid #1b68a8;
-  background:
+  border-left: 1px solid var(--m-border, #1b68a8);
+  background: var(--m-drawer-bg,
     radial-gradient(circle at 20% -10%, rgba(37, 99, 235, 0.16), transparent 40%),
-    linear-gradient(160deg, #06213d, #04152a);
+    linear-gradient(160deg, #06213d, #04152a));
   box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45);
   animation: gavetaIn 180ms ease-out;
 }
@@ -297,8 +297,8 @@
   box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.18), 0 0 12px rgba(14, 165, 233, 0.12);
 }
 
-.sectionHeading h2 { margin: 0; color: #f8fafc; font-size: 15px; font-weight: 700; line-height: 1.2; }
-.sectionHeading p { margin-top: 3px; color: #9dacbf; font-size: 11px; line-height: 1.35; }
+.sectionHeading h2 { margin: 0; color: var(--m-title, #f8fafc); font-size: 15px; font-weight: 700; line-height: 1.2; }
+.sectionHeading p { margin-top: 3px; color: var(--m-text-muted, #9dacbf); font-size: 11px; line-height: 1.35; }
 
 @media (max-width: 1280px) {
   .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -310,4 +310,113 @@
   .titleRow { align-items: stretch; flex-direction: column; }
   .kpiGrid,
   .kpiGrid5 { grid-template-columns: 1fr; }
+}
+
+/* Tema Claro: acentos neon perdem contraste no fundo branco — versões mais
+   escuras dos mesmos tons, e ícone branco sobre o selo colorido. */
+:global([data-tema='claro']) .kpiCyan { --kpi: #0891b2; --kpi-rgb: 8, 145, 178; }
+:global([data-tema='claro']) .kpiViolet { --kpi: #9333ea; --kpi-rgb: 147, 51, 234; }
+:global([data-tema='claro']) .kpiEmerald { --kpi: #059669; --kpi-rgb: 5, 150, 105; }
+:global([data-tema='claro']) .kpiAmber { --kpi: #d97706; --kpi-rgb: 217, 119, 6; }
+:global([data-tema='claro']) .kpiBlue { --kpi: #2563eb; --kpi-rgb: 37, 99, 235; }
+:global([data-tema='claro']) .kpiIcon { color: #fff; box-shadow: none; }
+:global([data-tema='claro']) .kpiCard { box-shadow: var(--m-shadow); }
+:global([data-tema='claro']) .sectionIcon { color: #0369a1; box-shadow: none; }
+:global([data-tema='claro']) .gaveta { box-shadow: -16px 0 40px rgba(15, 23, 42, 0.12); }
+
+
+
+/* Tema Escuro: borda do indicador mais discreta. */
+:global([data-tema='escuro']) .kpiCard { border-color: rgba(var(--kpi-rgb), 0.4); }
+
+/* Tema Escuro: menos brilho e acentos mais apagados (gerado a partir das regras acima:
+   brilhos externos saem, cores fortes perdem saturação/luz). */
+:global([data-tema='escuro']) .tabs .tabAtiva,
+:global([data-tema='escuro']) .tabs .tabAtiva:hover {
+  border-color: #4051e0;
+  background: linear-gradient(135deg, #3a37bb, #2634b9);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .kpiCard {
+  --kpi: #2a9eb0;
+  --kpi-rgb: 42, 158, 176;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+:global([data-tema='escuro']) .kpiCyan {
+  --kpi: #2a9eb0;
+  --kpi-rgb: 42, 158, 176;
+}
+:global([data-tema='escuro']) .kpiViolet {
+  --kpi: #9a3cdf;
+  --kpi-rgb: 154, 60, 223;
+}
+:global([data-tema='escuro']) .kpiEmerald {
+  --kpi: #2ba184;
+  --kpi-rgb: 43, 161, 132;
+}
+:global([data-tema='escuro']) .kpiAmber {
+  --kpi: #c39720;
+  --kpi-rgb: 195, 151, 32;
+}
+:global([data-tema='escuro']) .kpiBlue {
+  --kpi: #3c82d9;
+  --kpi-rgb: 60, 130, 217;
+}
+:global([data-tema='escuro']) .kpiIcon {
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .primaryButton {
+  border: 1px solid #4051e0;
+  background: linear-gradient(135deg, #3a37bb, #2634b9);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .sectionIcon {
+  background: rgba(36, 123, 162, 0.13);
+  color: #209cc6;
+  box-shadow: inset 0 0 0 1px rgba(40, 153, 203, 0.18);
+}
+
+/* Tema Claro: acentos escurecidos para contraste no fundo branco (gerado a partir das
+   regras acima: brilhos externos saem, cores claras de destaque escurecem). */
+:global([data-tema='claro']) .tabs .tabAtiva,
+:global([data-tema='claro']) .tabs .tabAtiva:hover {
+  border-color: #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .kpiCard {
+  --kpi: #0f7e8f;
+  --kpi-rgb: 15, 126, 143;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+:global([data-tema='claro']) .kpiCyan {
+  --kpi: #0f7e8f;
+  --kpi-rgb: 15, 126, 143;
+}
+:global([data-tema='claro']) .kpiViolet {
+  --kpi: #8406e0;
+  --kpi-rgb: 132, 6, 224;
+}
+:global([data-tema='claro']) .kpiEmerald {
+  --kpi: #118267;
+  --kpi-rgb: 17, 130, 103;
+}
+:global([data-tema='claro']) .kpiAmber {
+  --kpi: #956e04;
+  --kpi-rgb: 149, 110, 4;
+}
+:global([data-tema='claro']) .kpiBlue {
+  --kpi: #0c68d9;
+  --kpi-rgb: 12, 104, 217;
+}
+:global([data-tema='claro']) .kpiIcon {
+  box-shadow: none;
+}
+:global([data-tema='claro']) .primaryButton {
+  border: 1px solid #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .sectionIcon {
+  background: rgba(15, 124, 174, 0.13);
+  color: #047ca4;
+  box-shadow: inset 0 0 0 1px rgba(11, 123, 173, 0.18);
 }

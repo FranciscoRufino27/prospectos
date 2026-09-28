@@ -6,8 +6,8 @@
   overflow: hidden;
   background:
     radial-gradient(circle at 88% 3%, rgba(62, 84, 180, 0.1), transparent 27rem),
-    #041524;
-  color: #f4f7ff;
+    var(--m-bg-base, #041524);
+  color: var(--m-title, #f4f7ff);
 }
 
 .pageHeader {
@@ -40,7 +40,7 @@
 
 .headingBlock h1 {
   margin: 0;
-  color: #f7f8ff;
+  color: var(--m-title, #f7f8ff);
   font-size: 1.5rem;
   font-weight: 720;
   letter-spacing: -0.025em;
@@ -49,7 +49,7 @@
 
 .headingBlock p {
   margin: 0.35rem 0 0;
-  color: #8794ab;
+  color: var(--m-text-muted, #8794ab);
   font-size: 0.82rem;
   line-height: 1.4;
 }
@@ -86,7 +86,7 @@
 
 .toolbar {
   flex-shrink: 0;
-  border-bottom: 1px solid #092f4f;
+  border-bottom: 1px solid var(--m-border, #092f4f);
   padding: 0 1.5rem 1rem;
 }
 
@@ -110,19 +110,19 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  border: 1px solid #0b3962;
+  border: 1px solid var(--m-border, #0b3962);
   border-radius: 0.5rem;
   padding: 0.45rem 0.85rem;
-  background: #061f34;
-  color: #a9b4c8;
+  background: var(--m-bg-elevated, #061f34);
+  color: var(--m-text-soft, #a9b4c8);
   font-size: 0.78rem;
   font-weight: 590;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .tabs button:hover {
-  border-color: #0f4e86;
-  color: #eef2ff;
+  border-color: var(--m-border, #0f4e86);
+  color: var(--m-title, #eef2ff);
 }
 
 .tabs .tabActive {
@@ -133,13 +133,13 @@
 }
 
 .total {
-  color: #8896ad;
+  color: var(--m-text-muted, #8896ad);
   font-size: 0.75rem;
   white-space: nowrap;
 }
 
 .total strong {
-  color: #dbe3f3;
+  color: var(--m-title, #dbe3f3);
   font-weight: 620;
 }
 
@@ -152,10 +152,10 @@
 .filters select,
 .search {
   height: 2.35rem;
-  border: 1px solid #0a365d;
+  border: 1px solid var(--m-border, #0a365d);
   border-radius: 0.48rem;
-  background: #051d31;
-  color: #cbd4e5;
+  background: var(--m-bg-elevated, #051d31);
+  color: var(--m-text, #cbd4e5);
   font-size: 0.76rem;
 }
 
@@ -182,7 +182,7 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0 0.7rem;
-  color: #77869e;
+  color: var(--m-text-muted, #77869e);
 }
 
 .search input {
@@ -191,7 +191,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #dce4f4;
+  color: var(--m-title, #dce4f4);
   font: inherit;
 }
 
@@ -207,11 +207,11 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  border: 1px solid #0b3c66;
+  border: 1px solid var(--m-border, #0b3c66);
   border-radius: 0.48rem;
   padding: 0 0.8rem;
-  background: #061f34;
-  color: #c1cbda;
+  background: var(--m-bg-elevated, #061f34);
+  color: var(--m-text, #c1cbda);
   font-size: 0.76rem;
   font-weight: 560;
 }
@@ -219,17 +219,17 @@
 .moreButton:hover,
 .moreButtonActive {
   border-color: rgba(99, 102, 241, 0.58);
-  color: #c8caff;
+  color: var(--m-text, #c8caff);
 }
 
 .clearButton {
   border-color: transparent;
   background: transparent;
-  color: #8d9bb0;
+  color: var(--m-text-soft, #8d9bb0);
 }
 
 .clearButton:hover {
-  color: #e0e6f1;
+  color: var(--m-title, #e0e6f1);
 }
 
 .boardViewport {
@@ -259,15 +259,15 @@
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #0a3459;
+  border: 1px solid var(--m-border, #0a3459);
   border-radius: 0.65rem;
-  background: linear-gradient(180deg, rgba(7, 34, 59, 0.96), rgba(5, 27, 46, 0.94));
+  background: var(--m-surface, linear-gradient(180deg, rgba(7, 34, 59, 0.96), rgba(5, 27, 46, 0.94)));
   box-shadow: 0 0.75rem 2.2rem rgba(2, 10, 17, 0.13);
 }
 
 .columnHeader {
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(11, 57, 98, 0.78);
+  border-bottom: 1px solid var(--m-border, rgba(11, 57, 98, 0.78));
   padding: 0.75rem 0.7rem 0.68rem;
 }
 
@@ -290,7 +290,7 @@
 .columnTitle h2 {
   overflow: hidden;
   margin: 0;
-  color: #f1f4fb;
+  color: var(--m-title, #f1f4fb);
   font-size: 0.76rem;
   font-weight: 680;
   line-height: 1.2;
@@ -302,8 +302,8 @@
   min-width: 1.45rem;
   border-radius: 0.38rem;
   padding: 0.18rem 0.38rem;
-  background: #0b3a63;
-  color: #d8e0ef;
+  background: var(--m-bg-elevated, #0b3a63);
+  color: var(--m-text, #d8e0ef);
   font-size: 0.68rem;
   font-weight: 690;
   line-height: 1.2;
@@ -329,10 +329,10 @@
   align-items: center;
   gap: 0.4rem;
   margin-top: 0.5rem;
-  border: 1px solid #0a365d;
+  border: 1px solid var(--m-border, #0a365d);
   border-radius: 0.4rem;
   padding: 0 0.45rem;
-  background: #05192a;
+  background: var(--m-bg-elevated, #05192a);
   color: #6b7a92;
 }
 
@@ -350,7 +350,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #dce4f4;
+  color: var(--m-title, #dce4f4);
   font: inherit;
   font-size: 0.68rem;
 }
@@ -368,12 +368,12 @@
   border-radius: 0.25rem;
   padding: 0.15rem;
   background: transparent;
-  color: #7c8aa2;
+  color: var(--m-text-muted, #7c8aa2);
   cursor: pointer;
 }
 
 .columnSearch button:hover {
-  color: #cbd4e5;
+  color: var(--m-text, #cbd4e5);
 }
 
 .columnBody {
@@ -394,11 +394,11 @@
 /* "Ver mais (N)": só soma mais um lote no DOM desta coluna. */
 .verMais {
   width: 100%;
-  border: 1px dashed #0d4576;
+  border: 1px dashed var(--m-border, #0d4576);
   border-radius: 0.5rem;
   padding: 0.5rem;
   background: transparent;
-  color: #93a2ba;
+  color: var(--m-text-soft, #93a2ba);
   font: inherit;
   font-size: 0.68rem;
   font-weight: 600;
@@ -408,7 +408,7 @@
 
 .verMais:hover {
   border-color: rgba(106, 115, 255, 0.55);
-  color: #c8caff;
+  color: var(--m-text, #c8caff);
 }
 
 .card {
@@ -418,10 +418,10 @@
   flex-direction: column;
   align-items: stretch;
   margin: 0;
-  border: 1px solid #0c3d68;
+  border: 1px solid var(--m-border, #0c3d68);
   border-radius: 0.55rem;
   padding: 0.7rem;
-  background: #072743;
+  background: var(--m-bg-elevated, #072743);
   box-shadow: 0 0.35rem 1rem rgba(1, 9, 16, 0.12);
   color: inherit;
   font: inherit;
@@ -431,7 +431,7 @@
 
 .card:hover {
   border-color: rgba(106, 115, 255, 0.58);
-  background: #092e4e;
+  background: var(--m-bg-elevated, #092e4e);
   transform: translateY(-1px);
 }
 
@@ -449,7 +449,7 @@
 }
 
 .company {
-  color: #f4f6fc;
+  color: var(--m-title, #f4f6fc);
   font-size: 0.76rem;
   font-weight: 670;
   line-height: 1.25;
@@ -457,7 +457,7 @@
 
 .contact {
   margin-top: 0.28rem;
-  color: #aeb9ca;
+  color: var(--m-text-soft, #aeb9ca);
   font-size: 0.7rem;
   line-height: 1.25;
 }
@@ -496,7 +496,7 @@
 }
 
 .urgenciaAtraso {
-  border-color: rgba(248, 113, 113, 0.34);
+  border-color: var(--m-border, rgba(248, 113, 113, 0.34));
   background: rgba(248, 113, 113, 0.13);
   color: #f2a09a;
 }
@@ -510,12 +510,12 @@
 .urgenciaAguardando {
   border-color: rgba(148, 163, 184, 0.26);
   background: rgba(148, 163, 184, 0.1);
-  color: #94a3b8;
+  color: var(--m-text-soft, #94a3b8);
 }
 
 /* Único reforço no card inteiro, e só para atraso — o resto fica no selo. */
 .cardAtraso {
-  border-color: rgba(248, 113, 113, 0.32);
+  border-color: var(--m-border, rgba(248, 113, 113, 0.32));
 }
 
 .cardMeta {
@@ -524,14 +524,14 @@
   align-items: center;
   gap: 0.42rem;
   margin-top: 0.52rem;
-  color: #9ca9bc;
+  color: var(--m-text-soft, #9ca9bc);
   font-size: 0.66rem;
   line-height: 1.2;
 }
 
 .cardMeta svg {
   flex-shrink: 0;
-  color: #8796ad;
+  color: var(--m-text-muted, #8796ad);
 }
 
 .nextAction {
@@ -543,7 +543,7 @@
 }
 
 .nextAction small {
-  color: #cbd4e3;
+  color: var(--m-text, #cbd4e3);
   font-size: 0.64rem;
   font-weight: 560;
 }
@@ -567,7 +567,7 @@
 .empty,
 .pageState,
 .loadingMore {
-  color: #74849c;
+  color: var(--m-text-muted, #74849c);
   font-size: 0.72rem;
   text-align: center;
 }
@@ -689,4 +689,76 @@
   .primaryButton:hover {
     transform: none;
   }
+}
+
+/* Tema Escuro: menos brilho e acentos mais apagados (gerado a partir das regras acima:
+   brilhos externos saem, cores fortes perdem saturação/luz). */
+:global([data-tema='escuro']) .headingIcon {
+  background: rgba(64, 67, 208, 0.13);
+  color: #4d55e2;
+}
+:global([data-tema='escuro']) .primaryButton {
+  background: linear-gradient(135deg, #4437d3, #4036b8);
+}
+:global([data-tema='escuro']) .tabs .tabActive {
+  border-color: rgba(70, 55, 222, 0.55);
+  background: linear-gradient(135deg, #453acb, #443ca8);
+}
+:global([data-tema='escuro']) .filters select:focus,
+:global([data-tema='escuro']) .search:focus-within {
+  border-color: rgba(64, 67, 208, 0.72);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .moreButton:hover,
+:global([data-tema='escuro']) .moreButtonActive {
+  border-color: rgba(64, 67, 208, 0.58);
+}
+:global([data-tema='escuro']) .columnSearch:focus-within {
+  border-color: rgba(64, 67, 208, 0.6);
+}
+:global([data-tema='escuro']) .verMais:hover {
+  border-color: rgba(65, 74, 224, 0.55);
+}
+:global([data-tema='escuro']) .card:hover {
+  border-color: rgba(65, 74, 224, 0.58);
+}
+:global([data-tema='escuro']) .cardSelected {
+  border-color: #3b4adf;
+  box-shadow: 0 0.5rem 1.4rem rgba(13, 21, 58, 0.22);
+}
+:global([data-tema='escuro']) .urgenciaAtraso {
+  background: rgba(217, 72, 72, 0.13);
+}
+:global([data-tema='escuro']) .urgenciaHoje {
+  border-color: rgba(194, 150, 35, 0.32);
+  background: rgba(194, 150, 35, 0.12);
+  color: #c69648;
+}
+
+/* Tema Claro: acentos escurecidos para contraste no fundo branco (gerado a partir das
+   regras acima: brilhos externos saem, cores claras de destaque escurecem). */
+:global([data-tema='claro']) .headingIcon {
+  color: #0611e0;
+}
+:global([data-tema='claro']) .filters select:focus,
+:global([data-tema='claro']) .search:focus-within {
+  box-shadow: none;
+}
+:global([data-tema='claro']) .verMais:hover {
+  border-color: rgba(6, 19, 224, 0.55);
+}
+:global([data-tema='claro']) .card:hover {
+  border-color: rgba(6, 19, 224, 0.58);
+}
+:global([data-tema='claro']) .cardSelected {
+  border-color: #061ae0;
+  box-shadow: 0 0.5rem 1.4rem rgba(13, 21, 58, 0.22);
+}
+:global([data-tema='claro']) .urgenciaAtraso {
+  background: rgba(214, 16, 16, 0.13);
+}
+:global([data-tema='claro']) .urgenciaHoje {
+  border-color: rgba(151, 111, 7, 0.32);
+  background: rgba(151, 111, 7, 0.12);
+  color: #9c6b1c;
 }

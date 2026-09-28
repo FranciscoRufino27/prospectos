@@ -196,7 +196,7 @@ export default function TemplatesPanel() {
                           <Eye size={13} /> Ver
                         </button>
                         {acoes.includes('editar') && (
-                          <button onClick={() => setEditor({ template })} className="focus-ring inline-flex items-center gap-1 rounded text-xs text-slate-300 hover:text-white">
+                          <button onClick={() => setEditor({ template })} className="focus-ring inline-flex items-center gap-1 rounded text-xs text-slate-300 hover:text-[var(--t-strong,#fff)]">
                             <Pencil size={13} /> Editar
                           </button>
                         )}

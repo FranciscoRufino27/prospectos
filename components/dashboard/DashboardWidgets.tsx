@@ -217,7 +217,7 @@ function Kpi({ label, valor, Icon, cor, detalhe }: {
   detalhe?: string
 }) {
   return (
-    <div className="rounded-xl border border-[#2a3147] bg-[#1a1f2e] p-4">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
       <div className="flex items-center gap-2 text-xs text-slate-500"><Icon size={14} className={cor} /> {label}</div>
       <div className={`mt-2 text-2xl font-bold tabular-nums ${cor}`}>{valor.toLocaleString('pt-BR')}</div>
       {detalhe && <p className="mt-1 text-xs text-slate-600">{detalhe}</p>}
@@ -228,7 +228,7 @@ function Kpi({ label, valor, Icon, cor, detalhe }: {
 function MetaCard({ label, atual, meta, cor }: { label: string; atual: number; meta?: number; cor: string }) {
   const percentual = meta ? Math.min(100, Math.round((atual / meta) * 100)) : 0
   return (
-    <div className="rounded-lg border border-[#2a3147] bg-[#0f1117] p-3">
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-slate-500">{label}</p>
@@ -238,7 +238,7 @@ function MetaCard({ label, atual, meta, cor }: { label: string; atual: number; m
         </div>
         <span className={`text-xs font-semibold ${meta ? cor : 'text-slate-600'}`}>{meta ? `${percentual}%` : 'Sem meta'}</span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#252b3b]">
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--bg-input)]">
         <div className={`h-full rounded-full ${cor.replace('text-', 'bg-')}`} style={{ width: `${percentual}%` }} />
       </div>
     </div>
@@ -288,7 +288,7 @@ const ROTULO_ATIVIDADE: Record<string, { label: string; cls: string }> = {
 
 function ProximasAcoes({ tarefas, titulo }: { tarefas: TarefaDashboard[]; titulo: string }) {
   return (
-    <section className="rounded-xl border border-[#2a3147] bg-[#1a1f2e] p-5">
+    <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 font-semibold text-slate-100"><Clock3 size={16} className="text-cyan-400" /> {titulo}</h2>
         <Link href="/automacao?tab=execucoes" className="text-xs text-indigo-400 hover:underline">Ver todas</Link>
@@ -299,7 +299,7 @@ function ProximasAcoes({ tarefas, titulo }: { tarefas: TarefaDashboard[]; titulo
         <div className="mt-4 space-y-2">
           {tarefas.map((tarefa) => {
             const conteudo = (
-              <div className="flex items-center gap-3 rounded-lg border border-[#2a3147] p-3 transition-colors hover:bg-[#0f1117]">
+              <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] p-3 transition-colors hover:bg-[var(--bg-base)]">
                 <ListTodo size={15} className={tarefa.prioridade === 'alta' ? 'text-rose-400' : 'text-cyan-400'} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-slate-200">{tarefa.titulo}</p>
@@ -652,15 +652,15 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
         {resumoOperacional.map((item) => (
           <button key={item.id} type="button" onClick={() => setFiltroSituacao((atual) => atual === item.id ? 'todas' : item.id)}
             aria-pressed={filtroSituacao === item.id}
-            className={`rounded-xl border p-3 text-left transition-colors ${filtroSituacao === item.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-[#2a3147] bg-[#1a1f2e] hover:bg-[#202638]'}`}>
+            className={`rounded-xl border p-3 text-left transition-colors ${filtroSituacao === item.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--t-bg-card-hover,#202638)]'}`}>
             <span className={`block text-xl font-bold tabular-nums ${item.cor}`}>{item.valor.toLocaleString('pt-BR')}</span>
             <span className="mt-0.5 block text-[11px] text-slate-500">{item.label}</span>
           </button>
         ))}
       </div>
 
-      <section className="overflow-hidden rounded-xl border border-[#2a3147] bg-[#1a1f2e]">
-        <div className="flex items-start justify-between gap-3 border-b border-[#2a3147] px-5 py-4">
+      <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-semibold text-slate-100"><CalendarClock size={16} className="text-cyan-400" /> Fila de vencimentos e renovações</h2>
             <p className="mt-1 text-xs text-slate-500">Prioridade, comunicação, responsável e próxima ação reunidos por cliente.</p>
@@ -668,7 +668,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
           <Link href="/base-leads" className="shrink-0 text-xs text-indigo-400 hover:underline">Ver base <ArrowRight className="inline" size={11} /></Link>
         </div>
         {dados.vencimentos.length > 0 && (
-          <div className="space-y-3 border-b border-[#2a3147] bg-[#151a27] px-5 py-4">
+          <div className="space-y-3 border-b border-[var(--border)] bg-[var(--bg-subtle)] px-5 py-4">
             <div className="flex flex-wrap items-center gap-2">
               {([
                 { id: 'todas', label: 'Todas' },
@@ -677,7 +677,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
                 { id: 'de_31_a_60', label: '31 a 60 dias' },
               ] as const).map((item) => (
                 <button key={item.id} type="button" onClick={() => setJanela(item.id)} aria-pressed={janela === item.id}
-                  className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${janela === item.id ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-300' : 'border-[#2a3147] text-slate-500 hover:text-slate-300'}`}>
+                  className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${janela === item.id ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-300' : 'border-[var(--border)] text-slate-500 hover:text-slate-300'}`}>
                   {item.label}
                 </button>
               ))}
@@ -687,10 +687,10 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
                 <span className="sr-only">Buscar cliente, laudo ou campanha</span>
                 <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
                 <input value={busca} onChange={(evento) => setBusca(evento.target.value)} placeholder="Buscar cliente, laudo ou campanha..."
-                  className="w-full rounded-lg border border-[#2a3147] bg-[#0f1117] py-2 pl-9 pr-3 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-indigo-500" />
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-base)] py-2 pl-9 pr-3 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-indigo-500" />
               </label>
               <select value={filtroSituacao} onChange={(evento) => setFiltroSituacao(evento.target.value as FiltroSituacaoRenovacao)} aria-label="Filtrar situação da renovação"
-                className="rounded-lg border border-[#2a3147] bg-[#0f1117] px-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500">
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500">
                 <option value="todas">Todas as situações</option>
                 <option value="pendentes">Não comunicadas</option>
                 <option value="agendadas">Aguardando envio</option>
@@ -699,7 +699,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
                 <option value="erros">Com erro</option>
               </select>
               <select value={responsavel} onChange={(evento) => setResponsavel(evento.target.value)} aria-label="Filtrar responsável"
-                className="rounded-lg border border-[#2a3147] bg-[#0f1117] px-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500">
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500">
                 <option value="todos">Todos os responsáveis</option>
                 {responsaveis.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
                 <option value="sem_responsavel">Sem responsável</option>
@@ -723,7 +723,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] table-fixed text-sm">
               <thead>
-                <tr className="border-b border-[#2a3147] text-[11px] uppercase tracking-wide text-slate-600">
+                <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-wide text-slate-600">
                   <th className="w-[20%] px-5 py-3 text-left font-medium">Cliente</th>
                   <th className="w-[15%] px-3 py-3 text-left font-medium">Laudo(s)</th>
                   <th className="w-[12%] px-3 py-3 text-left font-medium">Vencimento</th>
@@ -738,7 +738,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
                   const visual = statusVisual(item.status)
                   const operacional = ROTULO_SITUACAO[item.situacao]
                   return (
-                    <tr key={item.chave} className="border-b border-[#2a3147]/60 transition-colors last:border-0 hover:bg-[#0f1117]">
+                    <tr key={item.chave} className="border-b border-[var(--border)]/60 transition-colors last:border-0 hover:bg-[var(--bg-base)]">
                       <td className="px-5 py-3" title={item.empresa}>
                         <p className="truncate font-medium text-slate-200">
                           {item.leadId
@@ -780,24 +780,24 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
             </table>
           </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#2a3147] px-5 py-3 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-3 text-xs text-slate-500">
           <span>{vencimentosFiltrados.length} de {dados.vencimentos.length} clientes na fila priorizada · {empresas.totalMonitoradas.toLocaleString('pt-BR')} empresas monitoradas</span>
           <Link href="/automacao/campanhas/nova?tipo=renovacao" className="font-medium text-cyan-400 hover:underline">Criar campanha de renovação <ArrowRight className="inline" size={11} /></Link>
         </div>
       </section>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-5">
-        <section className="overflow-hidden rounded-xl border border-[#2a3147] bg-[#1a1f2e] xl:col-span-3">
-          <div className="border-b border-[#2a3147] px-5 py-4">
+        <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-card)] xl:col-span-3">
+          <div className="border-b border-[var(--border)] px-5 py-4">
             <h2 className="flex items-center gap-2 font-semibold text-slate-100"><MailCheck size={16} className="text-emerald-400" /> Empresas já comunicadas</h2>
             <p className="mt-1 text-xs text-slate-500">Somente mensagens de renovação efetivamente enviadas; ensaios não entram.</p>
           </div>
           {dados.renovacoes.comunicacoes.length === 0 ? (
             <div className="px-5 py-10 text-center text-sm text-slate-500">Nenhuma mensagem real de renovação registrada.</div>
           ) : (
-            <div className="divide-y divide-[#2a3147]">
+            <div className="divide-y divide-[var(--border)]">
               {dados.renovacoes.comunicacoes.map((item) => (
-                <Link key={item.id} href={`/leads/${item.leadId}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[#0f1117]">
+                <Link key={item.id} href={`/leads/${item.leadId}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--bg-base)]">
                   <MailCheck size={15} className="shrink-0 text-emerald-400" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-200">{item.empresa}</p>
@@ -810,13 +810,13 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
           )}
         </section>
 
-        <section className="rounded-xl border border-[#2a3147] bg-[#1a1f2e] p-5 xl:col-span-2">
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 xl:col-span-2">
           <h2 className="flex items-center gap-2 font-semibold text-slate-100"><Target size={16} className="text-indigo-400" /> Meta de renovação</h2>
           <p className="mt-1 text-xs text-slate-500">Resultado real do mês contra a meta cadastrada.</p>
           <div className="mt-4">
             <MetaCard label="Laudos renovados" atual={dados.metasAtuais.renovacoes} meta={metas.renovacoes} cor="text-cyan-400" />
           </div>
-          <dl className="mt-4 divide-y divide-[#2a3147] text-sm">
+          <dl className="mt-4 divide-y divide-[var(--border)] text-sm">
             <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Empresas até 60 dias</dt><dd className="font-semibold text-slate-200">{empresas.proximos60.toLocaleString('pt-BR')}</dd></div>
             <div className="flex justify-between gap-4 py-3"><dt className="text-slate-500">Antecedência operacional</dt><dd className="font-semibold text-slate-200">{dados.antecedenciaDias} dias</dd></div>
           </dl>
@@ -824,7 +824,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <section className="rounded-xl border border-[#2a3147] bg-[#1a1f2e] p-5">
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
           <h2 className="flex items-center gap-2 font-semibold text-slate-100"><AlertTriangle size={16} className="text-amber-400" /> Alertas de renovação</h2>
           <div className="mt-4 space-y-2">
             {empresas.vencidas > 0 && (
@@ -890,11 +890,11 @@ export default function DashboardWidgets() {
       <div className="space-y-5 p-6">
         <CabecalhoDashboard />
         <div className="space-y-4">
-          <div className="h-10 animate-pulse rounded-lg bg-[#1a1f2e]" />
+          <div className="h-10 animate-pulse rounded-lg bg-[var(--bg-card)]" />
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[1, 2, 3, 4].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-[#1a1f2e]" />)}
+            {[1, 2, 3, 4].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-[var(--bg-card)]" />)}
           </div>
-          <div className="h-72 animate-pulse rounded-xl bg-[#1a1f2e]" />
+          <div className="h-72 animate-pulse rounded-xl bg-[var(--bg-card)]" />
         </div>
       </div>
     )
@@ -908,7 +908,7 @@ export default function DashboardWidgets() {
           <CircleAlert className="mx-auto text-red-400" size={24} />
           <h2 className="mt-3 font-semibold text-slate-100">Painel indisponível</h2>
           <p className="mt-1 text-sm text-slate-500">{erro || 'Não foi possível carregar os dados.'}</p>
-          <button type="button" onClick={carregar} className="mt-4 rounded-lg border border-[#2a3147] px-3 py-2 text-sm text-slate-300 hover:bg-[#1a1f2e]">Tentar novamente</button>
+          <button type="button" onClick={carregar} className="mt-4 rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--bg-card)]">Tentar novamente</button>
         </div>
       </div>
     )

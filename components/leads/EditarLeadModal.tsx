@@ -6,7 +6,7 @@ import type { Lead } from '@/lib/supabase'
 import { ORIGENS } from '@/lib/leads/origens'
 import { CANAIS_PREFERENCIAIS } from '@/lib/leads/edicao'
 
-const inputCls = 'w-full rounded-lg border border-[#2a3147] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 focus:border-indigo-500 focus:outline-none disabled:opacity-60'
+const inputCls = 'w-full rounded-lg border border-[var(--t-border,#2a3147)] bg-[var(--t-bg-base,#0f1117)] px-3 py-2 text-sm text-slate-200 focus:border-indigo-500 focus:outline-none disabled:opacity-60'
 const labelCls = 'mb-1.5 block text-xs font-medium text-slate-400'
 
 type Formulario = {
@@ -98,12 +98,12 @@ export default function EditarLeadModal({
       <form
         onSubmit={salvar}
         onClick={(event) => event.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#2a3147] bg-[#1a1f2e] shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--t-border,#2a3147)] bg-[var(--t-bg-card,#1a1f2e)] shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="editar-lead-titulo"
       >
-        <div className="flex items-start justify-between border-b border-[#2a3147] px-6 py-5">
+        <div className="flex items-start justify-between border-b border-[var(--t-border,#2a3147)] px-6 py-5">
           <div>
             <h2 id="editar-lead-titulo" className="flex items-center gap-2 text-lg font-bold text-slate-100">
               <PencilLine size={18} className="text-indigo-400" /> Editar informações do lead
@@ -197,9 +197,9 @@ export default function EditarLeadModal({
           {erro && <p className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300" role="alert">{erro}</p>}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[#2a3147] bg-[#0f1117] px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-[var(--t-border,#2a3147)] bg-[var(--t-bg-base,#0f1117)] px-6 py-4">
           {!alterado && <span className="mr-auto self-center text-xs text-slate-500">Altere ao menos um campo para salvar.</span>}
-          <button type="button" onClick={onClose} disabled={salvando} className="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-[#1a1f2e] disabled:opacity-50">Cancelar</button>
+          <button type="button" onClick={onClose} disabled={salvando} className="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-[var(--t-bg-card,#1a1f2e)] disabled:opacity-50">Cancelar</button>
           <button type="submit" disabled={!valido || !alterado || salvando} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
             {salvando && <Loader2 size={14} className="animate-spin" />} {salvando ? 'Salvando...' : 'Salvar alterações'}
           </button>

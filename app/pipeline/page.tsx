@@ -230,7 +230,7 @@ function PipelineInner() {
       )}
 
       {avisoMovimento && (
-        <div role="status" className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border border-[#1b68a8] bg-[#06213d] px-4 py-3 text-sm text-slate-100 shadow-2xl">
+        <div role="status" className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border border-[var(--m-border,#1b68a8)] bg-[var(--m-bg-card,#06213d)] px-4 py-3 text-sm text-slate-100 shadow-2xl">
           {avisoMovimento}
         </div>
       )}

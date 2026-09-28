@@ -71,15 +71,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-100 lg:grid lg:grid-cols-2">
+    <div className="min-h-screen bg-[var(--t-bg-base,#0f1117)] text-slate-100 lg:grid lg:grid-cols-2">
       {/* Coluna de apresentação (marca + valor + prévia) — some no mobile */}
-      <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-indigo-950 via-[#141a2e] to-[#0f1117] relative overflow-hidden">
+      <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-[var(--t-hero,oklch(25.7%_0.09_281.288))] via-[var(--t-bg-subtle,#141a2e)] to-[var(--t-bg-base,#0f1117)] relative overflow-hidden">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-green-500 flex items-center justify-center shadow-lg">
             <Zap size={18} className="text-white" />
           </div>
           <div>
-            <div className="text-white font-bold leading-tight">ProspectOS</div>
+            <div className="text-[var(--t-strong,#fff)] font-bold leading-tight">ProspectOS</div>
             <div className="text-indigo-300 text-xs leading-tight">InovaCode</div>
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function LoginPage() {
           </p>
 
           {/* Prévia ilustrativa do produto (motivo visual, não dado de usuário) */}
-          <div className="rounded-xl border border-white/10 bg-[#0f1117]/70 backdrop-blur p-3 shadow-2xl mb-8">
+          <div className="rounded-xl border border-white/10 bg-[var(--t-bg-base,#0f1117)]/70 backdrop-blur p-3 shadow-2xl mb-8">
             <div className="flex items-center gap-1.5 mb-2.5">
               <span className="w-2 h-2 rounded-full bg-red-400/70" />
               <span className="w-2 h-2 rounded-full bg-amber-400/70" />
@@ -103,13 +103,13 @@ export default function LoginPage() {
             </div>
             <div className="grid grid-cols-3 gap-2 mb-2.5">
               {['Leads', 'Respostas', 'Reuniões'].map((l, i) => (
-                <div key={l} className="rounded-lg bg-[#1a1f2e] border border-white/5 p-2">
+                <div key={l} className="rounded-lg bg-[var(--t-bg-card,#1a1f2e)] border border-white/5 p-2">
                   <div className="text-[9px] text-slate-500">{l}</div>
                   <div className="h-1.5 mt-1.5 rounded-full bg-indigo-500/60" style={{ width: `${[80, 55, 30][i]}%` }} />
                 </div>
               ))}
             </div>
-            <div className="rounded-lg bg-[#1a1f2e] border border-white/5 p-2.5">
+            <div className="rounded-lg bg-[var(--t-bg-card,#1a1f2e)] border border-white/5 p-2.5">
               <div className="flex items-center gap-1 text-[9px] text-slate-500 mb-1.5">
                 <TrendingUp size={10} className="text-indigo-400" /> Evolução da prospecção
               </div>
@@ -148,7 +148,7 @@ export default function LoginPage() {
               <Zap size={18} className="text-white" />
             </div>
             <div>
-              <div className="text-white font-bold leading-tight">ProspectOS</div>
+              <div className="text-[var(--t-strong,#fff)] font-bold leading-tight">ProspectOS</div>
               <div className="text-indigo-300 text-xs leading-tight">InovaCode</div>
             </div>
           </div>
@@ -161,7 +161,7 @@ export default function LoginPage() {
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">E-mail</label>
-                  <div className="flex items-center gap-2 border border-[#2a3147] rounded-lg px-3 bg-[#1a1f2e] focus-within:ring-2 focus-within:ring-indigo-500">
+                  <div className="flex items-center gap-2 border border-[var(--t-border,#2a3147)] rounded-lg px-3 bg-[var(--t-bg-card,#1a1f2e)] focus-within:ring-2 focus-within:ring-indigo-500">
                     <Mail size={15} className="text-slate-500 shrink-0" />
                     <input
                       type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
@@ -173,7 +173,7 @@ export default function LoginPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Senha</label>
-                  <div className="flex items-center gap-2 border border-[#2a3147] rounded-lg px-3 bg-[#1a1f2e] focus-within:ring-2 focus-within:ring-indigo-500">
+                  <div className="flex items-center gap-2 border border-[var(--t-border,#2a3147)] rounded-lg px-3 bg-[var(--t-bg-card,#1a1f2e)] focus-within:ring-2 focus-within:ring-indigo-500">
                     <Lock size={15} className="text-slate-500 shrink-0" />
                     <input
                       type={verSenha ? 'text' : 'password'} value={senha} onChange={(e) => setSenha(e.target.value)} required
@@ -190,7 +190,7 @@ export default function LoginPage() {
                   <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer select-none">
                     <input
                       type="checkbox" checked={lembrar} onChange={(e) => setLembrar(e.target.checked)}
-                      className="w-4 h-4 rounded border-[#2a3147] bg-[#1a1f2e] text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                      className="w-4 h-4 rounded border-[var(--t-border,#2a3147)] bg-[var(--t-bg-card,#1a1f2e)] text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
                     />
                     Lembrar de mim
                   </label>
@@ -238,7 +238,7 @@ export default function LoginPage() {
                   <form onSubmit={handleRecuperar} className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">E-mail</label>
-                      <div className="flex items-center gap-2 border border-[#2a3147] rounded-lg px-3 bg-[#1a1f2e] focus-within:ring-2 focus-within:ring-indigo-500">
+                      <div className="flex items-center gap-2 border border-[var(--t-border,#2a3147)] rounded-lg px-3 bg-[var(--t-bg-card,#1a1f2e)] focus-within:ring-2 focus-within:ring-indigo-500">
                         <Mail size={15} className="text-slate-500 shrink-0" />
                         <input
                           type="email" value={email} onChange={(e) => setEmail(e.target.value)} required

@@ -153,7 +153,7 @@ export default function SeletorMunicipios({
                 aria-label={`Remover ${rotulo(codigo)}`}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={() => onChange(selecionados.filter((c) => c !== codigo))}
-                className="text-indigo-200 hover:text-white"
+                className="text-indigo-200 hover:text-[var(--t-strong,#fff)]"
               >
                 <X size={11} />
               </button>

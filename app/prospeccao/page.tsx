@@ -859,7 +859,7 @@ export default function ProspeccaoPage() {
             <button type="button" onClick={() => { setSelecionados(new Map()); setConfirmandoDescarte(false); }} className="text-sm text-slate-400 hover:text-slate-200 focus-ring rounded">
               Limpar
             </button>
-            <div className="h-6 w-px bg-[#17496e]" />
+            <div className="h-6 w-px bg-[var(--m-border-subtle,#17496e)]" />
             {confirmandoDescarte ? (
               <button type="button" onClick={descartar} className="flex h-10 items-center gap-2 rounded-lg bg-red-500/15 px-4 text-sm font-medium text-red-300 ring-1 ring-inset ring-red-500/40 hover:bg-red-500/25 focus-ring">
                 <Trash2 size={15} /> Confirmar descarte

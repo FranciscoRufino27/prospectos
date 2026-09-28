@@ -3,7 +3,7 @@
 
 /* Campos */
 .rotulo { display: grid; min-width: 0; gap: 6px; }
-.rotulo > span { color: #eef4ff; font-size: 12px; font-weight: 600; }
+.rotulo > span { color: var(--m-title, #eef4ff); font-size: 12px; font-weight: 600; }
 
 .campo {
   height: 36px;
@@ -12,8 +12,8 @@
   padding: 0 12px;
   border: 1px solid #1b68a8;
   border-radius: 10px;
-  background: rgba(4, 32, 61, 0.82);
-  color: #dce8f7;
+  background: var(--m-surface-inset, rgba(4, 32, 61, 0.82));
+  color: var(--m-title, #dce8f7);
   font-size: 13px;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
   transition: border-color 150ms ease;
@@ -29,9 +29,9 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   display: inline-flex;
   gap: 3px;
   padding: 3px;
-  border: 1px solid #145b94;
+  border: 1px solid var(--m-border, #145b94);
   border-radius: 11px;
-  background: rgba(3, 30, 57, 0.74);
+  background: var(--m-surface-inset, rgba(3, 30, 57, 0.74));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
 }
 .segmentado button {
@@ -40,11 +40,11 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   padding: 5px 14px;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #bdc9db;
+  color: var(--m-text, #bdc9db);
   text-align: left;
   transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
-.segmentado button:hover { color: #f8fafc; background: rgba(18, 67, 108, 0.35); }
+.segmentado button:hover { color: var(--m-title, #f8fafc); background: var(--m-surface-hover, rgba(18, 67, 108, 0.35)); }
 .segmentado strong { font-size: 13px; font-weight: 650; }
 .segmentado small { color: inherit; font-size: 11px; opacity: 0.75; }
 .segmentado .segmentoAtivo,
@@ -64,12 +64,12 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   align-items: center;
   gap: 14px;
   padding: 10px 12px;
-  border: 1px solid #17496e;
+  border: 1px solid var(--m-border, #17496e);
   border-radius: 11px;
-  background: rgba(3, 24, 45, 0.55);
+  background: var(--m-surface-inset, rgba(3, 24, 45, 0.55));
   transition: border-color 150ms ease, background 150ms ease;
 }
-.equipamento:hover { border-color: #1f6aa5; }
+.equipamento:hover { border-color: var(--m-border, #1f6aa5); }
 .equipamentoAtivo {
   border-color: rgba(105, 121, 255, 0.7);
   background: linear-gradient(135deg, rgba(77, 73, 230, 0.14), rgba(3, 24, 45, 0.55));
@@ -91,11 +91,11 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   box-shadow: 0 0 16px rgba(99, 102, 241, 0.45);
 }
 
-.equipamentoNome { color: #f1f5f9; font-size: 14px; font-weight: 600; }
-.equipamentoPreco { margin-top: 2px; color: #93a4c0; font-size: 12px; }
+.equipamentoNome { color: var(--m-title, #f1f5f9); font-size: 14px; font-weight: 600; }
+.equipamentoPreco { margin-top: 2px; color: var(--m-text-soft, #93a4c0); font-size: 12px; }
 
-.subtotal { color: #f8fafc; font-size: 14px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
-.subtotal small { display: block; color: #93a4c0; font-size: 11px; font-weight: 500; }
+.subtotal { color: var(--m-title, #f8fafc); font-size: 14px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+.subtotal small { display: block; color: var(--m-text-soft, #93a4c0); font-size: 11px; font-weight: 500; }
 .subtotalVazio { color: #4b6283; }
 
 /* Contador − n + */
@@ -105,14 +105,14 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   overflow: hidden;
   border: 1px solid #1b68a8;
   border-radius: 9px;
-  background: rgba(4, 32, 61, 0.82);
+  background: var(--m-surface-inset, rgba(4, 32, 61, 0.82));
 }
 .stepper button {
   display: grid;
   width: 30px;
   height: 32px;
   place-items: center;
-  color: #bfd3ee;
+  color: var(--m-text, #bfd3ee);
   transition: background 150ms ease, color 150ms ease;
 }
 .stepper button:hover:not(:disabled) { background: rgba(34, 134, 207, 0.25); color: #fff; }
@@ -123,7 +123,7 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   border: 0;
   border-inline: 1px solid #17496e;
   background: transparent;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   font-size: 14px;
   font-weight: 600;
   text-align: center;
@@ -140,12 +140,12 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   align-items: flex-start;
   gap: 8px;
   padding: 11px 15px 13px;
-  border-top: 1px solid #17496e;
-  color: #93a4c0;
+  border-top: 1px solid var(--m-border, #17496e);
+  color: var(--m-text-soft, #93a4c0);
   font-size: 12px;
   line-height: 1.5;
 }
-.rodapePainel b { color: #cbd8ea; font-weight: 600; }
+.rodapePainel b { color: var(--m-text, #cbd8ea); font-weight: 600; }
 
 /* Resumo */
 .resumoCorpo { display: grid; gap: 12px; padding: 14px 15px 15px; }
@@ -158,11 +158,11 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   border-radius: 12px;
   background:
     radial-gradient(circle at 8% 20%, rgba(99, 102, 241, 0.22), transparent 45%),
-    linear-gradient(145deg, rgba(10, 30, 70, 0.97), rgba(5, 17, 34, 0.98));
+    var(--m-kpi-bg, linear-gradient(145deg, rgba(10, 30, 70, 0.97), rgba(5, 17, 34, 0.98)));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.055), 0 0 22px rgba(99, 102, 241, 0.14);
 }
 .destaqueTopo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.destaqueTopo > span { color: #c3cee0; font-size: 12px; font-weight: 600; }
+.destaqueTopo > span { color: var(--m-text, #c3cee0); font-size: 12px; font-weight: 600; }
 .selo {
   padding: 2px 8px;
   border-radius: 999px;
@@ -171,8 +171,8 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   font-size: 12px;
   font-weight: 700;
 }
-.destaqueValor { margin-top: 6px; color: #fff; font-size: 28px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.destaqueLinha2 { margin-top: 3px; color: #c3cee0; font-size: 12px; }
+.destaqueValor { margin-top: 6px; color: var(--m-title, #fff); font-size: 28px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.destaqueLinha2 { margin-top: 3px; color: var(--m-text, #c3cee0); font-size: 12px; }
 .destaqueRodape {
   display: flex;
   flex-wrap: wrap;
@@ -182,7 +182,7 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   margin-top: 10px;
   padding-top: 9px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
-  color: #93a4c0;
+  color: var(--m-text-soft, #93a4c0);
   font-size: 12px;
 }
 .economia { display: inline-flex; align-items: center; gap: 4px; color: #34d399; font-weight: 600; }
@@ -191,13 +191,13 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   display: grid;
   gap: 10px;
   padding: 12px;
-  border: 1px solid #155987;
+  border: 1px solid var(--m-border, #155987);
   border-radius: 11px;
-  background: rgba(3, 24, 45, 0.6);
+  background: var(--m-surface-inset, rgba(3, 24, 45, 0.6));
 }
 .editorTopo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.editorTopo > strong { color: #f1f5f9; font-size: 13px; font-weight: 650; }
-.editorTopo > span { color: #93a4c0; font-size: 11px; }
+.editorTopo > strong { color: var(--m-title, #f1f5f9); font-size: 13px; font-weight: 650; }
+.editorTopo > span { color: var(--m-text-soft, #93a4c0); font-size: 11px; }
 .editorCampos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 
 .campoValor {
@@ -208,7 +208,7 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   padding: 0 10px;
   border: 1px solid #1b68a8;
   border-radius: 9px;
-  background: rgba(4, 32, 61, 0.82);
+  background: var(--m-surface-inset, rgba(4, 32, 61, 0.82));
   transition: border-color 150ms ease;
 }
 .campoValor:hover { border-color: #2286cf; }
@@ -219,7 +219,7 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   min-width: 0;
   border: 0;
   background: transparent !important;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -230,15 +230,15 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
 .atalhosDesconto > button:not(.linkTabela) {
   min-height: 26px;
   padding: 0 10px;
-  border: 1px solid #17557f;
+  border: 1px solid var(--m-border, #17557f);
   border-radius: 999px;
-  background: rgba(4, 28, 52, 0.8);
-  color: #bdc9db;
+  background: var(--m-surface-inset, rgba(4, 28, 52, 0.8));
+  color: var(--m-text, #bdc9db);
   font-size: 12px;
   font-weight: 600;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
-.atalhosDesconto > button:not(.linkTabela):hover { color: #fff; border-color: #2286cf; }
+.atalhosDesconto > button:not(.linkTabela):hover { color: var(--m-title, #fff); border-color: #2286cf; }
 .atalhosDesconto > button.atalhoAtivo:not(.linkTabela),
 .atalhosDesconto > button.atalhoAtivo:not(.linkTabela):hover {
   border-color: #6979ff;
@@ -246,7 +246,7 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   color: #fff;
 }
 .linkTabela { margin-left: auto; color: #a5b4fc; font-size: 12px; }
-.linkTabela:hover { color: #e0e7ff; text-decoration: underline; }
+.linkTabela:hover { color: var(--m-title, #e0e7ff); text-decoration: underline; }
 
 /* Estado vazio */
 .vazio {
@@ -266,8 +266,8 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   color: #38bdf8;
   box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2), 0 0 18px rgba(14, 165, 233, 0.12);
 }
-.vazio strong { color: #eef4ff; font-size: 14px; font-weight: 650; }
-.vazio p { max-width: 300px; color: #93a4c0; font-size: 12px; line-height: 1.5; }
+.vazio strong { color: var(--m-title, #eef4ff); font-size: 14px; font-weight: 650; }
+.vazio p { max-width: 300px; color: var(--m-text-soft, #93a4c0); font-size: 12px; line-height: 1.5; }
 
 .passos { display: grid; gap: 8px; margin-top: 6px; width: min(320px, 100%); text-align: left; }
 .passos li {
@@ -275,10 +275,10 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid #17496e;
+  border: 1px solid var(--m-border, #17496e);
   border-radius: 10px;
-  background: rgba(3, 24, 45, 0.55);
-  color: #c3cee0;
+  background: var(--m-surface-inset, rgba(3, 24, 45, 0.55));
+  color: var(--m-text, #c3cee0);
   font-size: 12px;
 }
 .passos li > b {
@@ -289,7 +289,7 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   place-items: center;
   border-radius: 50%;
   background: rgba(99, 102, 241, 0.2);
-  color: #c7d2fe;
+  color: var(--m-text, #c7d2fe);
   font-size: 11px;
 }
 
@@ -306,8 +306,8 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   border-radius: 10px;
   background: rgba(77, 73, 230, 0.14);
 }
-.leadEscolhido strong { display: block; color: #f1f5f9; font-size: 13px; }
-.leadEscolhido small { display: block; color: #a9b8cf; font-size: 11px; }
+.leadEscolhido strong { display: block; color: var(--m-title, #f1f5f9); font-size: 13px; }
+.leadEscolhido small { display: block; color: var(--m-text-soft, #a9b8cf); font-size: 11px; }
 
 .menuLeads {
   position: absolute;
@@ -318,15 +318,15 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
   overflow-y: auto;
   border: 1px solid #1b68a8;
   border-radius: 12px;
-  background: #0b1729;
+  background: var(--m-bg-elevated, #0b1729);
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
 }
 .menuLeads button {
   display: block;
   width: 100%;
   padding: 8px 12px;
-  border-bottom: 1px solid #132a47;
-  color: #e5edf8;
+  border-bottom: 1px solid var(--m-border, #132a47);
+  color: var(--m-title, #e5edf8);
   font-size: 13px;
   text-align: left;
 }
@@ -338,16 +338,16 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
 
 .bloco {
   padding: 12px 14px 13px;
-  border: 1px solid #155987;
+  border: 1px solid var(--m-border, #155987);
   border-radius: 11px;
-  background: linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98));
+  background: var(--m-surface, linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98)));
 }
 .blocoTitulo {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
-  color: #c3cee0;
+  color: var(--m-text, #c3cee0);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -366,4 +366,144 @@ textarea.campo { height: auto; padding: 10px 12px; line-height: 1.5; resize: ver
 @media (max-width: 900px) {
   .equipamento { grid-template-columns: auto minmax(0, 1fr) auto; }
   .equipamento .subtotal { grid-column: 2 / -1; text-align: left; }
+}
+
+/* Tema Escuro: menos brilho e acentos mais apagados (gerado a partir das regras acima:
+   brilhos externos saem, cores fortes perdem saturação/luz). */
+:global([data-tema='escuro']) .campo {
+  border: 1px solid #255277;
+}
+:global([data-tema='escuro']) .campo:hover {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .segmentado .segmentoAtivo,
+:global([data-tema='escuro']) .segmentado .segmentoAtivo:hover {
+  border-color: #4051e0;
+  background: linear-gradient(135deg, #3a37bb, #2634b9);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .equipamentoAtivo {
+  border-color: rgba(64, 81, 224, 0.7);
+  background: linear-gradient(135deg, rgba(58, 55, 187, 0.14), rgba(3, 24, 45, 0.55));
+}
+:global([data-tema='escuro']) .equipamentoIcone {
+  background: rgba(36, 123, 162, 0.12);
+  color: #2899cb;
+}
+:global([data-tema='escuro']) .equipamentoAtivo .equipamentoIcone {
+  background: #4043d0;
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .subtotalVazio {
+  color: #425063;
+}
+:global([data-tema='escuro']) .stepper {
+  border: 1px solid #255277;
+}
+:global([data-tema='escuro']) .stepper button:hover:not(:disabled) {
+  background: rgba(47, 104, 146, 0.25);
+}
+:global([data-tema='escuro']) .stepper input:focus {
+  background: rgba(64, 67, 208, 0.12);
+}
+:global([data-tema='escuro']) .destaque {
+  border: 1px solid rgba(64, 81, 224, 0.75);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+:global([data-tema='escuro']) .selo {
+  background: rgba(43, 161, 132, 0.16);
+  color: #3fc8b2;
+}
+:global([data-tema='escuro']) .economia {
+  color: #389a76;
+}
+:global([data-tema='escuro']) .campoValor {
+  border: 1px solid #255277;
+}
+:global([data-tema='escuro']) .campoValor:hover {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .campoValor:focus-within {
+  border-color: #4051e0;
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .atalhosDesconto > button:not(.linkTabela):hover {
+  border-color: #2f6892;
+}
+:global([data-tema='escuro']) .atalhosDesconto > button.atalhoAtivo:not(.linkTabela),
+:global([data-tema='escuro']) .atalhosDesconto > button.atalhoAtivo:not(.linkTabela):hover {
+  border-color: #4051e0;
+  background: linear-gradient(135deg, rgba(58, 55, 187, 0.85), rgba(38, 52, 185, 0.85));
+}
+:global([data-tema='escuro']) .vazioIcone {
+  background: rgba(36, 123, 162, 0.12);
+  color: #2899cb;
+  box-shadow: inset 0 0 0 1px rgba(40, 153, 203, 0.2);
+}
+:global([data-tema='escuro']) .passos li > b {
+  background: rgba(64, 67, 208, 0.2);
+}
+:global([data-tema='escuro']) .leadEscolhido {
+  border: 1px solid rgba(64, 81, 224, 0.6);
+  background: rgba(58, 55, 187, 0.14);
+}
+:global([data-tema='escuro']) .menuLeads {
+  border: 1px solid #255277;
+}
+
+/* Tema Claro: acentos escurecidos para contraste no fundo branco (gerado a partir das
+   regras acima: brilhos externos saem, cores claras de destaque escurecem). */
+:global([data-tema='claro']) .campo:hover {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .segmentado .segmentoAtivo,
+:global([data-tema='claro']) .segmentado .segmentoAtivo:hover {
+  border-color: #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .equipamentoAtivo {
+  border-color: rgba(6, 29, 224, 0.7);
+}
+:global([data-tema='claro']) .equipamentoIcone {
+  background: rgba(15, 124, 174, 0.12);
+  color: #0b7bad;
+}
+:global([data-tema='claro']) .equipamentoAtivo .equipamentoIcone {
+  box-shadow: none;
+}
+:global([data-tema='claro']) .stepper button:hover:not(:disabled) {
+  background: rgba(35, 121, 184, 0.25);
+}
+:global([data-tema='claro']) .destaque {
+  border: 1px solid rgba(6, 29, 224, 0.75);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+:global([data-tema='claro']) .selo {
+  background: rgba(17, 130, 103, 0.16);
+  color: #158473;
+}
+:global([data-tema='claro']) .economia {
+  color: #20845f;
+}
+:global([data-tema='claro']) .campoValor:hover {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .campoValor:focus-within {
+  border-color: #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .atalhosDesconto > button:not(.linkTabela):hover {
+  border-color: #2379b8;
+}
+:global([data-tema='claro']) .atalhosDesconto > button.atalhoAtivo:not(.linkTabela),
+:global([data-tema='claro']) .atalhosDesconto > button.atalhoAtivo:not(.linkTabela):hover {
+  border-color: #061de0;
+}
+:global([data-tema='claro']) .vazioIcone {
+  background: rgba(15, 124, 174, 0.12);
+  color: #0b7bad;
+  box-shadow: inset 0 0 0 1px rgba(11, 123, 173, 0.2);
+}
+:global([data-tema='claro']) .leadEscolhido {
+  border: 1px solid rgba(6, 29, 224, 0.6);
 }

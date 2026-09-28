@@ -80,7 +80,7 @@ export default function CamposPerfilBusca({
   return (
     <>
       {!podeEditar && (
-        <p className="flex items-center gap-2 rounded-lg border border-[#17496e] bg-[rgba(3,24,45,0.72)] px-3 py-2 text-xs text-slate-400">
+        <p className="flex items-center gap-2 rounded-lg border border-[var(--m-border-subtle,#17496e)] bg-[rgba(3,24,45,0.72)] px-3 py-2 text-xs text-slate-400">
           <Lock size={13} /> Somente leitura — só quem configura o workspace altera o perfil.
         </p>
       )}
@@ -150,7 +150,7 @@ export default function CamposPerfilBusca({
                 <span key={c} className={`${s.chip} ${s.chipAtivo}`}>
                   <span className="font-mono">{formatarCnae(c)}</span>
                   {podeEditar && (
-                    <button type="button" aria-label={`Remover ${formatarCnae(c)}`} onClick={() => alternarAtividade(c)} className="text-indigo-200 hover:text-white">
+                    <button type="button" aria-label={`Remover ${formatarCnae(c)}`} onClick={() => alternarAtividade(c)} className="text-indigo-200 hover:text-[var(--t-strong,#fff)]">
                       <X size={12} />
                     </button>
                   )}

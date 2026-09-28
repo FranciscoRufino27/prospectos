@@ -1,10 +1,10 @@
 .page {
   min-height: 100%;
   padding: 22px 26px 28px;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   background:
-    radial-gradient(circle at 42% -12%, rgba(37, 99, 235, 0.12), transparent 35%),
-    radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.055), transparent 32%);
+    var(--m-page-bg, radial-gradient(circle at 42% -12%, rgba(37, 99, 235, 0.12), transparent 35%),
+    radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.055), transparent 32%));
 }
 
 .pageHeader {
@@ -16,12 +16,12 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #93a4c0;
+  color: var(--m-text-muted, #93a4c0);
   font-size: 12px;
 }
 
 .breadcrumb strong {
-  color: #e8eef9;
+  color: var(--m-title, #e8eef9);
   font-weight: 500;
 }
 
@@ -36,7 +36,7 @@
 
 .titleRow h1 {
   margin: 0;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   font-size: clamp(26px, 2.3vw, 36px);
   font-weight: 750;
   letter-spacing: -0.035em;
@@ -45,7 +45,7 @@
 
 .titleRow p {
   margin-top: 5px;
-  color: #c3cee0;
+  color: var(--m-text-soft, #c3cee0);
   font-size: 14px;
 }
 
@@ -55,10 +55,10 @@
   gap: 9px;
   min-height: 42px;
   padding: 0 15px;
-  border: 1px solid #155b95;
+  border: 1px solid var(--m-border, #155b95);
   border-radius: 10px;
-  background: rgba(4, 28, 54, 0.72);
-  color: #d6e7fb;
+  background: var(--m-surface-inset, rgba(4, 28, 54, 0.72));
+  color: var(--m-text, #d6e7fb);
   font-size: 12px;
   white-space: nowrap;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
@@ -66,8 +66,8 @@
 }
 
 .refreshButton:hover:not(:disabled) {
-  border-color: #2286cf;
-  background: rgba(7, 42, 76, 0.82);
+  border-color: var(--m-border-strong, #2286cf);
+  background: var(--m-surface-hover, rgba(7, 42, 76, 0.82));
 }
 
 .refreshButton:disabled {
@@ -84,9 +84,9 @@
   align-items: center;
   min-height: 44px;
   padding: 3px;
-  border: 1px solid #145b94;
+  border: 1px solid var(--m-border, #145b94);
   border-radius: 10px;
-  background: rgba(3, 30, 57, 0.74);
+  background: var(--m-surface-inset, rgba(3, 30, 57, 0.74));
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
 }
 
@@ -94,7 +94,7 @@
   min-height: 36px;
   padding: 0 24px;
   border-radius: 8px;
-  color: #bdc9db;
+  color: var(--m-text-soft, #bdc9db);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -102,7 +102,7 @@
 }
 
 .tabs button:hover {
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
 }
 
 .tabs .tabActive {
@@ -116,7 +116,7 @@
   display: grid;
   width: min(295px, 100%);
   gap: 5px;
-  color: #eef4ff;
+  color: var(--m-text, #eef4ff);
   font-size: 12px;
 }
 
@@ -130,10 +130,10 @@
   min-height: 42px;
   gap: 9px;
   padding: 0 12px;
-  border: 1px solid #1b68a8;
+  border: 1px solid var(--m-border, #1b68a8);
   border-radius: 10px;
-  background: rgba(4, 32, 61, 0.82);
-  color: #dce8f7;
+  background: var(--m-surface-inset, rgba(4, 32, 61, 0.82));
+  color: var(--m-text, #dce8f7);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
 }
 
@@ -149,8 +149,8 @@
 }
 
 .portfolioField option {
-  background: #0b1729;
-  color: #e5edf8;
+  background: var(--m-option-bg, #0b1729);
+  color: var(--m-text, #e5edf8);
 }
 
 .dashboardContent {
@@ -177,7 +177,7 @@
   border-radius: 11px;
   background:
     radial-gradient(circle at 8% 25%, rgba(var(--accent-rgb), 0.12), transparent 35%),
-    linear-gradient(145deg, rgba(5, 30, 56, 0.97), rgba(5, 17, 34, 0.98));
+    var(--m-kpi-bg, linear-gradient(145deg, rgba(5, 30, 56, 0.97), rgba(5, 17, 34, 0.98)));
   color: var(--accent);
   box-shadow:
     inset 0 1px rgba(255, 255, 255, 0.055),
@@ -228,7 +228,7 @@
 
 .kpiLabel {
   overflow: hidden;
-  color: #f5f8fd;
+  color: var(--m-title, #f5f8fd);
   font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -236,7 +236,7 @@
 }
 
 .kpiIdentity strong {
-  color: #fff;
+  color: var(--m-title, #fff);
   font-size: 28px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -273,12 +273,12 @@
 
 .trendPositive { color: #22e3b0; }
 .trendNegative { color: #fb7185; }
-.trendNeutral { color: #aebbcf; }
+.trendNeutral { color: var(--m-text-muted, #aebbcf); }
 
 .trendCaption {
   overflow: hidden;
   margin-top: 3px;
-  color: #91a1b9;
+  color: var(--m-text-muted, #91a1b9);
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -314,16 +314,16 @@
   z-index: 1;
   display: block;
   margin-top: 1px;
-  color: #bbc7d8;
+  color: var(--m-text-soft, #bbc7d8);
   font-size: 10px;
 }
 
 .activityCard,
 .insightCard {
-  border: 1px solid #155987;
+  border: 1px solid var(--m-border, #155987);
   border-radius: 11px;
-  background: linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04), 0 12px 30px rgba(0, 0, 0, 0.09);
+  background: var(--m-surface, linear-gradient(145deg, rgba(4, 32, 59, 0.96), rgba(4, 21, 40, 0.98)));
+  box-shadow: var(--m-shadow, inset 0 1px rgba(255, 255, 255, 0.04), 0 12px 30px rgba(0, 0, 0, 0.09));
 }
 
 .activityCard {
@@ -357,7 +357,7 @@
 
 .sectionHeading h2 {
   margin: 0;
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
@@ -365,7 +365,7 @@
 
 .sectionHeading p {
   margin-top: 3px;
-  color: #9dacbf;
+  color: var(--m-text-muted, #9dacbf);
   font-size: 11px;
   line-height: 1.35;
 }
@@ -380,13 +380,13 @@
   transition: color 150ms ease;
 }
 
-.historyLink:hover { color: #e4d8ff; }
+.historyLink:hover { color: var(--m-text, #e4d8ff); }
 
 .activityList {
   overflow: hidden;
-  border: 1px solid #17557f;
+  border: 1px solid var(--m-border, #17557f);
   border-radius: 9px;
-  background: rgba(3, 24, 45, 0.72);
+  background: var(--m-surface-inset, rgba(3, 24, 45, 0.72));
 }
 
 .activityRow {
@@ -396,31 +396,31 @@
   gap: 14px;
   min-height: 43px;
   padding: 8px 13px;
-  color: #b8c5d8;
+  color: var(--m-text-soft, #b8c5d8);
   font-size: 11px;
   transition: background 150ms ease;
 }
 
-.activityRow + .activityRow { border-top: 1px solid #17496e; }
-.activityRow:hover { background: rgba(18, 67, 108, 0.28); }
+.activityRow + .activityRow { border-top: 1px solid var(--m-border-subtle, #17496e); }
+.activityRow:hover { background: var(--m-surface-hover, rgba(18, 67, 108, 0.28)); }
 
 .activityRow > strong {
   overflow: hidden;
-  color: #f1f5f9;
+  color: var(--m-title, #f1f5f9);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .activityRow time {
-  color: #e0e8f4;
+  color: var(--m-text, #e0e8f4);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .activityDescription {
   overflow: hidden;
-  color: #a9b7ca;
+  color: var(--m-text-soft, #a9b7ca);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -438,7 +438,7 @@
 .activityBadgeLead,
 .activityBadgeDefault {
   background: rgba(59, 130, 246, 0.16);
-  color: #bfdbfe;
+  color: var(--m-text, #bfdbfe);
 }
 
 .emptyState,
@@ -447,7 +447,7 @@
   min-height: 128px;
   place-items: center;
   padding: 22px;
-  color: #7f91aa;
+  color: var(--m-text-muted, #7f91aa);
   font-size: 12px;
   text-align: center;
 }
@@ -476,16 +476,16 @@
 .followMetric {
   min-width: 0;
   padding: 11px;
-  border: 1px solid #17649b;
+  border: 1px solid var(--m-border, #17649b);
   border-radius: 9px;
-  background: rgba(4, 35, 64, 0.7);
+  background: var(--m-surface-inset, rgba(4, 35, 64, 0.7));
   color: #22c5ff;
 }
 
 .followMetric > span {
   display: block;
   margin-top: 5px;
-  color: #e0e8f4;
+  color: var(--m-text, #e0e8f4);
   font-size: 11px;
 }
 
@@ -498,7 +498,7 @@
 }
 
 .followMetric strong {
-  color: #fff;
+  color: var(--m-title, #fff);
   font-size: 24px;
   line-height: 1;
 }
@@ -508,7 +508,7 @@
 
 .chartTitle {
   margin-top: 10px;
-  color: #c7d2e2;
+  color: var(--m-text-soft, #c7d2e2);
   font-size: 10px;
 }
 
@@ -542,7 +542,7 @@
 .chartLabels {
   display: flex;
   justify-content: space-between;
-  color: #8190a7;
+  color: var(--m-text-muted, #8190a7);
   font-size: 8px;
 }
 
@@ -559,7 +559,7 @@
   align-items: center;
   min-height: 48px;
   gap: 9px;
-  border-bottom: 1px solid rgba(29, 86, 127, 0.55);
+  border-bottom: 1px solid var(--m-border-subtle, rgba(29, 86, 127, 0.55));
 }
 
 .barRow {
@@ -570,7 +570,7 @@
 .barRow > span,
 .responseRow > span {
   overflow: hidden;
-  color: #e5edf8;
+  color: var(--m-text, #e5edf8);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -578,14 +578,14 @@
 
 .barRow strong,
 .responseRow strong {
-  color: #f8fafc;
+  color: var(--m-title, #f8fafc);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 .barRow small,
 .responseRow small {
-  color: #93a4bb;
+  color: var(--m-text-muted, #93a4bb);
   font-size: 9px;
   text-align: right;
 }
@@ -595,7 +595,7 @@
   height: 17px;
   overflow: hidden;
   border-radius: 4px;
-  background: #122f4d;
+  background: var(--m-track, #122f4d);
 }
 
 .barTrack i,
@@ -630,9 +630,9 @@
   gap: 10px;
   margin-top: auto;
   padding: 11px;
-  border: 1px solid #17649b;
+  border: 1px solid var(--m-border, #17649b);
   border-radius: 9px;
-  background: rgba(4, 35, 64, 0.7);
+  background: var(--m-surface-inset, rgba(4, 35, 64, 0.7));
   color: #22c5ff;
 }
 
@@ -642,12 +642,12 @@
 }
 
 .responseTotal span {
-  color: #dce6f4;
+  color: var(--m-text, #dce6f4);
   font-size: 10px;
 }
 
 .responseTotal strong {
-  color: #fff;
+  color: var(--m-title, #fff);
   font-size: 21px;
   line-height: 1;
 }
@@ -699,4 +699,185 @@
   .barRow small { display: none; }
   .responseRow { grid-template-columns: minmax(80px, 1fr) minmax(70px, 1fr) auto; }
   .responseRow small { display: none; }
+}
+
+/* Tema Claro: acentos neon perdem contraste no fundo branco — versões mais
+   escuras dos mesmos tons, e ícone branco sobre o selo colorido. */
+:global([data-tema='claro']) .kpiCyan { --accent: #0891b2; --accent-rgb: 8, 145, 178; }
+:global([data-tema='claro']) .kpiViolet { --accent: #9333ea; --accent-rgb: 147, 51, 234; }
+:global([data-tema='claro']) .kpiEmerald { --accent: #059669; --accent-rgb: 5, 150, 105; }
+:global([data-tema='claro']) .kpiAmber { --accent: #d97706; --accent-rgb: 217, 119, 6; }
+:global([data-tema='claro']) .kpiIcon { color: #fff; box-shadow: none; }
+:global([data-tema='claro']) .kpiCard { box-shadow: var(--m-shadow); }
+:global([data-tema='claro']) .trendPositive { color: #047857; }
+:global([data-tema='claro']) .trendNegative { color: #be123c; }
+:global([data-tema='claro']) .sectionIcon { color: #0369a1; box-shadow: none; }
+:global([data-tema='claro']) .historyLink { color: #6d28d9; }
+:global([data-tema='claro']) .historyLink:hover { color: #5b21b6; }
+:global([data-tema='claro']) .activityBadgeLead,
+:global([data-tema='claro']) .activityBadgeDefault { background: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
+:global([data-tema='claro']) .followMetric,
+:global([data-tema='claro']) .responseTotal,
+:global([data-tema='claro']) .barRow { color: #0369a1; }
+:global([data-tema='claro']) .followLine { filter: none; }
+:global([data-tema='claro']) .miniLine { filter: none; }
+
+
+
+/* Tema Escuro: borda do indicador mais discreta. */
+:global([data-tema='escuro']) .kpiCard { border-color: rgba(var(--accent-rgb), 0.4); }
+
+/* Tema Escuro: menos brilho e acentos mais apagados (gerado a partir das regras acima:
+   brilhos externos saem, cores fortes perdem saturação/luz). */
+:global([data-tema='escuro']) .tabs .tabActive {
+  border: 1px solid #4051e0;
+  background: linear-gradient(135deg, #3a37bb, #2634b9);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .kpiCard {
+  --accent: #2a9eb0;
+  --accent-rgb: 42, 158, 176;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+:global([data-tema='escuro']) .kpiCyan {
+  --accent: #2a9eb0;
+  --accent-rgb: 42, 158, 176;
+}
+:global([data-tema='escuro']) .kpiViolet {
+  --accent: #9a3cdf;
+  --accent-rgb: 154, 60, 223;
+}
+:global([data-tema='escuro']) .kpiEmerald {
+  --accent: #2ba184;
+  --accent-rgb: 43, 161, 132;
+}
+:global([data-tema='escuro']) .kpiAmber {
+  --accent: #c39720;
+  --accent-rgb: 195, 151, 32;
+}
+:global([data-tema='escuro']) .kpiIcon {
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .trendPositive {
+  color: #2ea384;
+}
+:global([data-tema='escuro']) .trendNegative {
+  color: #dc475d;
+}
+:global([data-tema='escuro']) .miniLine {
+  filter: none;
+}
+:global([data-tema='escuro']) .miniBars span {
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .sectionIcon {
+  background: rgba(36, 123, 162, 0.13);
+  color: #209cc6;
+  box-shadow: inset 0 0 0 1px rgba(40, 153, 203, 0.18);
+}
+:global([data-tema='escuro']) .activityBadgeLead,
+:global([data-tema='escuro']) .activityBadgeDefault {
+  background: rgba(42, 103, 202, 0.16);
+}
+:global([data-tema='escuro']) .followMetric {
+  color: #209bc7;
+}
+:global([data-tema='escuro']) .chartGridLine {
+  stroke: rgba(84, 96, 218, 0.22);
+}
+:global([data-tema='escuro']) .followLine {
+  stroke: #8242e0;
+  filter: none;
+}
+:global([data-tema='escuro']) .barRow {
+  color: #229bd3;
+}
+:global([data-tema='escuro']) .barTrack i,
+:global([data-tema='escuro']) .responseTrack i {
+  background: linear-gradient(90deg, #28779e, #2899cb);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .responseTrack i {
+  background: linear-gradient(90deg, #1f8161, #30a185);
+  box-shadow: none;
+}
+:global([data-tema='escuro']) .responseTotal {
+  color: #209bc7;
+}
+
+/* Tema Claro: acentos escurecidos para contraste no fundo branco (gerado a partir das
+   regras acima: brilhos externos saem, cores claras de destaque escurecem). */
+:global([data-tema='claro']) .tabs .tabActive {
+  border: 1px solid #061de0;
+  box-shadow: none;
+}
+:global([data-tema='claro']) .kpiCard {
+  --accent: #0f7e8f;
+  --accent-rgb: 15, 126, 143;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+:global([data-tema='claro']) .kpiCyan {
+  --accent: #0f7e8f;
+  --accent-rgb: 15, 126, 143;
+}
+:global([data-tema='claro']) .kpiViolet {
+  --accent: #8406e0;
+  --accent-rgb: 132, 6, 224;
+}
+:global([data-tema='claro']) .kpiEmerald {
+  --accent: #118267;
+  --accent-rgb: 17, 130, 103;
+}
+:global([data-tema='claro']) .kpiAmber {
+  --accent: #956e04;
+  --accent-rgb: 149, 110, 4;
+}
+:global([data-tema='claro']) .kpiIcon {
+  box-shadow: none;
+}
+:global([data-tema='claro']) .trendPositive {
+  color: #148567;
+}
+:global([data-tema='claro']) .trendNegative {
+  color: #da0c2a;
+}
+:global([data-tema='claro']) .miniLine {
+  filter: none;
+}
+:global([data-tema='claro']) .miniBars span {
+  box-shadow: none;
+}
+:global([data-tema='claro']) .sectionIcon {
+  background: rgba(15, 124, 174, 0.13);
+  color: #047ca4;
+  box-shadow: inset 0 0 0 1px rgba(11, 123, 173, 0.18);
+}
+:global([data-tema='claro']) .activityBadgeLead,
+:global([data-tema='claro']) .activityBadgeDefault {
+  background: rgba(15, 91, 214, 0.16);
+}
+:global([data-tema='claro']) .followMetric {
+  color: #047ea9;
+}
+:global([data-tema='claro']) .chartGridLine {
+  stroke: rgba(17, 35, 212, 0.22);
+}
+:global([data-tema='claro']) .followLine {
+  stroke: #5d06e0;
+  filter: none;
+}
+:global([data-tema='claro']) .barRow {
+  color: #057cb3;
+}
+:global([data-tema='claro']) .barTrack i,
+:global([data-tema='claro']) .responseTrack i {
+  background: linear-gradient(90deg, #147bad, #0b7bad);
+  box-shadow: none;
+}
+:global([data-tema='claro']) .responseTrack i {
+  background: linear-gradient(90deg, #0e825c, #168367);
+  box-shadow: none;
+}
+:global([data-tema='claro']) .responseTotal {
+  color: #047ea9;
 }

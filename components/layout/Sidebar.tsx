@@ -82,19 +82,19 @@ export default function Sidebar() {
   const navItemClasses = (active: boolean) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border-l-[3px] ${
       active
-        ? 'bg-white/10 text-white border-indigo-400'
-        : 'text-indigo-200 border-transparent hover:bg-white/5 hover:text-white'
+        ? 'bg-[var(--sb-active)] text-[var(--sb-text-strong)] border-indigo-400'
+        : 'text-indigo-200 border-transparent hover:bg-[var(--sb-hover)] hover:text-[var(--sb-text-strong)]'
     }`;
 
   return (
-    <aside className="flex flex-col w-60 min-h-screen shrink-0 bg-indigo-950">
+    <aside className="flex flex-col w-60 min-h-screen shrink-0 bg-[var(--sb-bg)] border-r border-[var(--sb-edge)]">
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-5 py-5 border-b border-white/10">
+      <div className="flex items-center gap-2.5 px-5 py-5 border-b border-[var(--sb-line)]">
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-500 shadow-sm">
           <Zap size={16} className="text-white" />
         </div>
         <div>
-          <div className="text-white font-bold text-sm leading-tight">ProspectOS</div>
+          <div className="text-[var(--sb-text-strong)] font-bold text-sm leading-tight">ProspectOS</div>
         </div>
       </div>
 
@@ -131,10 +131,10 @@ export default function Sidebar() {
       </nav>
 
       {/* Sair */}
-      <div className="px-3 pb-2 border-t border-white/10 pt-3">
+      <div className="px-3 pb-2 border-t border-[var(--sb-line)] pt-3">
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border-l-[3px] border-transparent w-full text-[#FC8181] hover:bg-red-500/10"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border-l-[3px] border-transparent w-full text-[#FC8181] [[data-tema=claro]_&]:text-red-600 hover:bg-red-500/10"
         >
           <LogOut size={18} strokeWidth={1.8} />
           Sair
@@ -144,7 +144,7 @@ export default function Sidebar() {
       {/* Usuário logado */}
       <Link
         href="/perfil"
-        className="flex items-center gap-3 px-4 py-3 border-t border-white/10 hover:bg-white/5 transition-colors"
+        className="flex items-center gap-3 px-4 py-3 border-t border-[var(--sb-line)] hover:bg-[var(--sb-hover)] transition-colors"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -153,7 +153,7 @@ export default function Sidebar() {
           className="w-8 h-8 rounded-full object-cover shrink-0"
         />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-white truncate">
+          <p className="text-sm font-medium text-[var(--sb-text-strong)] truncate">
             {perfil?.nome || 'Meu perfil'}
           </p>
           <p className="text-xs text-indigo-300 truncate">

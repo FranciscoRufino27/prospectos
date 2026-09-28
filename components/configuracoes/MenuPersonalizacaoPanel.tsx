@@ -92,7 +92,7 @@ export default function MenuPersonalizacaoPanel() {
 
         <div className="grid gap-2 p-4">
           {!podeEditar && (
-            <p className="flex items-center gap-2 rounded-lg border border-[#17496e] bg-[rgba(3,24,45,0.72)] px-3 py-2 text-xs text-slate-400">
+            <p className="flex items-center gap-2 rounded-lg border border-[var(--m-border-subtle,#17496e)] bg-[var(--m-surface-inset,rgba(3,24,45,0.72))] px-3 py-2 text-xs text-slate-400">
               <Lock size={13} /> Somente leitura — requer a permissão <code className="text-indigo-300">workspace.configure</code>.
             </p>
           )}
@@ -107,7 +107,7 @@ export default function MenuPersonalizacaoPanel() {
                   <div
                     key={item.id}
                     className={`flex items-center gap-3 rounded-[11px] border px-3 py-2.5 transition-colors ${
-                      visivel ? 'border-[#155987] bg-[rgba(3,24,45,0.6)]' : 'border-dashed border-[#1f4a70] bg-transparent opacity-70'
+                      visivel ? 'border-[var(--m-border,#155987)] bg-[var(--m-surface-inset,rgba(3,24,45,0.6))]' : 'border-dashed border-[var(--m-border,#1f4a70)] bg-transparent opacity-70'
                     }`}
                   >
                     <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[9px] ${visivel ? 'bg-indigo-500/20 text-indigo-200' : 'bg-slate-500/10 text-slate-500'}`}>
@@ -152,7 +152,7 @@ export default function MenuPersonalizacaoPanel() {
           <TituloSecao icone={Eye} titulo="Prévia do menu" subtitulo={alterado ? 'Alterações ainda não salvas.' : 'É o que a equipe vê agora.'} />
         </div>
         <div className="p-4">
-          <nav aria-label="Prévia do menu" className="grid gap-1 rounded-xl bg-indigo-950 p-2.5">
+          <nav aria-label="Prévia do menu" className="grid gap-1 rounded-xl bg-[var(--sb-bg)] p-2.5">
             {agruparMenu(visiveis, ['administracao']).map((grupo) => (
               <div key={grupo.id} className="grid gap-0.5 [&+&]:mt-2">
                 <span className="px-2.5 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-indigo-300/60">{grupo.label}</span>
@@ -174,7 +174,7 @@ export default function MenuPersonalizacaoPanel() {
           </nav>
         </div>
 
-        <div className="grid gap-2 border-t border-[#17496e] p-4">
+        <div className="grid gap-2 border-t border-[var(--m-border-subtle,#17496e)] p-4">
           {visiveis.length === 0 && (
             <p className="flex items-center gap-2 text-xs text-amber-300"><AlertCircle size={13} /> Deixe pelo menos um item visível.</p>
           )}

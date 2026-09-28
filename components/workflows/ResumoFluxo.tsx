@@ -192,10 +192,10 @@ export default function ResumoFluxo({ def, usuarios }: { def: DefinicaoWorkflow;
   const condicoes = def.condicoes ?? [];
   const frase = montarFraseFluxo(def, usuarios);
   return (
-    <div className="bg-[#1a1f2e] rounded-xl border border-[#2a3147] p-4">
+    <div className="bg-[var(--t-bg-card,#1a1f2e)] rounded-xl border border-[var(--t-border,#2a3147)] p-4">
       <div className="text-sm font-semibold text-slate-200 mb-3">Resumo do fluxo</div>
       {frase && (
-        <p className="text-xs text-slate-300 leading-relaxed bg-[#0f1117]/60 rounded-lg px-3 py-2.5 mb-3 border border-[#2a3147]">
+        <p className="text-xs text-slate-300 leading-relaxed bg-[var(--t-bg-base,#0f1117)]/60 rounded-lg px-3 py-2.5 mb-3 border border-[var(--t-border,#2a3147)]">
           {frase}
         </p>
       )}

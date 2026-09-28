@@ -123,7 +123,7 @@ export default function PerfilProspeccaoPanel() {
           ))}
         </dl>
 
-        <div className="grid gap-2 border-t border-[#17496e] p-4">
+        <div className="grid gap-2 border-t border-[var(--m-border-subtle,#17496e)] p-4">
           {erro && (
             <p className="flex items-center gap-2 text-sm text-red-300"><AlertCircle size={14} /> {erro}</p>
           )}

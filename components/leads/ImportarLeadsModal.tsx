@@ -100,7 +100,7 @@ export default function ImportarLeadsModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !inserindo && onClose()}>
-      <div className="bg-[#1a1f2e] rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Importar leads">
+      <div className="bg-[var(--t-bg-card,#1a1f2e)] rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Importar leads">
         <div className="flex items-start justify-between mb-4">
           <h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">
             <FileSpreadsheet size={18} className="text-indigo-400" /> Importar leads
@@ -129,7 +129,7 @@ export default function ImportarLeadsModal({
           <>
             {/* 1) Upload */}
             <label className="block text-sm text-slate-400 mb-1.5">Arquivo CSV</label>
-            <label className="flex items-center gap-2 cursor-pointer bg-[#0f1117] border border-dashed border-[#2a3147] rounded-lg px-3 py-3 text-sm text-slate-300 hover:border-blue-500/50">
+            <label className="flex items-center gap-2 cursor-pointer bg-[var(--t-bg-base,#0f1117)] border border-dashed border-[var(--t-border,#2a3147)] rounded-lg px-3 py-3 text-sm text-slate-300 hover:border-blue-500/50">
               <Upload size={16} className="text-slate-500" />
               <span className="truncate">{file ? file.name : 'Escolher arquivo…'}</span>
               <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => escolherArquivo(e.target.files?.[0] ?? null)} />
@@ -149,7 +149,7 @@ export default function ImportarLeadsModal({
 
             {/* 2) Preview */}
             {resumo && (
-              <div className="mt-4 rounded-lg border border-[#2a3147] bg-[#0f1117] p-3 text-sm space-y-1">
+              <div className="mt-4 rounded-lg border border-[var(--t-border,#2a3147)] bg-[var(--t-bg-base,#0f1117)] p-3 text-sm space-y-1">
                 <div className="flex justify-between"><span className="text-slate-400">Linhas no arquivo</span><span className="text-slate-200 tabular-nums">{resumo.totalLinhas}</span></div>
                 <div className="flex justify-between"><span className="text-slate-400">Válidas</span><span className="text-slate-200 tabular-nums">{resumo.validas}</span></div>
                 {resumo.duplicadosNoArquivo > 0 && <div className="flex justify-between"><span className="text-slate-400">Duplicadas no arquivo</span><span className="text-slate-300 tabular-nums">{resumo.duplicadosNoArquivo}</span></div>}
@@ -161,9 +161,9 @@ export default function ImportarLeadsModal({
                     <span className="text-rose-400 tabular-nums">{resumo.semResponsavelValido}</span>
                   </div>
                 )}
-                <div className="flex justify-between pt-1 border-t border-[#2a3147] mt-1"><span className="text-slate-200 font-medium">A inserir</span><span className="text-emerald-400 font-semibold tabular-nums">{resumo.importaveis}</span></div>
+                <div className="flex justify-between pt-1 border-t border-[var(--t-border,#2a3147)] mt-1"><span className="text-slate-200 font-medium">A inserir</span><span className="text-emerald-400 font-semibold tabular-nums">{resumo.importaveis}</span></div>
                 {resumo.responsaveisNaoReconhecidos.length > 0 && (
-                  <div className="pt-2 mt-2 border-t border-[#2a3147] space-y-1.5">
+                  <div className="pt-2 mt-2 border-t border-[var(--t-border,#2a3147)] space-y-1.5">
                     <p className="text-xs font-medium text-rose-300">Responsáveis que não existem na equipe</p>
                     {resumo.responsaveisNaoReconhecidos.map((item) => (
                       <div key={item.valor} className="flex items-start justify-between gap-3 text-xs">
@@ -205,7 +205,7 @@ export default function ImportarLeadsModal({
                   </div>
                 )}
                 {resumo.nichos.length > 0 && (
-                  <div className="pt-2 mt-2 border-t border-[#2a3147] space-y-1.5">
+                  <div className="pt-2 mt-2 border-t border-[var(--t-border,#2a3147)] space-y-1.5">
                     <p className="text-xs font-medium text-slate-400">Nichos dos novos leads</p>
                     {resumo.nichos.map((item) => (
                       <div key={item.nicho} className="flex items-center justify-between gap-3 text-xs">
@@ -223,7 +223,7 @@ export default function ImportarLeadsModal({
                   </div>
                 )}
                 {resumo.semSegmento > 0 && (
-                  <p className="pt-2 mt-2 border-t border-[#2a3147] text-xs leading-5 text-amber-300/80">
+                  <p className="pt-2 mt-2 border-t border-[var(--t-border,#2a3147)] text-xs leading-5 text-amber-300/80">
                     {resumo.semSegmento} lead{resumo.semSegmento === 1 ? '' : 's'} sem segmento na planilha.
                     {resumo.semSegmento === 1 ? ' Ele entra' : ' Eles entram'} na base normalmente, mas o motor
                     não escolhe a mensagem de primeiro contato sem segmento — classifique depois na ficha do lead
@@ -231,7 +231,7 @@ export default function ImportarLeadsModal({
                   </p>
                 )}
                 {resumo.validadeInvalida > 0 && (
-                  <p className="pt-2 mt-2 border-t border-[#2a3147] text-xs leading-5 text-amber-300/80">
+                  <p className="pt-2 mt-2 border-t border-[var(--t-border,#2a3147)] text-xs leading-5 text-amber-300/80">
                     {resumo.validadeInvalida} linha{resumo.validadeInvalida === 1 ? '' : 's'} com validade que não foi
                     reconhecida como data — use dd/mm/aaaa ou aaaa-mm-dd. {resumo.validadeInvalida === 1 ? 'Ela entra' : 'Elas entram'} na
                     base sem validade; preencha depois na ficha do lead.
@@ -253,7 +253,7 @@ export default function ImportarLeadsModal({
             {erro && <p className="text-sm text-rose-400 mt-4">{erro}</p>}
 
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={onClose} disabled={inserindo} className="text-sm px-4 py-2 rounded-lg text-slate-300 hover:bg-[#0f1117]">Cancelar</button>
+              <button onClick={onClose} disabled={inserindo} className="text-sm px-4 py-2 rounded-lg text-slate-300 hover:bg-[var(--t-bg-base,#0f1117)]">Cancelar</button>
               <button
                 onClick={confirmar}
                 disabled={!file || !resumo || resumo.importaveis === 0 || inserindo}
