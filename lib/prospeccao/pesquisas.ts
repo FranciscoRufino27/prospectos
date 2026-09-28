@@ -68,7 +68,8 @@ export function nomeSugerido(filtros: FiltrosPesquisaSalva, quantidade: number |
   const nicho = grupos.length === 1 ? grupos[0].nome : grupos.length > 1 ? `${grupos.length} nichos` : 'Atividades'
   const ufs = filtros.ufs ?? []
   const regiao = ufs.length === 0 ? 'Brasil' : ufs.length === 1 ? ufs[0] : ufs.length <= 3 ? ufs.join(', ') : `${ufs.length} estados`
-  const partes = [`${nicho} ${regiao}`]
+  const municipios = filtros.municipios?.length ?? 0
+  const partes = [`${nicho} ${regiao}${municipios ? ` (${municipios} ${municipios === 1 ? 'cidade' : 'cidades'})` : ''}`]
   const portes = filtros.portes ?? []
   if (portes.length === 1) partes.push(ROTULO_PORTE[portes[0]])
   else if (portes.length > 1) partes.push(`${portes.length} portes`)
@@ -84,6 +85,9 @@ export function resumoPesquisa(p: PesquisaSalva): string {
   return [
     `${atividades} atividade${atividades === 1 ? '' : 's'}`,
     regiao,
+    ...(p.filtros.municipios?.length
+      ? [`${p.filtros.municipios.length} município${p.filtros.municipios.length === 1 ? '' : 's'}`]
+      : []),
     p.quantidade ? `até ${p.quantidade} empresas` : 'sem limite',
   ].join(' · ')
 }

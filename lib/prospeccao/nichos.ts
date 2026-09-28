@@ -51,12 +51,18 @@ export const NICHOS: readonly Nicho[] = [
   },
   {
     id: 'alimentacao',
-    nome: 'Alimentação e buffets',
+    nome: 'Alimentação',
     atividades: [
       { codigo: '5620101', nome: 'Alimentação para empresas' },
-      { codigo: '5620102', nome: 'Bufê para eventos e recepções' },
       { codigo: '5620103', nome: 'Cantinas' },
       { codigo: '5620104', nome: 'Alimentação para consumo domiciliar' },
+    ],
+  },
+  {
+    id: 'buffets',
+    nome: 'Buffets',
+    atividades: [
+      { codigo: '5620102', nome: 'Bufê para eventos e recepções' },
     ],
   },
   {

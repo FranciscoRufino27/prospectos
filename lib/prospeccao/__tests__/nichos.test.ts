@@ -11,7 +11,7 @@ describe('nichos da prospecção', () => {
 
   it('dá nome e nicho à atividade conhecida; null à desconhecida', () => {
     expect(nomeAtividade('5510801')).toBe('Hotéis')
-    expect(nichoDaAtividade('5620102')?.id).toBe('alimentacao')
+    expect(nichoDaAtividade('5620102')?.id).toBe('buffets')
     expect(nomeAtividade('0000000')).toBeNull()
     expect(nichoDaAtividade('0000000')).toBeNull()
   })
@@ -20,7 +20,7 @@ describe('nichos da prospecção', () => {
     const grupos = gruposDoPerfil(['5620102', '9999999', '5510802', '5510801'])
     expect(grupos).toEqual([
       { id: 'hotelaria', nome: 'Hotelaria', cnaes: ['5510802', '5510801'] },
-      { id: 'alimentacao', nome: 'Alimentação e buffets', cnaes: ['5620102'] },
+      { id: 'buffets', nome: 'Buffets', cnaes: ['5620102'] },
       { id: ID_OUTRAS, nome: 'Outras atividades', cnaes: ['9999999'] },
     ])
   })

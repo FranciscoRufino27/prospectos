@@ -10,7 +10,7 @@ describe('workspaceConfig.prospeccao (perfil de busca)', () => {
   it('blob v4 sem perfil migra para a versão atual sem inventar perfil', () => {
     const r = parseWorkspaceConfig({ _schema_version: 4, roi: { custoMensal: 10 } })
     expect(r._schema_version).toBe(WORKSPACE_CONFIG_SCHEMA_VERSION)
-    expect(WORKSPACE_CONFIG_SCHEMA_VERSION).toBe(6)
+    expect(WORKSPACE_CONFIG_SCHEMA_VERSION).toBe(7)
     expect(r.prospeccao).toBeUndefined()
     expect(r.roi).toEqual({ custoMensal: 10 })
   })
@@ -22,6 +22,9 @@ describe('workspaceConfig.prospeccao (perfil de busca)', () => {
         ufs: ['SP', 'XX', 'sp', 'RJ'],
         municipios: ['7107', 'abc'],
         portes: ['micro', 'gigante'],
+        faixasFuncionarios: ['11-50', '11-50', 'desconhecida'],
+        cargosAlvo: ['proprietario', 'owner'],
+        areasAlvo: ['ti', 'vendas'],
         excluirMei: true,
         incluirCnaesSecundarios: 'sim',
         campoDesconhecido: 1,
@@ -32,6 +35,9 @@ describe('workspaceConfig.prospeccao (perfil de busca)', () => {
       ufs: ['SP', 'RJ'],
       municipios: ['7107'],
       portes: ['micro'],
+      faixasFuncionarios: ['11-50'],
+      cargosAlvo: ['proprietario'],
+      areasAlvo: ['ti'],
       excluirMei: true,
     })
   })
