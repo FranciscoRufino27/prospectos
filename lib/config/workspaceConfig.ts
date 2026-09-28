@@ -15,7 +15,7 @@
 // junto com as fases). Se a superfície crescer muito, aí sim avaliamos um zod.
 
 // Suba este número ao mudar o formato do blob, e adicione o passo em `migrar()`.
-export const WORKSPACE_CONFIG_SCHEMA_VERSION = 6
+export const WORKSPACE_CONFIG_SCHEMA_VERSION = 7
 
 // Objetivos que o produto já consegue medir de ponta a ponta. Novos objetivos
 // só entram nesta allowlist quando houver dado operacional real para dashboard,
@@ -165,11 +165,25 @@ export const UFS_BRASIL = [
 
 export const PROSPECCAO_LIMITES = { cnaes: 20, municipios: 100 } as const
 
+export const FAIXAS_FUNCIONARIOS = ['1-10', '11-50', '51-200', '201-500', '501+'] as const
+export type FaixaFuncionarios = (typeof FAIXAS_FUNCIONARIOS)[number]
+
+export const CARGOS_ALVO_PROSPECCAO = ['proprietario', 'socio', 'founder', 'diretor', 'gerente'] as const
+export type CargoAlvoProspeccao = (typeof CARGOS_ALVO_PROSPECCAO)[number]
+
+export const AREAS_ALVO_PROSPECCAO = ['ti', 'rh', 'logistica', 'operacoes', 'comercial', 'marketing', 'financeiro', 'compras'] as const
+export type AreaAlvoProspeccao = (typeof AREAS_ALVO_PROSPECCAO)[number]
+
 export interface ProspeccaoConfig {
   cnaes?: string[]          // 7 dígitos, sem máscara (ex.: '5510801')
   ufs?: string[]            // vazio = Brasil inteiro
   municipios?: string[]     // códigos de município da RF; vazio = todos das UFs
   portes?: PorteProspeccao[] // vazio = todos
+  // Preferências de qualificação/enriquecimento. A fonte RF atual não possui
+  // estes campos, então ainda não entram nos parâmetros da busca do catálogo.
+  faixasFuncionarios?: FaixaFuncionarios[]
+  cargosAlvo?: CargoAlvoProspeccao[]
+  areasAlvo?: AreaAlvoProspeccao[]
   excluirMei?: boolean
   // Casar também pelo CNAE secundário. Desligado por padrão: traz empresas de
   // outro ramo que só listam a atividade como acessória.
@@ -188,10 +202,16 @@ export function parseProspeccaoConfig(bruto: unknown): ProspeccaoConfig | undefi
   const ufs = listaUnica(bruto.ufs, (s) => (UFS_BRASIL as readonly string[]).includes(s), UFS_BRASIL.length)
   const municipios = listaUnica(bruto.municipios, (s) => /^\d{1,7}$/.test(s), PROSPECCAO_LIMITES.municipios)
   const portes = listaUnica(bruto.portes, (s) => (PORTES_PROSPECCAO as readonly string[]).includes(s), PORTES_PROSPECCAO.length)
+  const faixasFuncionarios = listaUnica(bruto.faixasFuncionarios, (s) => (FAIXAS_FUNCIONARIOS as readonly string[]).includes(s), FAIXAS_FUNCIONARIOS.length)
+  const cargosAlvo = listaUnica(bruto.cargosAlvo, (s) => (CARGOS_ALVO_PROSPECCAO as readonly string[]).includes(s), CARGOS_ALVO_PROSPECCAO.length)
+  const areasAlvo = listaUnica(bruto.areasAlvo, (s) => (AREAS_ALVO_PROSPECCAO as readonly string[]).includes(s), AREAS_ALVO_PROSPECCAO.length)
   if (cnaes.length) p.cnaes = cnaes
   if (ufs.length) p.ufs = ufs
   if (municipios.length) p.municipios = municipios
   if (portes.length) p.portes = portes as PorteProspeccao[]
+  if (faixasFuncionarios.length) p.faixasFuncionarios = faixasFuncionarios as FaixaFuncionarios[]
+  if (cargosAlvo.length) p.cargosAlvo = cargosAlvo as CargoAlvoProspeccao[]
+  if (areasAlvo.length) p.areasAlvo = areasAlvo as AreaAlvoProspeccao[]
   if (typeof bruto.excluirMei === 'boolean') p.excluirMei = bruto.excluirMei
   if (typeof bruto.incluirCnaesSecundarios === 'boolean') p.incluirCnaesSecundarios = bruto.incluirCnaesSecundarios
   return Object.keys(p).length ? p : undefined
@@ -306,6 +326,8 @@ function migrar(bruto: Record<string, unknown>): Record<string, unknown> {
   if (v < 5) cfg = { ...cfg, _schema_version: 5 }
   // v5 -> v6: adiciona prospeccaoPesquisas (pesquisas salvas). Ausência = nenhuma.
   if (v < 6) cfg = { ...cfg, _schema_version: 6 }
+  // v6 -> v7: adiciona preferências de qualificação da Prospecção. Ausência = nenhuma.
+  if (v < 7) cfg = { ...cfg, _schema_version: 7 }
   return cfg
 }
 

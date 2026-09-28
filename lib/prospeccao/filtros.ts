@@ -37,7 +37,9 @@ export function filtrosDoPerfil(perfil: ProspeccaoConfig | undefined): FiltrosBu
     municipios: perfil?.municipios ?? [],
     portes: perfil?.portes ?? [],
     excluirMei: perfil?.excluirMei ?? false,
-    soComEmail: false,
+    // Padrão recomendado: e-mail válido é o único critério mínimo que a fonte
+    // atual sustenta de verdade (migration 0051, p_so_com_email filtra no servidor).
+    soComEmail: true,
     texto: '',
   }
 }

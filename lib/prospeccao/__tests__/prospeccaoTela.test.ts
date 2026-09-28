@@ -12,7 +12,7 @@ describe('filtros da busca', () => {
   it('parte do perfil quando o cliente não manda nada', () => {
     expect(normalizarFiltros(undefined, PERFIL)).toEqual({
       cnaes: ['5510801'], incluirCnaesSecundarios: false, ufs: ['SP'], municipios: [],
-      portes: [], excluirMei: true, soComEmail: false, texto: '',
+      portes: [], excluirMei: true, soComEmail: true, texto: '',
     })
     expect(filtrosDoPerfil(undefined).cnaes).toEqual([])
   })
@@ -207,6 +207,29 @@ describe('buscarProspeccao', () => {
     const r2 = await buscarProspeccao(admin, 'org-a', filtros, r.proximoCursor, { contar: false })
     expect(r2.total).toBeNull()
     expect(rpc).not.toHaveBeenCalledWith('prospeccao_contar', expect.anything())
+  })
+
+  it('conta geral e com e-mail sempre as duas, independente do toggle', async () => {
+    const contagens = vi.fn(async (_nome: string, params: { p_so_com_email: boolean }) => (
+      params.p_so_com_email ? { data: 60, error: null } : { data: 137, error: null }
+    ))
+    const admin = {
+      rpc: vi.fn((nome: string, params?: Record<string, unknown>) => (
+        nome === 'prospeccao_buscar'
+          ? Promise.resolve({ data: [linha('10000000000001')], error: null })
+          : contagens(nome, params as { p_so_com_email: boolean })
+      )),
+      from: () => ({
+        select: () => ({ eq: () => ({ order: () => ({ limit: () => ({
+          maybeSingle: async () => ({ data: { mes_rf: '2026-09', concluida_em: null, cnaes: ['5510801'] }, error: null }),
+        }) }) }) }),
+      }),
+    } as unknown as SupabaseClient
+    const r = await buscarProspeccao(admin, 'org-a', normalizarFiltros({ soComEmail: false }, PERFIL), null, { contar: true })
+    expect(r.total).toBe(137)
+    expect(r.totalComEmail).toBe(60)
+    expect(contagens).toHaveBeenCalledWith('prospeccao_contar', expect.objectContaining({ p_so_com_email: false }))
+    expect(contagens).toHaveBeenCalledWith('prospeccao_contar', expect.objectContaining({ p_so_com_email: true }))
   })
 
   it('última página não devolve cursor', async () => {

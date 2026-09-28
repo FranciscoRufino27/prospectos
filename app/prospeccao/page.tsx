@@ -3,17 +3,20 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, Filter, LayoutGrid, ListChecks, Mail,
-  Plus, Radar, RotateCcw, Search, Settings, SlidersHorizontal, Trash2, X,
+  Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, Filter, LayoutGrid, Mail,
+  Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2, UserRound, X,
 } from 'lucide-react';
-import { LIMITE_PAGINA, type FiltrosBusca } from '@/lib/prospeccao/filtros';
+import { filtrosDoPerfil, LIMITE_PAGINA, type FiltrosBusca } from '@/lib/prospeccao/filtros';
 import type { ResultadoCatalogo, StatusCatalogo } from '@/lib/prospeccao/buscaServidor';
 import { ROTULO_QUALIDADE, type QualidadeEmail } from '@/lib/prospeccao/qualidadeEmail';
 import { formatarCnae, iniciais, nomeLegivel, rotuloPorte, ROTULO_PORTE } from '@/lib/prospeccao/rotulos';
-import { gruposDoPerfil, nomeAtividade } from '@/lib/prospeccao/nichos';
+import { gruposDoPerfil, nichoDaAtividade, nomeAtividade } from '@/lib/prospeccao/nichos';
 import { nomeSugerido } from '@/lib/prospeccao/pesquisas';
 import { formatarCnpj } from '@/lib/empresas/cnpj';
-import { PESQUISAS_LIMITES, PORTES_PROSPECCAO, quantidadeValida, type PesquisaSalva, type PorteProspeccao } from '@/lib/config/workspaceConfig';
+import {
+  PESQUISAS_LIMITES, PORTES_PROSPECCAO, quantidadeValida,
+  type PesquisaSalva, type PorteProspeccao, type ProspeccaoConfig,
+} from '@/lib/config/workspaceConfig';
 import DetalheEmpresa, { type Decisor } from '@/components/prospeccao/DetalheEmpresa';
 import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoModal';
 import CaixaSelecao from '@/components/prospeccao/CaixaSelecao';
@@ -78,11 +81,15 @@ interface RespostaApi {
   itens: ResultadoCatalogo[];
   proximoCursor: string | null;
   total: number | null;
+  totalComEmail: number | null;
   catalogo: StatusCatalogo | null;
   filtros: FiltrosBusca;
   perfil: FiltrosBusca;
   temPerfil: boolean;
 }
+
+const ROTULO_STATUS_EMAIL = { todos: 'Todos', com_email: 'Com e-mail', sem_email: 'Sem e-mail' } as const;
+type StatusEmailResultado = keyof typeof ROTULO_STATUS_EMAIL;
 
 // Rótulo em cima, campo embaixo: cada filtro lê como um item de formulário.
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
@@ -196,6 +203,17 @@ export default function ProspeccaoPage() {
   const [itens, setItens] = useState<ResultadoCatalogo[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [total, setTotal] = useState<number | null>(null);
+  const [totalComEmail, setTotalComEmail] = useState<number | null>(null);
+  // Quantas empresas o usuário descartou manualmente nesta sessão de busca
+  // (duplicada, fora do perfil etc.) — some ao reabrir a busca do zero.
+  const [descartadosSessao, setDescartadosSessao] = useState(0);
+  // Filtros do resultado: analisam o que já foi carregado, sem re-consultar o
+  // servidor (diferente dos filtros acima, que ajustam o perfil da busca).
+  const [filtroResultadoTexto, setFiltroResultadoTexto] = useState('');
+  const [filtroResultadoEmail, setFiltroResultadoEmail] = useState<StatusEmailResultado>('todos');
+  const [filtroResultadoNicho, setFiltroResultadoNicho] = useState('');
+  const [filtroResultadoPorte, setFiltroResultadoPorte] = useState('');
+  const [filtroResultadoUf, setFiltroResultadoUf] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
@@ -206,7 +224,6 @@ export default function ProspeccaoPage() {
   const [texto, setTexto] = useState('');
   // '' = todos os nichos do perfil.
   const [nicho, setNicho] = useState('');
-  const [editandoPerfil, setEditandoPerfil] = useState(false);
   // Quantidade desejada: a lista para nela (null = sem limite). O texto do
   // campo aplica com debounce; valor fora de 1–500 não vale.
   const [quantidade, setQuantidade] = useState<number | null>(null);
@@ -237,7 +254,16 @@ export default function ProspeccaoPage() {
       if (!f) setFiltros(corpo.filtros ?? null);
       setItens((atual) => (apos ? [...atual, ...(corpo.itens ?? [])] : corpo.itens ?? []));
       setCursor(corpo.proximoCursor ?? null);
-      if (!apos) setTotal(corpo.total ?? null);
+      if (!apos) {
+        setTotal(corpo.total ?? null);
+        setTotalComEmail(corpo.totalComEmail ?? null);
+        setDescartadosSessao(0);
+        setFiltroResultadoTexto('');
+        setFiltroResultadoEmail('todos');
+        setFiltroResultadoNicho('');
+        setFiltroResultadoPorte('');
+        setFiltroResultadoUf('');
+      }
     } catch (e) {
       if (id === buscaAtual.current) setErro(e instanceof Error ? e.message : 'Erro na busca');
     } finally {
@@ -286,14 +312,24 @@ export default function ProspeccaoPage() {
     buscar(filtros, null, quantidade ? Math.min(quantidade, LIMITE_PAGINA) : undefined);
   }, [filtros, quantidade, buscar]);
 
-  // Perfil salvo no painel: recomeça do perfil novo (o servidor devolve os
-  // filtros efetivos, e o efeito de filtros não dispara uma 2ª busca).
-  function aoSalvarPerfil() {
-    setEditandoPerfil(false);
+  // Perfil salvo no painel: recomeça pelo novo perfil sem perder os ajustes
+  // da busca atual que ainda não fazem parte da configuração persistida.
+  function aoSalvarPerfil(novoPerfil: ProspeccaoConfig | null) {
     setNicho('');
     setTexto('');
     primeiraExecucao.current = true;
-    buscar(null, null);
+    if (!novoPerfil) {
+      buscar(null, null, quantidade ? Math.min(quantidade, LIMITE_PAGINA) : undefined);
+      return;
+    }
+    const novosFiltros = {
+      ...filtrosDoPerfil(novoPerfil),
+      soComEmail: filtros?.soComEmail ?? false,
+    };
+    setTemPerfil(true);
+    setPerfil(novosFiltros);
+    setFiltros(novosFiltros);
+    buscar(novosFiltros, null, quantidade ? Math.min(quantidade, LIMITE_PAGINA) : undefined);
   }
 
   function atualizar(patch: Partial<FiltrosBusca>) {
@@ -385,9 +421,39 @@ export default function ProspeccaoPage() {
     });
   }
 
-  const selecionaveis = useMemo(() => itens.filter((i) => !i.ja_na_base), [itens]);
+  // Opções dos filtros de resultado: só o que existe de verdade no que já
+  // carregou (nunca oferece opção sem nenhuma empresa por trás).
+  const nichosPresentes = useMemo(() => {
+    const vistos = new Map<string, string>();
+    for (const i of itens) {
+      const nicho = nichoDaAtividade(i.cnae_principal);
+      if (nicho) vistos.set(nicho.id, nicho.nome);
+    }
+    return [...vistos.entries()].map(([id, nome]) => ({ id, nome }));
+  }, [itens]);
+  const portesPresentes = useMemo(() => [...new Set(itens.map((i) => i.porte).filter((p): p is string => !!p))], [itens]);
+  const ufsPresentes = useMemo(() => [...new Set(itens.map((i) => i.uf).filter((u): u is string => !!u))].sort(), [itens]);
+
+  const itensFiltrados = useMemo(() => {
+    const termo = filtroResultadoTexto.trim().toLocaleLowerCase('pt-BR');
+    return itens.filter((i) => {
+      if (filtroResultadoEmail === 'com_email' && !i.email) return false;
+      if (filtroResultadoEmail === 'sem_email' && i.email) return false;
+      if (filtroResultadoNicho && nichoDaAtividade(i.cnae_principal)?.id !== filtroResultadoNicho) return false;
+      if (filtroResultadoPorte && i.porte !== filtroResultadoPorte) return false;
+      if (filtroResultadoUf && i.uf !== filtroResultadoUf) return false;
+      if (!termo) return true;
+      const nome = (i.nome_fantasia ?? i.razao_social ?? '').toLocaleLowerCase('pt-BR');
+      const cidade = (i.municipio ?? '').toLocaleLowerCase('pt-BR');
+      const nicho = (nomeAtividade(i.cnae_principal) ?? '').toLocaleLowerCase('pt-BR');
+      return nome.includes(termo) || cidade.includes(termo) || nicho.includes(termo) || i.cnpj.includes(termo.replace(/\D/g, ''));
+    });
+  }, [itens, filtroResultadoTexto, filtroResultadoEmail, filtroResultadoNicho, filtroResultadoPorte, filtroResultadoUf]);
+
+  const haFiltroResultadoAtivo = !!filtroResultadoTexto || filtroResultadoEmail !== 'todos' || !!filtroResultadoNicho || !!filtroResultadoPorte || !!filtroResultadoUf;
+
+  const selecionaveis = useMemo(() => itensFiltrados.filter((i) => !i.ja_na_base), [itensFiltrados]);
   const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every((i) => selecionados.has(i.cnpj));
-  const comEmail = useMemo(() => itens.filter((i) => !!i.email).length, [itens]);
 
   function alternarTodos() {
     setConfirmandoDescarte(false);
@@ -401,6 +467,7 @@ export default function ProspeccaoPage() {
 
   async function descartar() {
     const cnpjs = [...selecionados.keys()];
+    const comEmailDescartados = [...selecionados.values()].filter((i) => !!i.email).length;
     setConfirmandoDescarte(false);
     try {
       const res = await fetch('/api/prospeccao/descartar', {
@@ -411,6 +478,8 @@ export default function ProspeccaoPage() {
       if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.erro || 'Falha ao descartar');
       setItens((atual) => atual.filter((i) => !selecionados.has(i.cnpj)));
       setTotal((t) => (t === null ? t : Math.max(0, t - cnpjs.length)));
+      setTotalComEmail((t) => (t === null ? t : Math.max(0, t - comEmailDescartados)));
+      setDescartadosSessao((n) => n + cnpjs.length);
       setSelecionados(new Map());
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao descartar');
@@ -463,9 +532,16 @@ export default function ProspeccaoPage() {
   // Há mais para carregar: o servidor tem próxima página E a quantidade não foi atingida.
   const temMais = !!cursor && (quantidade === null || carregados < quantidade);
 
+  function focarPerfil() {
+    const titulo = document.getElementById('perfil-busca-titulo');
+    titulo?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    titulo?.focus({ preventScroll: true });
+  }
+
   return (
-    <div className="h-screen overflow-y-auto">
-      <div className={s.page}>
+    <div className={s.workspace}>
+      <div className={s.mainColumn}>
+        <div className={s.page}>
         {/* Cabeçalho */}
         <header className={s.pageHeader}>
           <nav className={s.breadcrumb} aria-label="Navegação estrutural">
@@ -487,9 +563,6 @@ export default function ProspeccaoPage() {
               ) : temPerfil !== null && (
                 <span className="chip chip-warning"><Database size={11} /> Catálogo sem carga concluída</span>
               )}
-              <button type="button" onClick={() => setEditandoPerfil(true)} className={`${s.outlineButton} focus-ring`}>
-                <Settings size={15} /> Perfil de busca
-              </button>
             </div>
           </div>
 
@@ -509,9 +582,6 @@ export default function ProspeccaoPage() {
                   );
                 })}
               </div>
-              <button type="button" onClick={() => setEditandoPerfil(true)} className={`${s.addNicho} focus-ring rounded`}>
-                <Plus size={13} /> Adicionar nicho
-              </button>
             </div>
           )}
 
@@ -541,8 +611,8 @@ export default function ProspeccaoPage() {
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
                 Escolha os nichos, estados e porte das empresas que você quer prospectar. A busca começa por ele.
               </p>
-              <button type="button" onClick={() => setEditandoPerfil(true)} className={`${s.primaryButton} mt-6 focus-ring`}>
-                <Settings size={15} /> Configurar perfil de busca
+              <button type="button" onClick={focarPerfil} className={`${s.primaryButton} mt-6 focus-ring`}>
+                <SlidersHorizontal size={15} /> Configurar no painel ao lado
               </button>
             </section>
           ) : (
@@ -637,69 +707,60 @@ export default function ProspeccaoPage() {
                       </Selecao>
                     </Campo>
 
-                    <Campo rotulo="Quantidade">
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={PESQUISAS_LIMITES.quantidadeMax}
-                        value={quantidadeTexto}
-                        onChange={(e) => setQuantidadeTexto(e.target.value)}
-                        placeholder="Sem limite"
-                        className={`${s.field} px-3 focus-ring`}
-                      />
-                    </Campo>
                   </div>
-                  {quantidadeTexto.trim() !== '' && quantidadeValida(Number(quantidadeTexto)) === null && (
-                    <p className="mt-2 text-xs text-amber-300">
-                      Quantidade entre 1 e {PESQUISAS_LIMITES.quantidadeMax}.
-                    </p>
-                  )}
 
                   <div className={s.toggleRow}>
-                    <Alternar ativo={filtros.soComEmail} onChange={(v) => atualizar({ soComEmail: v })}>Só com e-mail</Alternar>
                     <Alternar ativo={filtros.excluirMei} onChange={(v) => atualizar({ excluirMei: v })}>Excluir MEI</Alternar>
                     <Alternar ativo={filtros.incluirCnaesSecundarios} onChange={(v) => atualizar({ incluirCnaesSecundarios: v })}>Incluir atividade secundária</Alternar>
                   </div>
                 </section>
               )}
 
-              {/* Resumo */}
+              {/* Resumo — Meta = quantidade desejada; avaliadas/com e-mail/descartadas
+                  vêm da contagem real do servidor, sem depender do que já carregou. */}
               <section className={s.kpiGrid}>
                 <Indicador
                   tom="cyan"
+                  icone={Target}
+                  rotulo="Meta"
+                  valor={quantidade ? `${quantidade.toLocaleString('pt-BR')}` : '—'}
+                  detalhe={
+                    !quantidade
+                      ? 'defina a quantidade no painel'
+                      : filtros?.soComEmail
+                        ? 'leads com e-mail válido'
+                        : 'empresas — ligue "e-mail obrigatório" para valer como leads válidos'
+                  }
+                />
+                <Indicador
+                  tom="violet"
                   icone={Building2}
-                  rotulo="Empresas encontradas"
+                  rotulo="Empresas avaliadas"
                   valor={total === null ? '—' : total.toLocaleString('pt-BR')}
                   detalhe={carregando && carregados === 0 ? 'Buscando…' : 'no catálogo, com os filtros atuais'}
                 />
                 <Indicador
-                  tom="violet"
-                  icone={ListChecks}
-                  rotulo="Na lista"
-                  valor={carregados.toLocaleString('pt-BR')}
-                  proporcao={quantidade ? carregados / Math.max(1, Math.min(quantidade, total ?? quantidade)) : total ? carregados / total : null}
+                  tom="emerald"
+                  icone={Mail}
+                  rotulo="Com e-mail válido"
+                  valor={totalComEmail === null ? '—' : totalComEmail.toLocaleString('pt-BR')}
+                  proporcao={total && totalComEmail !== null ? totalComEmail / Math.max(1, total) : null}
                   detalhe={
-                    quantidade && total !== null && total > quantidade
-                      ? `de ${quantidade.toLocaleString('pt-BR')} desejadas${temMais ? ' — use “Carregar mais”' : ''}`
-                      : temMais ? 'use “Carregar mais” no fim da lista' : 'todas as encontradas estão na lista'
+                    total && totalComEmail !== null
+                      ? `${Math.round((totalComEmail / Math.max(1, total)) * 100)}% do avaliado`
+                      : 'aguardando contagem'
                   }
                 />
                 <Indicador
-                  tom="emerald"
-                  icone={Mail}
-                  rotulo="Com e-mail na lista"
-                  valor={comEmail.toLocaleString('pt-BR')}
-                  proporcao={carregados ? comEmail / carregados : null}
-                  detalhe={carregados ? `${Math.round((comEmail / carregados) * 100)}% da lista tem e-mail da Receita` : 'nenhuma empresa na lista'}
-                />
-                <Indicador
                   tom="amber"
-                  icone={Check}
-                  rotulo="Selecionadas"
-                  valor={selecionados.size.toLocaleString('pt-BR')}
-                  proporcao={selecionaveis.length ? Math.min(1, selecionados.size / selecionaveis.length) : null}
-                  detalhe={selecionados.size ? 'prontas para importar' : 'marque as empresas que interessam'}
+                  icone={Ban}
+                  rotulo="Descartadas"
+                  valor={
+                    total === null || totalComEmail === null
+                      ? descartadosSessao.toLocaleString('pt-BR')
+                      : (Math.max(0, total - totalComEmail) + descartadosSessao).toLocaleString('pt-BR')
+                  }
+                  detalhe="sem e-mail ou descartadas manualmente nesta busca"
                 />
               </section>
 
@@ -715,20 +776,78 @@ export default function ProspeccaoPage() {
                     titulo="Resultados"
                     subtitulo={grupoAtivo ? `Empresas de ${grupoAtivo.nome} no catálogo da Receita.` : 'Empresas do catálogo da Receita para o seu perfil.'}
                   />
-                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                    <CaixaSelecao marcado={todosSelecionados} onChange={alternarTodos} />
-                    Selecionar todas da lista
-                  </label>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs text-slate-400">
+                      <span className="font-semibold tabular-nums text-slate-200">{selecionados.size}</span> selecionada{selecionados.size === 1 ? '' : 's'}
+                    </span>
+                    <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                      <CaixaSelecao marcado={todosSelecionados} onChange={alternarTodos} />
+                      Selecionar todas as {selecionaveis.length.toLocaleString('pt-BR')} filtradas
+                    </label>
+                  </div>
                 </div>
+
+                {/* Filtros de resultado: analisam o que já carregou nesta busca —
+                    diferente dos filtros acima, não voltam ao servidor. */}
+                <div className={`${s.panelHeader}`} style={{ borderBottom: '1px solid var(--m-border-subtle, #17496e)' }}>
+                  <div className={s.filterGrid} style={{ marginTop: 0, flex: 1 }}>
+                    <Campo rotulo="Filtrar nesta lista">
+                      <div className="relative">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={filtroResultadoTexto}
+                          onChange={(e) => setFiltroResultadoTexto(e.target.value)}
+                          placeholder="Empresa, cidade ou nicho…"
+                          className={`${s.field} pl-9 pr-9 focus-ring`}
+                        />
+                      </div>
+                    </Campo>
+                    <Campo rotulo="E-mail">
+                      <Selecao rotuloAcessivel="E-mail" valor={filtroResultadoEmail} onChange={(v) => setFiltroResultadoEmail(v as StatusEmailResultado)}>
+                        {(Object.keys(ROTULO_STATUS_EMAIL) as StatusEmailResultado[]).map((v) => <option key={v} value={v}>{ROTULO_STATUS_EMAIL[v]}</option>)}
+                      </Selecao>
+                    </Campo>
+                    <Campo rotulo="Nicho">
+                      <Selecao rotuloAcessivel="Nicho" valor={filtroResultadoNicho} onChange={setFiltroResultadoNicho}>
+                        <option value="">Todos</option>
+                        {nichosPresentes.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
+                      </Selecao>
+                    </Campo>
+                    <Campo rotulo="Porte">
+                      <Selecao rotuloAcessivel="Porte" valor={filtroResultadoPorte} onChange={setFiltroResultadoPorte}>
+                        <option value="">Todos</option>
+                        {portesPresentes.map((p) => <option key={p} value={p}>{rotuloPorte(p)}</option>)}
+                      </Selecao>
+                    </Campo>
+                    <Campo rotulo="Localização">
+                      <Selecao rotuloAcessivel="Localização" valor={filtroResultadoUf} onChange={setFiltroResultadoUf}>
+                        <option value="">Todas</option>
+                        {ufsPresentes.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+                      </Selecao>
+                    </Campo>
+                  </div>
+                  {haFiltroResultadoAtivo && (
+                    <button
+                      type="button"
+                      onClick={() => { setFiltroResultadoTexto(''); setFiltroResultadoEmail('todos'); setFiltroResultadoNicho(''); setFiltroResultadoPorte(''); setFiltroResultadoUf(''); }}
+                      className={`${s.linkAction} focus-ring rounded`}
+                    >
+                      <RotateCcw size={12} /> Limpar filtros de resultado
+                    </button>
+                  )}
+                </div>
+
                 <table className={s.table}>
                   <thead>
                     <tr>
-                      <th className="w-14"><span className="sr-only">Selecionar</span></th>
-                      <th className="w-[34%]">Empresa</th>
-                      <th className="w-[18%]">Cidade</th>
-                      <th className="w-[14%]">Porte</th>
-                      <th>E-mail</th>
-                      <th className="w-36"><span className="sr-only">Situação</span></th>
+                      <th className="w-12"><span className="sr-only">Selecionar</span></th>
+                      <th className="w-[24%]">Empresa</th>
+                      <th className="w-[14%]">Localização</th>
+                      <th className="w-[10%]">Porte</th>
+                      <th className="w-[13%]">Nicho</th>
+                      <th className="w-[19%]">E-mail</th>
+                      <th className="w-[14%]">Decisor</th>
+                      <th className="w-28"><span className="sr-only">Situação</span></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -736,14 +855,22 @@ export default function ProspeccaoPage() {
                       <LinhasEsqueleto />
                     ) : carregados === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-24 text-center">
+                        <td colSpan={8} className="py-24 text-center">
                           <Building2 size={30} className="mx-auto text-slate-600" />
                           <p className="mt-4 text-sm font-medium text-slate-300">Nenhuma empresa com esses filtros</p>
                           <p className="mt-1 text-sm text-slate-500">Tente ampliar os estados, o porte ou o nicho.</p>
                         </td>
                       </tr>
+                    ) : itensFiltrados.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-24 text-center">
+                          <Filter size={30} className="mx-auto text-slate-600" />
+                          <p className="mt-4 text-sm font-medium text-slate-300">Nenhuma empresa com esse filtro de resultado</p>
+                          <p className="mt-1 text-sm text-slate-500">{carregados} carregada{carregados === 1 ? '' : 's'} nesta busca — tente limpar o filtro acima.</p>
+                        </td>
+                      </tr>
                     ) : (
-                      itens.map((i) => {
+                      itensFiltrados.map((i) => {
                         const expandido = aberto === i.cnpj;
                         const selecionado = selecionados.has(i.cnpj);
                         const decisor = decisores[i.cnpj];
@@ -755,7 +882,7 @@ export default function ProspeccaoPage() {
                               onClick={() => setAberto(expandido ? null : i.cnpj)}
                               className={`group cursor-pointer ${selecionado ? s.rowSelected : expandido ? s.rowOpen : ''}`}
                             >
-                              <td className={`w-14 px-5 py-2.5 ${selecionado ? 'shadow-[inset_3px_0_0_var(--accent)]' : ''}`} onClick={(e) => e.stopPropagation()}>
+                              <td className={`w-12 px-5 py-2.5 ${selecionado ? 'shadow-[inset_3px_0_0_var(--accent)]' : ''}`} onClick={(e) => e.stopPropagation()}>
                                 <CaixaSelecao
                                   desabilitado={i.ja_na_base}
                                   marcado={selecionado}
@@ -773,13 +900,7 @@ export default function ProspeccaoPage() {
                                       <span className="min-w-0 font-medium text-slate-100 truncate">{nome}</span>
                                       <ChevronRight size={14} className={`shrink-0 text-slate-600 transition-transform group-hover:text-slate-400 ${expandido ? 'rotate-90 text-slate-300' : ''}`} />
                                     </div>
-                                    <div className="mt-1 flex min-w-0 items-center gap-2">
-                                      <span className="shrink-0 font-mono text-xs text-slate-500">{formatarCnpj(i.cnpj)}</span>
-                                      <span className={s.activityTag} title={formatarCnae(i.cnae_principal)}>{atividade ?? formatarCnae(i.cnae_principal)}</span>
-                                    </div>
-                                    {decisor?.nome && (
-                                      <div className="mt-1 flex items-center gap-1 text-xs text-indigo-300"><Check size={11} /> {decisor.nome}</div>
-                                    )}
+                                    <span className="mt-1 block font-mono text-xs text-slate-500">{formatarCnpj(i.cnpj)}</span>
                                   </div>
                                 </div>
                               </td>
@@ -790,6 +911,9 @@ export default function ProspeccaoPage() {
                               <td className="px-4 py-2.5 whitespace-nowrap text-slate-300">
                                 {rotuloPorte(i.porte)}
                                 {i.mei && <span className="chip chip-warning ml-2">MEI</span>}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span className={s.activityTag} title={formatarCnae(i.cnae_principal)}>{atividade ?? formatarCnae(i.cnae_principal)}</span>
                               </td>
                               <td className="px-4 py-2.5">
                                 {i.email ? (
@@ -807,7 +931,20 @@ export default function ProspeccaoPage() {
                                   <span className="text-sm text-slate-500">Sem e-mail</span>
                                 )}
                               </td>
-                              <td className="w-36 px-5 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <td className="px-4 py-2.5">
+                                {decisor?.nome ? (
+                                  <div className="flex items-start gap-1.5 text-xs text-indigo-300">
+                                    <UserRound size={13} className="mt-0.5 shrink-0" />
+                                    <span>
+                                      <span className="block text-slate-200">{decisor.nome}</span>
+                                      {decisor.cargo && <span className="block text-slate-500">{decisor.cargo}</span>}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-slate-500">Não verificado</span>
+                                )}
+                              </td>
+                              <td className="w-28 px-5 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                 {i.ja_na_base && (
                                   i.lead_id
                                     ? <Link href={`/leads/${i.lead_id}`} className="chip chip-success hover:brightness-125"><Check size={11} /> Já na base</Link>
@@ -817,7 +954,7 @@ export default function ProspeccaoPage() {
                             </tr>
                             {expandido && (
                               <tr>
-                                <td colSpan={6} className="p-0">
+                                <td colSpan={8} className="p-0">
                                   <DetalheEmpresa empresa={i} decisor={decisor ?? null} onDecisor={(d) => setDecisores((m) => ({ ...m, [i.cnpj]: d }))} />
                                 </td>
                               </tr>
@@ -846,12 +983,23 @@ export default function ProspeccaoPage() {
               {selecionados.size > 0 && <div className="h-16" />}
             </>
           )}
+          </div>
         </div>
       </div>
 
+      <PerfilBuscaPainel
+        catalogoCnaes={catalogo?.cnaes ?? null}
+        quantidadeTexto={quantidadeTexto}
+        soComEmail={filtros?.soComEmail ?? false}
+        filtrosDisponiveis={!!filtros}
+        onQuantidadeChange={setQuantidadeTexto}
+        onSoComEmailChange={(ativo) => atualizar({ soComEmail: ativo })}
+        onSalvo={aoSalvarPerfil}
+      />
+
       {/* Barra de ações da seleção — left-60 = largura do menu lateral. */}
       {selecionados.size > 0 && (
-        <div className="pointer-events-none fixed left-60 right-0 bottom-6 z-40 flex justify-center">
+        <div className={`${s.selectionDock} pointer-events-none fixed bottom-6 z-40 flex justify-center`}>
           <div className={`${s.selectionBar} pointer-events-auto animate-in`}>
             <span className="text-sm text-slate-200">
               <span className="font-semibold tabular-nums">{selecionados.size}</span> selecionada{selecionados.size === 1 ? '' : 's'}
@@ -874,14 +1022,6 @@ export default function ProspeccaoPage() {
             </button>
           </div>
         </div>
-      )}
-
-      {editandoPerfil && (
-        <PerfilBuscaPainel
-          catalogoCnaes={catalogo?.cnaes ?? null}
-          onFechar={() => setEditandoPerfil(false)}
-          onSalvo={aoSalvarPerfil}
-        />
       )}
 
       {importando && (
