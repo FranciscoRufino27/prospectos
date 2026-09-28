@@ -311,6 +311,21 @@ export class SupabaseWorkflowStore implements WorkflowStore {
       .sort((a, b) => String(a.iniciado_em).localeCompare(String(b.iniciado_em))) as WorkflowExecucao[]
   }
 
+  async execucoesCampanhaTravadas(limiteEm: string): Promise<WorkflowExecucao[]> {
+    const { data, error } = await this.db
+      .from('workflow_execucoes')
+      .select('*')
+      .eq('organizacao_id', this.organizacaoId)
+      .eq('status', 'aguardando')
+      .eq('passo_atual', 0)
+      .eq('agendamento_geracao', 0)
+      .not('campanha_id', 'is', null)
+      .lte('proxima_verificacao_em', limiteEm)
+      .order('iniciado_em', { ascending: true })
+    if (error) throw error
+    return (data ?? []) as WorkflowExecucao[]
+  }
+
   async workflowsPublicados(): Promise<Workflow[]> {
     const { data, error } = await this.db
       .from('workflows')

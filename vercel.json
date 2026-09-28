@@ -70,6 +70,10 @@
     {
       "path": "/api/comercial/handoff/acompanhamento",
       "schedule": "45 12 * * *"
+    },
+    {
+      "path": "/api/campanhas/watchdog-fila",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

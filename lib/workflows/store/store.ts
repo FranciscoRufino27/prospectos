@@ -79,6 +79,12 @@ export interface WorkflowStore {
   // Execuções que o poll deve tocar AGORA: em_andamento, ou aguardando com
   // proxima_verificacao_em <= agora (espera vencida). Ordenadas por antiguidade.
   execucoesPendentes(agoraISO: string): Promise<WorkflowExecucao[]>
+  // 1ª ação (passo_atual=0, agendamento_geracao=0) de uma campanha que ficou
+  // 'aguardando' sem avançar além do limiar — indício de falha na ENTREGA da
+  // fila de disparo (não de erro de execução, que já vira status='erro').
+  // A exclusão de prospecção (que tem reconciliação própria e durável) é feita
+  // pelo chamador via ambiente.buscarControleExecucaoCampanha, não aqui.
+  execucoesCampanhaTravadas?(limiteEm: string): Promise<WorkflowExecucao[]>
   // Workflows publicados (status='publicado') — candidatos a enrollment.
   workflowsPublicados(): Promise<Workflow[]>
   // Contagem de execuções ATIVAS (em_andamento|aguardando) por workflow_id — a

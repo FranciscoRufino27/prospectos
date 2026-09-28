@@ -260,6 +260,20 @@ export class MemoryWorkflowStore implements WorkflowStore {
       .map((ex) => ({ ...ex }))
   }
 
+  async execucoesCampanhaTravadas(limiteEm: string): Promise<WorkflowExecucao[]> {
+    const limite = new Date(limiteEm).getTime()
+    return [...this.execucoes.values()]
+      .filter((ex) =>
+        ex.status === 'aguardando'
+        && ex.passo_atual === 0
+        && (ex.agendamento_geracao ?? 0) === 0
+        && !!ex.campanha_id
+        && ex.proxima_verificacao_em != null
+        && new Date(ex.proxima_verificacao_em).getTime() <= limite)
+      .sort((a, b) => a.iniciado_em.localeCompare(b.iniciado_em))
+      .map((ex) => ({ ...ex }))
+  }
+
   async workflowsPublicados(): Promise<Workflow[]> {
     return [...this.workflows.values()].filter((w) => w.status === 'publicado').map((w) => ({ ...w }))
   }
