@@ -37,7 +37,11 @@ export interface StatusCatalogo {
 export interface RespostaBusca {
   itens: ResultadoCatalogo[]
   proximoCursor: string | null
+  // Total geral (ignora soComEmail) e total com e-mail: os dois juntos dão os
+  // cards "Empresas avaliadas" / "Com e-mail válido" / "Descartadas", sempre,
+  // independente do critério de e-mail estar ligado nesta busca.
   total: number | null
+  totalComEmail: number | null
   catalogo: StatusCatalogo | null
 }
 
@@ -62,19 +66,23 @@ export async function buscarProspeccao(
 ): Promise<RespostaBusca> {
   // Sem CNAE a busca varreria o catálogo inteiro: a tela pede para configurar.
   if (filtros.cnaes.length === 0) {
-    return { itens: [], proximoCursor: null, total: 0, catalogo: await statusCatalogo(admin) }
+    return { itens: [], proximoCursor: null, total: 0, totalComEmail: 0, catalogo: await statusCatalogo(admin) }
   }
   const params = paramsRpc(org, filtros)
   // Quantidade desejada: a página traz só o que falta (nunca mais que LIMITE_PAGINA).
   const limite = limitePagina(opcoes.limite)
-  const [pagina, contagem, catalogo] = await Promise.all([
+  const [pagina, contagemGeral, contagemComEmail, catalogo] = await Promise.all([
     admin.rpc('prospeccao_buscar', { ...params, p_apos_cnpj: cursor, p_limite: limite }),
-    // Contagem só na primeira página: paginar não muda o total.
-    opcoes.contar ? admin.rpc('prospeccao_contar', params) : Promise.resolve({ data: null, error: null }),
+    // Contagem só na primeira página: paginar não muda o total. Sempre as duas
+    // (geral e com e-mail), independente do toggle atual — os cards precisam
+    // dos dois números ao mesmo tempo.
+    opcoes.contar ? admin.rpc('prospeccao_contar', { ...params, p_so_com_email: false }) : Promise.resolve({ data: null, error: null }),
+    opcoes.contar ? admin.rpc('prospeccao_contar', { ...params, p_so_com_email: true }) : Promise.resolve({ data: null, error: null }),
     statusCatalogo(admin),
   ])
   if (pagina.error) throw new Error(`Falha na busca: ${pagina.error.message}`)
-  if (contagem.error) throw new Error(`Falha na contagem: ${contagem.error.message}`)
+  if (contagemGeral.error) throw new Error(`Falha na contagem: ${contagemGeral.error.message}`)
+  if (contagemComEmail.error) throw new Error(`Falha na contagem com e-mail: ${contagemComEmail.error.message}`)
 
   const linhas = (pagina.data ?? []) as Omit<ResultadoCatalogo, 'qualidade_email'>[]
   const itens = linhas.map((l) => ({
@@ -85,7 +93,8 @@ export async function buscarProspeccao(
   return {
     itens,
     proximoCursor: itens.length === limite ? itens[itens.length - 1].cnpj : null,
-    total: contagem.data === null ? null : Number(contagem.data),
+    total: contagemGeral.data === null ? null : Number(contagemGeral.data),
+    totalComEmail: contagemComEmail.data === null ? null : Number(contagemComEmail.data),
     catalogo,
   }
 }
