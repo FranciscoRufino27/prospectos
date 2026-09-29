@@ -45,6 +45,7 @@ export default function PerfilBuscaPainel({
   filtrosDisponiveis,
   onQuantidadeChange,
   onSoComEmailChange,
+  onFechar,
   onSalvo,
 }: {
   catalogoCnaes: string[] | null;
@@ -53,6 +54,7 @@ export default function PerfilBuscaPainel({
   filtrosDisponiveis: boolean;
   onQuantidadeChange: (valor: string) => void;
   onSoComEmailChange: (ativo: boolean) => void;
+  onFechar: () => void;
   onSalvo: (perfil: ProspeccaoConfig | null) => void;
 }) {
   const [perfil, setPerfil] = useState<ProspeccaoConfig>({});
@@ -78,6 +80,13 @@ export default function PerfilBuscaPainel({
       .catch((e) => setErro(e instanceof Error ? e.message : 'Erro ao carregar'))
       .finally(() => setCarregando(false));
   }, []);
+
+  useEffect(() => {
+    // Esc já tratado por um campo (ex.: menu aberto) não fecha a gaveta.
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented && !salvando) onFechar(); };
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [onFechar, salvando]);
 
   const cnaes = perfil.cnaes ?? [];
   const ufs = perfil.ufs ?? [];
@@ -153,13 +162,16 @@ export default function PerfilBuscaPainel({
   }
 
   return (
-    <aside className={s.profilePanel} aria-labelledby="perfil-busca-titulo">
+    <div className={s.drawerBackdrop} onMouseDown={(e) => { if (e.target === e.currentTarget && !salvando) onFechar(); }}>
+    <aside className={s.profilePanel} role="dialog" aria-modal="true" aria-labelledby="perfil-busca-titulo">
       <header className={s.profileHeader}>
-        <span className={s.profileHeaderIcon}><SlidersHorizontal size={17} aria-hidden="true" /></span>
         <div className="min-w-0">
           <h2 id="perfil-busca-titulo" tabIndex={-1}>Perfil de busca</h2>
           <p>Defina onde e que tipo de empresa você deseja encontrar.</p>
         </div>
+        <button type="button" onClick={onFechar} disabled={salvando} aria-label="Fechar perfil de busca" className={`${s.profileClose} focus-ring`}>
+          <X size={17} />
+        </button>
       </header>
 
       {carregando ? (
@@ -313,5 +325,6 @@ export default function PerfilBuscaPainel({
         </footer>
       )}
     </aside>
+    </div>
   );
 }

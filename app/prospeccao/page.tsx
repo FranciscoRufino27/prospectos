@@ -198,6 +198,7 @@ function LinhasEsqueleto() {
 export default function ProspeccaoPage() {
   const [filtros, setFiltros] = useState<FiltrosBusca | null>(null);
   const [perfil, setPerfil] = useState<FiltrosBusca | null>(null);
+  const [perfilAberto, setPerfilAberto] = useState(false);
   const [temPerfil, setTemPerfil] = useState<boolean | null>(null);
   const [catalogo, setCatalogo] = useState<StatusCatalogo | null>(null);
   const [itens, setItens] = useState<ResultadoCatalogo[]>([]);
@@ -315,6 +316,7 @@ export default function ProspeccaoPage() {
   // Perfil salvo no painel: recomeça pelo novo perfil sem perder os ajustes
   // da busca atual que ainda não fazem parte da configuração persistida.
   function aoSalvarPerfil(novoPerfil: ProspeccaoConfig | null) {
+    setPerfilAberto(false);
     setNicho('');
     setTexto('');
     primeiraExecucao.current = true;
@@ -533,9 +535,7 @@ export default function ProspeccaoPage() {
   const temMais = !!cursor && (quantidade === null || carregados < quantidade);
 
   function focarPerfil() {
-    const titulo = document.getElementById('perfil-busca-titulo');
-    titulo?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    titulo?.focus({ preventScroll: true });
+    setPerfilAberto(true);
   }
 
   return (
@@ -553,6 +553,9 @@ export default function ProspeccaoPage() {
               <p>Encontre empresas novas na Receita Federal e traga para a base as que fazem sentido.</p>
             </div>
             <div className={s.headerActions}>
+              <button type="button" onClick={focarPerfil} className={`${s.outlineButton} focus-ring`}>
+                <SlidersHorizontal size={15} /> Perfil de busca
+              </button>
               {catalogo ? (
                 <span
                   className={s.catalogBadge}
@@ -987,6 +990,7 @@ export default function ProspeccaoPage() {
         </div>
       </div>
 
+      {perfilAberto && (
       <PerfilBuscaPainel
         catalogoCnaes={catalogo?.cnaes ?? null}
         quantidadeTexto={quantidadeTexto}
@@ -994,8 +998,10 @@ export default function ProspeccaoPage() {
         filtrosDisponiveis={!!filtros}
         onQuantidadeChange={setQuantidadeTexto}
         onSoComEmailChange={(ativo) => atualizar({ soComEmail: ativo })}
+        onFechar={() => setPerfilAberto(false)}
         onSalvo={aoSalvarPerfil}
       />
+      )}
 
       {/* Barra de ações da seleção — left-60 = largura do menu lateral. */}
       {selecionados.size > 0 && (
