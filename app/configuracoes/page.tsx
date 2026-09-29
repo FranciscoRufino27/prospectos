@@ -2,12 +2,13 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Settings, Sliders, SlidersHorizontal, Palette, Target, Radar } from 'lucide-react';
+import { Settings, Sliders, SlidersHorizontal, Palette, Target, Radar, Plug } from 'lucide-react';
 import ParametrosMotorPanel from '@/components/configuracoes/ParametrosMotorPanel';
 import ProcessoComercialPanel from '@/components/configuracoes/ProcessoComercialPanel';
 import PersonalizacaoPanel from '@/components/configuracoes/PersonalizacaoPanel';
 import ObjetivosOperacaoPanel from '@/components/configuracoes/ObjetivosOperacaoPanel';
 import PerfilProspeccaoPanel from '@/components/configuracoes/PerfilProspeccaoPanel';
+import IntegracoesPanel from '@/components/configuracoes/IntegracoesPanel';
 import { AbasModulo, PaginaModulo } from '@/components/tema/Modulo';
 
 // Configurações por workspace: objetivos, motor, processo e personalização.
@@ -20,8 +21,8 @@ export default function ConfiguracoesPage() {
   );
 }
 
-type Aba = 'objetivos' | 'prospeccao' | 'motor' | 'processo' | 'personalizacao';
-const ABAS: Aba[] = ['objetivos', 'prospeccao', 'motor', 'processo', 'personalizacao'];
+type Aba = 'objetivos' | 'prospeccao' | 'motor' | 'processo' | 'personalizacao' | 'integracoes';
+const ABAS: Aba[] = ['objetivos', 'prospeccao', 'motor', 'processo', 'personalizacao', 'integracoes'];
 
 function Inner() {
   const searchParams = useSearchParams();
@@ -85,6 +86,7 @@ function Inner() {
     { id: 'motor', label: 'Motor de cadência', Icon: Sliders },
     { id: 'processo', label: 'Processo comercial', Icon: SlidersHorizontal },
     { id: 'personalizacao', label: 'Personalização', Icon: Palette },
+    { id: 'integracoes', label: 'Integrações', Icon: Plug },
   ] as const;
 
   return (
@@ -98,6 +100,7 @@ function Inner() {
         {aba === 'motor' && <ParametrosMotorPanel />}
         {aba === 'processo' && <ProcessoComercialPanel />}
         {aba === 'personalizacao' && <PersonalizacaoPanel />}
+        {aba === 'integracoes' && <IntegracoesPanel />}
       </div>
     </PaginaModulo>
   );
