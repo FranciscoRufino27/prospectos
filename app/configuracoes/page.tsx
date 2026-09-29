@@ -2,15 +2,13 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Settings, Sliders, SlidersHorizontal, Palette, Target, Radar } from 'lucide-react';
-import ParametrosMotorPanel from '@/components/configuracoes/ParametrosMotorPanel';
-import ProcessoComercialPanel from '@/components/configuracoes/ProcessoComercialPanel';
+import { Settings, Users, Palette, Target } from 'lucide-react';
+import DistribuicaoComercialPanel from '@/components/configuracoes/DistribuicaoComercialPanel';
 import PersonalizacaoPanel from '@/components/configuracoes/PersonalizacaoPanel';
 import ObjetivosOperacaoPanel from '@/components/configuracoes/ObjetivosOperacaoPanel';
-import PerfilProspeccaoPanel from '@/components/configuracoes/PerfilProspeccaoPanel';
 import { AbasModulo, PaginaModulo } from '@/components/tema/Modulo';
 
-// Configurações por workspace: objetivos, motor, processo e personalização.
+// Configurações por workspace: objetivos, distribuição comercial e personalização.
 // Deep-links por ?tab. useSearchParams exige Suspense.
 export default function ConfiguracoesPage() {
   return (
@@ -20,8 +18,11 @@ export default function ConfiguracoesPage() {
   );
 }
 
-type Aba = 'objetivos' | 'prospeccao' | 'motor' | 'processo' | 'personalizacao';
-const ABAS: Aba[] = ['objetivos', 'prospeccao', 'motor', 'processo', 'personalizacao'];
+type Aba = 'objetivos' | 'distribuicao' | 'personalizacao';
+const ABAS: Aba[] = ['objetivos', 'distribuicao', 'personalizacao'];
+// Abas removidas: o link antigo do processo comercial (/processo-comercial
+// redireciona para ?tab=processo) cai na Distribuição, única seção que ficou.
+const ABAS_LEGADAS: Record<string, Aba> = { processo: 'distribuicao' };
 
 function Inner() {
   const searchParams = useSearchParams();
@@ -33,6 +34,7 @@ function Inner() {
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && (ABAS as string[]).includes(tab)) setAba(tab as Aba);
+    else if (tab && ABAS_LEGADAS[tab]) setAba(ABAS_LEGADAS[tab]);
   }, [searchParams]);
 
   useEffect(() => {
@@ -51,7 +53,7 @@ function Inner() {
   const cabecalho = {
     grupo: 'Administração',
     titulo: 'Configurações',
-    subtitulo: 'Objetivos, perfil de busca, motor, processo comercial e personalização do workspace.',
+    subtitulo: 'Objetivos, distribuição comercial e personalização do workspace.',
   };
 
   if (podeConfigurar === null) {
@@ -68,7 +70,7 @@ function Inner() {
           <Settings size={22} className="mx-auto text-slate-400" />
           <h2 className="mt-3 text-lg font-semibold text-slate-200">Configurações do workspace</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Estas configurações valem para toda a operação — motor de cadência, processo comercial e
+            Estas configurações valem para toda a operação — objetivos, distribuição comercial e
             personalização. O seu acesso não inclui alterá-las.
           </p>
           <p className="mt-3 text-xs text-slate-500">
@@ -81,9 +83,7 @@ function Inner() {
 
   const TABS = [
     { id: 'objetivos', label: 'Objetivos da operação', Icon: Target },
-    { id: 'prospeccao', label: 'Perfil de busca', Icon: Radar },
-    { id: 'motor', label: 'Motor de cadência', Icon: Sliders },
-    { id: 'processo', label: 'Processo comercial', Icon: SlidersHorizontal },
+    { id: 'distribuicao', label: 'Distribuição', Icon: Users },
     { id: 'personalizacao', label: 'Personalização', Icon: Palette },
   ] as const;
 
@@ -94,9 +94,7 @@ function Inner() {
     >
       <div className="animate-in">
         {aba === 'objetivos' && <ObjetivosOperacaoPanel />}
-        {aba === 'prospeccao' && <PerfilProspeccaoPanel />}
-        {aba === 'motor' && <ParametrosMotorPanel />}
-        {aba === 'processo' && <ProcessoComercialPanel />}
+        {aba === 'distribuicao' && <DistribuicaoComercialPanel />}
         {aba === 'personalizacao' && <PersonalizacaoPanel />}
       </div>
     </PaginaModulo>
