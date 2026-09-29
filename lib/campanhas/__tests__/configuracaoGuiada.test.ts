@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   aplicarRegraPublicoPorTipo,
   campanhaEhDisparoUnico,
+  avisoRetornoCampanha,
   corpoComLink,
   montarDefinicaoCampanha,
   modeloEmailRespostaCampanha,
   normalizarPublicoCampanha,
+  responsavelRecebeCopiaDosEnvios,
   tipoTemplateCampanha,
   validarCampanhaGuiada,
 } from '../configuracaoGuiada'
@@ -203,5 +205,71 @@ describe('configuração guiada de campanha', () => {
     }), 'renovacao')
     expect(publico.operacao?.resposta?.emailAssunto).toBe('Assunto próprio')
     expect(publico.operacao?.resposta?.emailCorpo).toBe('Corpo próprio')
+  })
+})
+describe('acompanhamento do responsável e aviso de resposta da campanha', () => {
+  const base = {
+    responsavel_id: 'perfil-1',
+    selecao: { modo: 'manual', leadIds: ['lead-1'] },
+  }
+  const comAviso = (aviso: unknown, resto: Record<string, unknown> = {}) => normalizarPublicoCampanha({
+    ...base,
+    operacao: { remetenteEmail: 'time@empresa.com', mensagemInicial: { assunto: 'Oi', corpo: 'Olá' }, resposta: { aviso, ...resto } },
+  })
+
+  it('campanha anterior às opções: cópia ligada, sem aviso próprio, e-mail de retorno como antes', () => {
+    const publico = normalizarPublicoCampanha({ responsavel_id: 'perfil-1' })
+    expect(publico.operacao?.responsavelRecebe).toBe('envios_e_respostas')
+    expect(publico.operacao?.resposta?.aviso).toBeUndefined()
+    expect(publico.operacao?.resposta?.notificarResponsavel).toBe(true)
+    expect(responsavelRecebeCopiaDosEnvios({})).toBe(true)
+    expect(responsavelRecebeCopiaDosEnvios(null)).toBe(true)
+    expect(avisoRetornoCampanha({ operacao: { resposta: {} } })).toBeNull()
+  })
+
+  it('"somente as respostas" desliga a cópia dos envios; valor desconhecido cai no padrão', () => {
+    const cru = { operacao: { responsavelRecebe: 'somente_respostas' } }
+    expect(normalizarPublicoCampanha(cru).operacao?.responsavelRecebe).toBe('somente_respostas')
+    expect(responsavelRecebeCopiaDosEnvios(cru)).toBe(false)
+    expect(normalizarPublicoCampanha({ operacao: { responsavelRecebe: 'nunca' } }).operacao?.responsavelRecebe).toBe('envios_e_respostas')
+  })
+
+  it('só e-mail, só WhatsApp ou os dois; destinos desconhecidos/duplicados são descartados', () => {
+    expect(comAviso({ email: true, whatsapp: [] }).operacao?.resposta?.aviso).toEqual({ email: true, whatsapp: [] })
+    expect(comAviso({ email: false, whatsapp: ['grupo', 'sms', 'grupo', 'responsavel'] }).operacao?.resposta?.aviso)
+      .toEqual({ email: false, whatsapp: ['responsavel', 'grupo'] })
+  })
+
+  it('sem e-mail marcado, o e-mail de retorno fica desligado (mesmo com o flag antigo) e o modelo não é exigido', () => {
+    const publico = comAviso({ email: false, whatsapp: ['grupo'] }, { notificarResponsavel: true })
+    expect(publico.operacao?.resposta?.notificarResponsavel).toBe(false)
+    expect(validarCampanhaGuiada(publico)).toEqual([])
+  })
+
+  it('com e-mail marcado, o modelo do e-mail continua exigido', () => {
+    const publico = comAviso({ email: true, whatsapp: ['responsavel'] })
+    expect(publico.operacao?.resposta?.notificarResponsavel).toBe(true)
+    expect(validarCampanhaGuiada(publico)).toEqual(expect.arrayContaining(['Informe o assunto do e-mail de resposta ao responsável.']))
+  })
+
+  it('nenhum canal marcado não passa', () => {
+    expect(validarCampanhaGuiada(comAviso({ email: false, whatsapp: [] })))
+      .toContain('Escolha ao menos um canal para o aviso de resposta (e-mail ou WhatsApp).')
+  })
+
+  it('grupo próprio da campanha: aparado e validado no formato da Z-API', () => {
+    const ok = comAviso({ email: false, whatsapp: ['grupo'], grupoWhatsappId: ' 120363019502650977-group ' })
+    expect(ok.operacao?.resposta?.aviso?.grupoWhatsappId).toBe('120363019502650977-group')
+    expect(validarCampanhaGuiada(ok)).toEqual([])
+    expect(validarCampanhaGuiada(comAviso({ email: false, whatsapp: ['grupo'], grupoWhatsappId: 'grupo da equipe' })))
+      .toContain('O grupo do WhatsApp precisa estar no formato 120363019502650977-group.')
+    // Vazio = usa o grupo da conta (não é gravado).
+    expect(comAviso({ email: true, whatsapp: ['grupo'], grupoWhatsappId: '  ' }).operacao?.resposta?.aviso).toEqual({ email: true, whatsapp: ['grupo'] })
+  })
+
+  it('formato curto anterior (resposta.canais) é lido como aviso ao responsável', () => {
+    expect(avisoRetornoCampanha({ operacao: { resposta: { canais: 'email_whatsapp' } } })).toEqual({ email: true, whatsapp: ['responsavel'] })
+    const soWhatsapp = normalizarPublicoCampanha({ operacao: { resposta: { canais: 'whatsapp' } } })
+    expect(soWhatsapp.operacao?.resposta).toMatchObject({ aviso: { email: false, whatsapp: ['responsavel'] }, notificarResponsavel: false })
   })
 })

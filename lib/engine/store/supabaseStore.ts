@@ -12,6 +12,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { getEngineConfig, OWNER_ENGINE } from '../config'
 import { log } from '../logger'
 import { ESTAGIOS_EM_CADENCIA, dominioDoLead } from '../templates'
+import { avisoRetornoCampanha } from '@/lib/campanhas/configuracaoGuiada'
 import type { ContextoCampanhaResposta, Lead, NovaInteracao, TipoInteracaoEngine, UsuarioBasico } from '../types'
 import type { Store, TemplateEmail } from './store'
 
@@ -307,6 +308,7 @@ export class SupabaseStore implements Store {
     const resposta = operacao.resposta && typeof operacao.resposta === 'object'
       ? operacao.resposta as Record<string, unknown>
       : {}
+    const avisoRetorno = avisoRetornoCampanha(publico)
     return {
       id: campanhaRow.id,
       execucaoId: (execucao as { id?: string | null }).id ?? null,
@@ -319,7 +321,10 @@ export class SupabaseStore implements Store {
       // Só o valor explícito 'lead' inverte a precedência; campanha antiga (sem
       // o campo) continua encaminhando para o responsável fixo.
       retornoParaResponsavelDoLead: publico?.retornoPara === 'lead',
-      notificarResponsavel: resposta.notificarResponsavel !== false,
+      avisoRetorno,
+      // Com a escolha do aviso, o e-mail marcado nela manda (mesmo que o flag
+      // antigo tenha ficado gravado como true).
+      notificarResponsavel: avisoRetorno ? avisoRetorno.email : resposta.notificarResponsavel !== false,
       emailAssunto: typeof resposta.emailAssunto === 'string' ? resposta.emailAssunto : null,
       emailCorpo: typeof resposta.emailCorpo === 'string' ? resposta.emailCorpo : null,
       emailHtml: typeof resposta.emailHtml === 'string' ? resposta.emailHtml : null,

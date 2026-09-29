@@ -89,7 +89,8 @@ async function detectarEEncaminharRespostas(motor: Motor) {
     classificarResposta: (r) => classificarResposta(r, classificadorIa),
     handoffProspeccao: admin && rodizioLigado ? montarHookHandoffProspeccao(admin) : undefined,
     // Aviso de resposta no WhatsApp da equipe: o hook consulta a config da
-    // org e não faz nada quando ela não ligou o aviso.
+    // org e não faz nada quando ela não ligou o aviso — salvo resposta de
+    // campanha com aviso próprio, cujos destinos valem no lugar da regra da org.
     avisarResposta: admin ? montarHookAvisoResposta(admin) : undefined,
   })
   await motor.fila.processar()

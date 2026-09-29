@@ -33,13 +33,18 @@ export async function enviarEmailCampanhaComCopia(
     // campanha como fallback. Mesma precedência do aviso de retorno — o cliente
     // não pode receber e-mail assinado por uma pessoa e cair na caixa de outra.
     preferirResponsavelDoLead?: boolean
+    // false = campanha em "somente as respostas": o responsável continua
+    // assinando e recebendo o retorno, mas não vai em cópia de cada envio.
+    copiarResponsavel?: boolean
   },
 ): Promise<UsuarioBasico> {
   const responsavel = escolherResponsavelCampanha(mensagem)
+  // Exigido mesmo sem cópia: é quem assina e quem recebe o retorno.
   if (!responsavel) {
     throw new Error('Envio bloqueado: o responsável comercial não possui e-mail para receber a cópia.')
   }
-  const cc = responsavel.email.trim().toLowerCase() === mensagem.remetenteEmail?.trim().toLowerCase()
+  const cc = mensagem.copiarResponsavel === false
+    || responsavel.email.trim().toLowerCase() === mensagem.remetenteEmail?.trim().toLowerCase()
     ? undefined
     : responsavel.email.trim()
   await provider.enviar(

@@ -16,6 +16,7 @@ import { log } from '@/lib/engine/logger'
 import type { Motor } from '@/lib/engine'
 import type { Lead } from '@/lib/engine/types'
 import { montarEmailCampanhaHtml } from '@/lib/campanhas/emailCampanha'
+import { responsavelRecebeCopiaDosEnvios } from '@/lib/campanhas/configuracaoGuiada'
 import { enviarEmailCampanhaComCopia, escolherResponsavelCampanha } from '@/lib/campanhas/emailComCopiaServidor'
 import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
 import {
@@ -500,14 +501,19 @@ export class AmbienteSupabase implements AmbienteWorkflow {
       }
     }
 
+    // "Somente as respostas" na campanha: o e-mail sai sem o responsável em
+    // cópia (vale para os dois caminhos de CC abaixo).
+    const copiarResponsavel = responsavelRecebeCopiaDosEnvios(campanhaPublico)
     // Envio real: usa a conta da org (emailProvider) se configurada; senão a padrão.
     try {
     if (campanhaId && ccRenovacaoAtivo) {
-      const cc = resolverCcResponsavelRenovacao({
-        para: lead.contato_email,
-        remetenteEmail: emailCred?.user,
-        responsavelLead,
-      })
+      const cc = copiarResponsavel
+        ? resolverCcResponsavelRenovacao({
+          para: lead.contato_email,
+          remetenteEmail: emailCred?.user,
+          responsavelLead,
+        })
+        : undefined
       await emailProvider.enviar(lead.contato_email, assunto, corpo, html, cc)
     } else if (campanhaId) {
       await enviarEmailCampanhaComCopia(emailProvider, {
@@ -519,6 +525,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
         responsavelCampanha: contextoCampanha?.responsavel,
         responsavelLead,
         preferirResponsavelDoLead,
+        copiarResponsavel,
       })
     } else {
       await emailProvider.enviar(lead.contato_email, assunto, corpo, html)

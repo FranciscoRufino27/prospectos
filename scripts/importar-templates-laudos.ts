@@ -34,7 +34,7 @@ for (const linha of readFileSync('.env.local', 'utf-8').split(/\r?\n/)) {
 }
 
 const PASTA = path.join(
-  process.cwd(), 'templates', 'templates laudos', 'templates', 'templates laudos', 'templates', 'laudos',
+  process.cwd(), 'templates', 'templates laudos', 'templates', 'laudos',
 )
 const ORGANIZACAO_NOME = 'LAUDO DE BRINQUEDOS'
 

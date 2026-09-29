@@ -5,8 +5,10 @@ import { materializarCampanhaGuiada } from './materializarServidor'
 import {
   LIMITE_CONFIRMACAO_CAMPANHA,
   aplicarRegraPublicoPorTipo,
+  normalizarPublicoCampanha,
   validarCampanhaGuiada,
 } from './configuracaoGuiada'
+import { exigirAvisoRetornoPronto } from './retornoWhatsappServidor'
 import { buscarPreviaPublicoCampanha } from './publicoServidor'
 import { exigirEnvioRealCampanhaDisponivel } from './opcoesServidor'
 import { restaurarLeadImportadoForaDoMotor, transferirLeadImportadoParaMotor } from './carteiraServidor'
@@ -137,6 +139,11 @@ export async function inscreverCampanhaReal(
   if (!workflow || workflow.status !== 'publicado' || !workflow.versao_atual_id) {
     throw new Error('O workflow da campanha precisa estar publicado antes do envio real.')
   }
+
+  // Aviso de resposta escolhido na campanha: grupo marcado precisa existir, e
+  // sem e-mail a resposta tem de chegar a alguém pelo WhatsApp — não sai do
+  // ensaio sem isso.
+  await exigirAvisoRetornoPronto(admin, org, normalizarPublicoCampanha(campanha.publico), previa.idsElegiveis)
 
   // Só sai do dry-run depois de público e workflow terem sido revalidados.
   if (campanha.dry_run !== false) {

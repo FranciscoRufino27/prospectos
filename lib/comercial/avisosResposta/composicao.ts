@@ -38,12 +38,9 @@ async function lerContextoLead(admin: SupabaseClient, org: string, leadId: strin
   return { empresa: (lead.empresa as string | null) ?? '', contato: (lead.contato_nome as string | null) ?? '', responsavel }
 }
 
-// O responsável é um `usuarios`; o número fica no PERFIL de login dele. A
-// ponte usuarios → perfil é a mesma da atribuição (e-mail exato, senão nome
-// inequívoco); sem correspondência única, não há para quem avisar.
-async function lerWhatsappResponsavel(admin: SupabaseClient, org: string, usuarioId: string): Promise<string | null> {
-  const perfilId = await resolverAuthIdDoResponsavel(admin, org, usuarioId)
-  if (!perfilId) return null
+// Número de avisos de um perfil de login — só se ele ligou os avisos e o
+// número é válido; senão null.
+export async function lerWhatsappDoPerfil(admin: SupabaseClient, org: string, perfilId: string): Promise<string | null> {
   const { data, error } = await admin
     .from('perfis')
     .select('whatsapp_avisos, avisos_whatsapp_ativo')
@@ -53,6 +50,15 @@ async function lerWhatsappResponsavel(admin: SupabaseClient, org: string, usuari
   if (error) throw new Error(error.message)
   if (!data?.avisos_whatsapp_ativo) return null
   return numeroWhatsappAvisos(data.whatsapp_avisos as string | null)
+}
+
+// O responsável é um `usuarios`; o número fica no PERFIL de login dele. A
+// ponte usuarios → perfil é a mesma da atribuição (e-mail exato, senão nome
+// inequívoco); sem correspondência única, não há para quem avisar.
+export async function lerWhatsappResponsavel(admin: SupabaseClient, org: string, usuarioId: string): Promise<string | null> {
+  const perfilId = await resolverAuthIdDoResponsavel(admin, org, usuarioId)
+  if (!perfilId) return null
+  return lerWhatsappDoPerfil(admin, org, perfilId)
 }
 
 // Z-API → porta do serviço. O individual usa o mesmo send-text do lead.
@@ -78,6 +84,7 @@ export function montarDepsAvisoResposta(admin: SupabaseClient): DepsAvisoRespost
     lerGrupoId: (org) => lerGrupoComercialDaOrg(admin, org),
     lerContextoLead: (org, leadId) => lerContextoLead(admin, org, leadId),
     lerWhatsappResponsavel: (org, usuarioId) => lerWhatsappResponsavel(admin, org, usuarioId),
+    lerWhatsappPerfil: (org, perfilId) => lerWhatsappDoPerfil(admin, org, perfilId),
     enviarIndividual: enviarIndividualZapi,
     enviarGrupo: enviadorGrupoZapi,
     provedorConfigurado: () => lerConfigZapi() !== null,

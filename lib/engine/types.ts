@@ -79,6 +79,14 @@ export interface ContextoCampanhaResposta {
   // PRÓPRIO lead (carteira), usando `responsavel` acima só como fallback.
   // Opcional: contexto montado por store antigo/teste vale como false (legado).
   retornoParaResponsavelDoLead?: boolean
+  // Aviso de resposta escolhido na campanha (publico.operacao.resposta.aviso).
+  // Com valor, os destinos de WhatsApp dele SUBSTITUEM a regra da organização
+  // para esta resposta; null/ausente = campanha antiga (só a regra da org).
+  avisoRetorno?: {
+    email: boolean
+    whatsapp: ('responsavel' | 'grupo')[]
+    grupoWhatsappId?: string
+  } | null
   notificarResponsavel: boolean
   emailAssunto: string | null
   emailCorpo: string | null
