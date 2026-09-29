@@ -3,9 +3,10 @@
 // fakes nos testes).
 //
 // Invariantes:
-//   - modo ausente na organização = desligado: nada é registrado nem enviado,
-//     salvo quando a campanha da resposta pediu o WhatsApp do responsável
-//     (incluirResponsavel) — aí só esse destino;
+//   - resposta de campanha com escolha de aviso (destinosCampanha): os
+//     destinos dela valem no lugar da regra da organização ([] = nenhum);
+//   - fora disso, modo ausente na organização = desligado: nada é registrado
+//     nem enviado;
 //   - um aviso por (resposta, destino): a mesma resposta nunca avisa duas vezes;
 //   - no máximo um aviso por lead por JANELA_ANTISPAM_MIN (cliente de WhatsApp
 //     costuma mandar várias mensagens seguidas);
@@ -69,11 +70,9 @@ export type ResultadoAvisoResposta =
   | { tipo: 'sem_destino' } // ex.: só grupo, e o grupo já foi avisado pelo handoff
   | { tipo: 'processado'; resultados: ResultadoProcessamentoAviso[] }
 
-function destinosDoModo(modo: ModoAvisoResposta | null, incluirResponsavel: boolean): DestinoAvisoResposta[] {
-  const destinos: DestinoAvisoResposta[] = modo === 'ambos' ? ['responsavel', 'grupo'] : modo ? [modo] : []
-  // A campanha pediu o WhatsApp do responsável: soma ao que a org escolheu.
-  if (incluirResponsavel && !destinos.includes('responsavel')) destinos.unshift('responsavel')
-  return destinos
+function destinosDoModo(modo: ModoAvisoResposta): DestinoAvisoResposta[] {
+  if (modo === 'ambos') return ['responsavel', 'grupo']
+  return [modo]
 }
 
 /** Registra (idempotente) e tenta entregar os avisos de UMA resposta. */
@@ -82,9 +81,15 @@ export async function avisarRespostaCliente(
   entrada: EntradaAvisoResposta,
 ): Promise<ResultadoAvisoResposta> {
   const org = entrada.organizacaoId
-  const modo = await deps.lerModo(org)
-  const incluirResponsavel = entrada.incluirResponsavel === true
-  if (!modo && !incluirResponsavel) return { tipo: 'desligado' }
+  // A escolha da campanha manda; só sem ela vale a regra da organização.
+  let destinosBase: DestinoAvisoResposta[]
+  if (entrada.destinosCampanha) {
+    destinosBase = (['responsavel', 'grupo'] as const).filter((d) => entrada.destinosCampanha!.includes(d))
+  } else {
+    const modo = await deps.lerModo(org)
+    destinosBase = modo ? destinosDoModo(modo) : []
+  }
+  if (destinosBase.length === 0) return { tipo: 'desligado' }
 
   // Retentativa da mesma resposta: reaproveita o que já foi registrado.
   let avisos = await deps.repo.listarPorEvento(org, entrada.eventoId)
@@ -96,7 +101,7 @@ export async function avisarRespostaCliente(
     const ctx = await deps.lerContextoLead(org, entrada.leadId)
     if (!ctx) return { tipo: 'lead_nao_encontrado' }
 
-    const destinos = destinosDoModo(modo, incluirResponsavel).filter((d) => !(d === 'grupo' && entrada.grupoJaAvisado))
+    const destinos = destinosBase.filter((d) => !(d === 'grupo' && entrada.grupoJaAvisado))
     if (destinos.length === 0) return { tipo: 'sem_destino' }
 
     // Responsável da campanha (quando a campanha define quem recebe) vale para
@@ -110,6 +115,7 @@ export async function avisarRespostaCliente(
       trecho: extrairTrecho(entrada.texto),
       responsavelId: ctx.responsavel?.id ?? null,
       responsavelPerfilId: daCampanha?.id ?? null,
+      grupoId: entrada.grupoIdCampanha?.trim() || null,
       responsavelNome: daCampanha?.nome ?? ctx.responsavel?.nome ?? '',
       link: deps.linkLead?.(entrada.leadId) ?? null,
     }
@@ -129,7 +135,7 @@ async function resolverDestino(deps: DepsAvisoResposta, a: AvisoResposta): Promi
     return { motivo: 'Z-API não configurada no servidor (ZAPI_INSTANCE_ID, ZAPI_TOKEN, ZAPI_CLIENT_TOKEN).' }
   }
   if (a.destinoTipo === 'grupo') {
-    const grupo = await deps.lerGrupoId(a.organizacaoId)
+    const grupo = a.dados.grupoId || await deps.lerGrupoId(a.organizacaoId)
     return grupo ? { destino: grupo } : { motivo: 'Grupo comercial não configurado (Configurações > Processo comercial > Distribuição).' }
   }
   const numero = a.dados.responsavelPerfilId

@@ -31,6 +31,8 @@ export interface DadosAvisoResposta {
   // presente, é ele quem recebe o aviso individual, no lugar do dono do lead.
   // Ausente em avisos gravados antes deste campo = regra antiga.
   responsavelPerfilId?: string | null
+  // Grupo definido pela campanha; ausente = grupo da organização.
+  grupoId?: string | null
   responsavelNome: string
   link: string | null
 }
@@ -70,10 +72,12 @@ export interface EntradaAvisoResposta {
   // A resposta positiva com rodízio já avisou o grupo pelo handoff: não
   // manda um segundo aviso ao mesmo grupo.
   grupoJaAvisado?: boolean
-  // A campanha escolheu avisar o responsável no WhatsApp
-  // (publico.operacao.resposta.canais): liga o destino 'responsavel' para
-  // ESTA resposta mesmo com o aviso da organização desligado ou só no grupo.
-  incluirResponsavel?: boolean
+  // Destinos de WhatsApp escolhidos pela campanha da resposta
+  // (publico.operacao.resposta.aviso.whatsapp). Presente = SUBSTITUI a regra
+  // da organização para esta resposta ([] = campanha sem WhatsApp).
+  destinosCampanha?: DestinoAvisoResposta[]
+  // Grupo escolhido na campanha (id Z-API "…-group"); ausente = grupo da conta.
+  grupoIdCampanha?: string | null
   // Quem a campanha define como responsável pelo retorno (perfil de login),
   // quando é ele — e não o dono do lead — quem recebe. Mesma pessoa do e-mail
   // de retorno; ausente = responsável do lead.

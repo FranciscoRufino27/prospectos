@@ -8,7 +8,7 @@ import {
   normalizarPublicoCampanha,
   validarCampanhaGuiada,
 } from './configuracaoGuiada'
-import { exigirWhatsappRetornoPronto } from './retornoWhatsappServidor'
+import { exigirAvisoRetornoPronto } from './retornoWhatsappServidor'
 import { buscarPreviaPublicoCampanha } from './publicoServidor'
 import { exigirEnvioRealCampanhaDisponivel } from './opcoesServidor'
 import { restaurarLeadImportadoForaDoMotor, transferirLeadImportadoParaMotor } from './carteiraServidor'
@@ -140,9 +140,10 @@ export async function inscreverCampanhaReal(
     throw new Error('O workflow da campanha precisa estar publicado antes do envio real.')
   }
 
-  // "Somente WhatsApp": sem número de avisos de quem recebe o retorno, a
-  // resposta não chegaria a ninguém — não sai do ensaio assim.
-  await exigirWhatsappRetornoPronto(admin, org, normalizarPublicoCampanha(campanha.publico), previa.idsElegiveis)
+  // Aviso de resposta escolhido na campanha: grupo marcado precisa existir, e
+  // sem e-mail a resposta tem de chegar a alguém pelo WhatsApp — não sai do
+  // ensaio sem isso.
+  await exigirAvisoRetornoPronto(admin, org, normalizarPublicoCampanha(campanha.publico), previa.idsElegiveis)
 
   // Só sai do dry-run depois de público e workflow terem sido revalidados.
   if (campanha.dry_run !== false) {

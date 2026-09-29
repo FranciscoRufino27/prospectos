@@ -166,34 +166,50 @@ describe('avisarRespostaCliente', () => {
   })
 })
 
-describe('avisarRespostaCliente — escolha da campanha (WhatsApp do responsável)', () => {
+describe('avisarRespostaCliente — aviso escolhido na campanha', () => {
   let t: ReturnType<typeof montar>
   beforeEach(() => { t = montar(null) })
 
-  it('org desligada + campanha pede o WhatsApp: avisa só o responsável no privado', async () => {
-    const r = await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: true }))
+  it('org desligada + campanha pede o responsável: avisa só o responsável no privado', async () => {
+    const r = await avisarRespostaCliente(t.deps, entrada({ destinosCampanha: ['responsavel'] }))
     expect(r.tipo).toBe('processado')
     expect(t.enviados.map((e) => [e.tipo, e.destino])).toEqual([['individual', '5511999998888']])
-    expect(t.repo.linhas.map((a) => a.destinoTipo)).toEqual(['responsavel'])
   })
 
-  it('org só no grupo + campanha pede o WhatsApp: privado E grupo', async () => {
-    t.estado.modo = 'grupo'
-    await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: true }))
-    expect(t.enviados.map((e) => e.tipo)).toEqual(['individual', 'grupo'])
-  })
-
-  it('org em "ambos" + campanha pede o WhatsApp: o responsável não é avisado duas vezes', async () => {
+  it('a escolha da campanha SUBSTITUI a da organização: org "ambos", campanha só grupo', async () => {
     t.estado.modo = 'ambos'
-    await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: true }))
+    await avisarRespostaCliente(t.deps, entrada({ destinosCampanha: ['grupo'] }))
+    expect(t.enviados.map((e) => e.tipo)).toEqual(['grupo'])
+  })
+
+  it('campanha sem WhatsApp ([]): ninguém é avisado, mesmo com a org em "ambos"', async () => {
+    t.estado.modo = 'ambos'
+    expect(await avisarRespostaCliente(t.deps, entrada({ destinosCampanha: [] }))).toEqual({ tipo: 'desligado' })
+    expect(t.repo.linhas).toHaveLength(0)
+  })
+
+  it('responsável e grupo, sem destino repetido', async () => {
+    await avisarRespostaCliente(t.deps, entrada({ destinosCampanha: ['grupo', 'responsavel', 'grupo'] }))
     expect(t.repo.linhas.map((a) => a.destinoTipo)).toEqual(['responsavel', 'grupo'])
-    expect(t.enviados.map((e) => e.tipo)).toEqual(['individual', 'grupo'])
+  })
+
+  it('grupo próprio da campanha vai no lugar do grupo da conta, também no reprocesso', async () => {
+    t.estado.provedor = false
+    const r = await avisarRespostaCliente(t.deps, entrada({ destinosCampanha: ['grupo'], grupoIdCampanha: '120363000000000001-group' }))
+    expect(r.tipo === 'processado' && r.resultados[0].tipo).toBe('configuracao_ausente')
+    t.estado.provedor = true
+    expect(await reprocessarAvisosResposta(t.deps, ORG)).toEqual({ tentados: 1, enviados: 1 })
+    expect(t.enviados[0].destino).toBe('120363000000000001-group')
+  })
+
+  it('sem grupo próprio, usa o grupo da conta', async () => {
+    await avisarRespostaCliente(t.deps, entrada({ destinosCampanha: ['grupo'], grupoIdCampanha: null }))
+    expect(t.enviados[0].destino).toBe('120363019502650977-group')
   })
 
   it('responsável definido pela campanha: vai para o número do PERFIL dele e é ele na menção do grupo', async () => {
-    t.estado.modo = 'grupo'
     await avisarRespostaCliente(t.deps, entrada({
-      incluirResponsavel: true,
+      destinosCampanha: ['responsavel', 'grupo'],
       responsavelPerfil: { id: 'perfil-aline', nome: 'Aline' },
     }))
     expect(t.enviados.map((e) => [e.tipo, e.destino])).toEqual([
@@ -206,16 +222,14 @@ describe('avisarRespostaCliente — escolha da campanha (WhatsApp do responsáve
 
   it('responsável da campanha sem WhatsApp de avisos: fica em configuracao_ausente e sai quando ele cadastrar', async () => {
     t.estado.numeroPerfil = null
-    const r = await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: true, responsavelPerfil: { id: 'perfil-aline', nome: 'Aline' } }))
+    const r = await avisarRespostaCliente(t.deps, entrada({ destinosCampanha: ['responsavel'], responsavelPerfil: { id: 'perfil-aline', nome: 'Aline' } }))
     expect(r.tipo === 'processado' && r.resultados[0].tipo).toBe('configuracao_ausente')
-    expect(t.enviados).toHaveLength(0)
     t.estado.numeroPerfil = '5521988887777'
     expect(await reprocessarAvisosResposta(t.deps, ORG)).toEqual({ tentados: 1, enviados: 1 })
     expect(t.enviados[0].destino).toBe('5521988887777')
   })
 
-  it('sem o pedido da campanha, org desligada continua desligada', async () => {
-    expect(await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: false }))).toEqual({ tipo: 'desligado' })
-    expect(t.repo.linhas).toHaveLength(0)
+  it('resposta sem escolha da campanha segue a organização (desligada = desligado)', async () => {
+    expect(await avisarRespostaCliente(t.deps, entrada())).toEqual({ tipo: 'desligado' })
   })
 })

@@ -4,31 +4,29 @@ import type { Publico } from '@/components/automacao/tiposCampanha'
 import { lerConfigZapi } from '@/lib/whatsapp/zapi'
 import { lerWhatsappDoPerfil, lerWhatsappResponsavel } from '@/lib/comercial/avisosResposta/composicao'
 import { numeroWhatsappAvisos } from '@/lib/comercial/avisosResposta/numero'
-import { canaisRetornoCampanha } from './configuracaoGuiada'
+import { lerGrupoComercialDaOrg } from '@/lib/comercial/handoff/composicao'
+import { avisoRetornoCampanha } from './configuracaoGuiada'
 
-// Pré-condição do "Somente WhatsApp" na campanha: sem Z-API ou sem o número de
-// avisos de quem recebe o retorno, a resposta do cliente não chegaria a
-// ninguém (o e-mail de retorno está desligado nesse modo). A campanha não
-// começa assim — o wizard mostra o mesmo bloqueio antes, para o responsável
-// geral; na carteira os donos dos leads só são conhecidos com o público.
+// Pré-condições do aviso de resposta escolhido na campanha, conferidas antes
+// de sair do ensaio. O wizard mostra os mesmos bloqueios antes, no que dá para
+// saber lá (Z-API, grupo, número do responsável geral); na carteira os donos
+// dos leads só são conhecidos com o público.
+//   - grupo marcado sem grupo (nem da campanha, nem da conta) → bloqueia;
+//   - sem e-mail, a resposta precisa chegar a alguém pelo WhatsApp: Z-API
+//     configurada E (grupo disponível OU todos os responsáveis com número).
 
 const LOTE_LEADS = 300
 
-export interface PendenciasWhatsappRetorno {
-  provedorConfigurado: boolean
-  // Quem receberia o retorno e não tem o WhatsApp de avisos ligado.
-  semNumero: string[]
-}
-
-export async function verificarWhatsappRetorno(
+// Quem receberia o retorno no WhatsApp individual e não tem o número de avisos
+// ligado. Mesma escolha de pessoa do aviso (avisoPedidoPelaCampanha): carteira
+// = dono de cada lead, com o responsável da campanha para lead sem dono.
+export async function responsaveisSemWhatsapp(
   admin: SupabaseClient,
   org: string,
   publico: Publico,
   leadIds: string[],
-): Promise<PendenciasWhatsappRetorno> {
+): Promise<string[]> {
   const semNumero: string[] = []
-  // Mesma escolha de pessoa do aviso (avisoPedidoPelaCampanha): carteira =
-  // dono de cada lead, com o responsável da campanha para lead sem dono.
   let usaResponsavelDaCampanha = publico.retornoPara !== 'lead'
   if (publico.retornoPara === 'lead') {
     const donos = new Set<string>()
@@ -65,23 +63,36 @@ export async function verificarWhatsappRetorno(
       semNumero.push((data?.nome as string | null)?.trim() || 'responsável da campanha')
     }
   }
-  return { provedorConfigurado: lerConfigZapi() !== null, semNumero: [...new Set(semNumero)] }
+  return [...new Set(semNumero)]
 }
 
-export async function exigirWhatsappRetornoPronto(
+export async function exigirAvisoRetornoPronto(
   admin: SupabaseClient,
   org: string,
   publico: Publico,
   leadIds: string[],
 ): Promise<void> {
-  if (canaisRetornoCampanha(publico) !== 'whatsapp') return
-  const p = await verificarWhatsappRetorno(admin, org, publico, leadIds)
-  if (!p.provedorConfigurado) {
-    throw new Error('"Somente WhatsApp" precisa do WhatsApp (Z-API) configurado no servidor. Escolha "E-mail e WhatsApp" ou configure a Z-API antes de iniciar.')
+  const aviso = avisoRetornoCampanha(publico)
+  if (!aviso) return
+  if (!aviso.email && !aviso.whatsapp.length) {
+    throw new Error('Escolha ao menos um canal para o aviso de resposta (e-mail ou WhatsApp).')
   }
-  if (p.semNumero.length) {
-    const quem = p.semNumero.join(', ')
-    throw new Error(`"Somente WhatsApp": ${quem} ainda não ${p.semNumero.length === 1 ? 'ligou' : 'ligaram'} o WhatsApp de avisos (Meu perfil > Avisos no WhatsApp) — as respostas não chegariam a ninguém. Peça o cadastro ou escolha "E-mail e WhatsApp".`)
+  const querGrupo = aviso.whatsapp.includes('grupo')
+  const grupo = querGrupo ? aviso.grupoWhatsappId || await lerGrupoComercialDaOrg(admin, org) : null
+  if (querGrupo && !grupo) {
+    throw new Error('O aviso no grupo do WhatsApp está marcado, mas não há grupo: informe o grupo na campanha ou cadastre em Configurações > Processo comercial > Distribuição.')
+  }
+  if (aviso.email) return
+
+  // Sem e-mail: o WhatsApp é o único caminho da resposta até a equipe.
+  if (!lerConfigZapi()) {
+    throw new Error('Aviso só por WhatsApp precisa do WhatsApp (Z-API) configurado no servidor. Marque também o e-mail ou configure a Z-API antes de iniciar.')
+  }
+  if (grupo) return
+  const semNumero = await responsaveisSemWhatsapp(admin, org, publico, leadIds)
+  if (semNumero.length) {
+    const quem = semNumero.join(', ')
+    throw new Error(`Aviso só por WhatsApp: ${quem} ainda não ${semNumero.length === 1 ? 'ligou' : 'ligaram'} o WhatsApp de avisos (Meu perfil > Avisos no WhatsApp) — as respostas não chegariam a ninguém. Peça o cadastro, marque o grupo ou marque também o e-mail.`)
   }
 }
 

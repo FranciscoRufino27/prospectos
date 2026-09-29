@@ -88,7 +88,20 @@ export interface FollowupCampanha extends MensagemCampanha {
 }
 
 export type ResponsavelRecebe = 'envios_e_respostas' | 'somente_respostas';
-export type CanaisRetorno = 'email_whatsapp' | 'whatsapp';
+export type DestinoWhatsappRetorno = 'responsavel' | 'grupo';
+
+// Como a equipe é avisada quando o cliente responde a ESTA campanha. Com o
+// campo presente, ele substitui a regra da organização (comercial.avisoResposta)
+// para as respostas da campanha.
+export interface AvisoRetorno {
+  // E-mail de retorno ao responsável (modelo da etapa Cadência).
+  email: boolean;
+  // Destinos no WhatsApp; vazio = sem WhatsApp.
+  whatsapp: DestinoWhatsappRetorno[];
+  // Grupo desta campanha (id Z-API "…-group"); ausente = grupo cadastrado em
+  // Configurações > Processo comercial > Distribuição.
+  grupoWhatsappId?: string;
+}
 
 export interface OperacaoCampanha {
   // Comunicados gerais são disparos únicos; renovação e objetivos comerciais
@@ -104,12 +117,9 @@ export interface OperacaoCampanha {
   // só fica sabendo quando o cliente responde.
   responsavelRecebe?: ResponsavelRecebe;
   resposta?: {
-    // Por onde o responsável recebe o aviso de resposta. 'email_whatsapp' =
-    // e-mail de retorno + WhatsApp de avisos; 'whatsapp' = só o WhatsApp (o
-    // e-mail de retorno fica desligado). Ausente = campanha anterior a este
-    // campo: e-mail conforme `notificarResponsavel` e WhatsApp só pela regra
-    // da organização.
-    canais?: CanaisRetorno;
+    // Ausente = campanha anterior à escolha: e-mail conforme
+    // `notificarResponsavel` e WhatsApp só pela regra da organização.
+    aviso?: AvisoRetorno;
     pararCadencia?: boolean;
     criarTarefa?: boolean;
     prazoHoras?: number;

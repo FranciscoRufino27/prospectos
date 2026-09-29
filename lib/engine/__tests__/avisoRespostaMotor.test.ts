@@ -122,7 +122,7 @@ describe('aviso de resposta no motor', () => {
   })
 })
 
-describe('aviso de resposta — WhatsApp pedido pela campanha', () => {
+describe('aviso de resposta — escolha da campanha', () => {
   let email: SimulatedProvider
   let fila: Queue
   beforeEach(() => { email = new SimulatedProvider(); fila = new Queue() })
@@ -136,47 +136,60 @@ describe('aviso de resposta — WhatsApp pedido pela campanha', () => {
   const leadRenovacao = (over: Parameters<typeof makeLead>[0] = {}) =>
     makeLead({ estagio: 'renovacao', contato_email: 'ana@acme.com.br', ultimo_contato: SEMANA_PASSADA, ...over })
 
-  it('responsável geral da campanha: liga o WhatsApp e aponta a pessoa da campanha', async () => {
+  it('responsável geral + grupo próprio: destinos, pessoa e grupo da campanha vão para o aviso', async () => {
     const store = new StoreTeste([leadRenovacao({ responsavel_id: 'usuario-bruno' })])
-    store.contexto = contexto({ canaisRetorno: 'whatsapp' })
+    store.contexto = contexto({ avisoRetorno: { email: false, whatsapp: ['responsavel', 'grupo'], grupoWhatsappId: '120363000000000001-group' } })
     const a = avisoFake()
     email.injetar(msg())
     await detectarResposta(store, email, fila, { avisarResposta: a.hook })
-    expect(a.chamadas[0]).toMatchObject({ incluirResponsavel: true, responsavelPerfil: { id: 'perfil-aline', nome: 'Aline' } })
+    expect(a.chamadas[0]).toMatchObject({
+      destinosCampanha: ['responsavel', 'grupo'],
+      responsavelPerfil: { id: 'perfil-aline', nome: 'Aline' },
+      grupoIdCampanha: '120363000000000001-group',
+    })
   })
 
-  it('carteira com dono no lead: WhatsApp vai para o dono (sem responsável da campanha)', async () => {
+  it('carteira com dono no lead: o WhatsApp individual vai para o dono (sem responsável da campanha)', async () => {
     const store = new StoreTeste([leadRenovacao({ responsavel_id: 'usuario-bruno' })])
-    store.contexto = contexto({ canaisRetorno: 'email_whatsapp', retornoParaResponsavelDoLead: true })
+    store.contexto = contexto({ avisoRetorno: { email: true, whatsapp: ['responsavel'] }, retornoParaResponsavelDoLead: true })
     const a = avisoFake()
     email.injetar(msg())
     await detectarResposta(store, email, fila, { avisarResposta: a.hook })
-    expect(a.chamadas[0]).toMatchObject({ incluirResponsavel: true, responsavelPerfil: null })
+    expect(a.chamadas[0]).toMatchObject({ destinosCampanha: ['responsavel'], responsavelPerfil: null, grupoIdCampanha: null })
   })
 
   it('carteira com lead sem dono: cai no responsável da campanha, como o e-mail', async () => {
     const store = new StoreTeste([leadRenovacao({ responsavel_id: undefined })])
-    store.contexto = contexto({ canaisRetorno: 'email_whatsapp', retornoParaResponsavelDoLead: true })
+    store.contexto = contexto({ avisoRetorno: { email: true, whatsapp: ['responsavel'] }, retornoParaResponsavelDoLead: true })
     const a = avisoFake()
     email.injetar(msg())
     await detectarResposta(store, email, fila, { avisarResposta: a.hook })
     expect(a.chamadas[0].responsavelPerfil).toEqual({ id: 'perfil-aline', nome: 'Aline' })
   })
 
-  it('campanha anterior à opção (sem canais): nada muda — só a regra da organização', async () => {
+  it('só e-mail: a campanha manda destinos vazios (nenhum WhatsApp)', async () => {
+    const store = new StoreTeste([leadRenovacao()])
+    store.contexto = contexto({ avisoRetorno: { email: true, whatsapp: [] } })
+    const a = avisoFake()
+    email.injetar(msg())
+    await detectarResposta(store, email, fila, { avisarResposta: a.hook })
+    expect(a.chamadas[0].destinosCampanha).toEqual([])
+  })
+
+  it('campanha anterior à escolha: nada muda — só a regra da organização', async () => {
     const store = new StoreTeste([leadRenovacao()])
     store.contexto = contexto()
     const a = avisoFake()
     email.injetar(msg())
     await detectarResposta(store, email, fila, { avisarResposta: a.hook })
-    expect(a.chamadas[0].incluirResponsavel).toBeUndefined()
+    expect(a.chamadas[0].destinosCampanha).toBeUndefined()
     expect(a.chamadas[0].responsavelPerfil).toBeUndefined()
   })
 
-  it('"somente WhatsApp": o Fluxo 3 não manda e-mail de retorno ao responsável', async () => {
+  it('sem e-mail marcado: o Fluxo 3 não manda e-mail de retorno ao responsável', async () => {
     const lead = leadRenovacao()
     const store = new StoreTeste([lead])
-    store.contexto = contexto({ canaisRetorno: 'whatsapp', notificarResponsavel: false })
+    store.contexto = contexto({ avisoRetorno: { email: false, whatsapp: ['grupo'] }, notificarResponsavel: false })
     const a = avisoFake()
     email.injetar(msg())
     await detectarResposta(store, email, fila, { avisarResposta: a.hook })

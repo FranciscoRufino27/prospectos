@@ -103,24 +103,30 @@ async function avisarRespostaSemFalhar(opts: DetectarRespostaOpts, entrada: Entr
   }
 }
 
-// Campanha que escolheu os canais do retorno (publico.operacao.resposta.canais)
-// liga o WhatsApp do responsável para esta resposta e aponta a MESMA pessoa do
-// e-mail de retorno (Fluxo 3): no modo carteira o dono do lead (o responsável
-// da campanha só quando o lead não tem dono); fora dele, o responsável da
-// campanha. Com handoff, o sorteado já está gravado no lead e prevalece.
-// Campanha antiga (sem canais) não muda nada: só a regra da organização vale.
+// Campanha que escolheu o aviso de resposta (publico.operacao.resposta.aviso):
+// os destinos de WhatsApp dela (responsável e/ou grupo) valem no lugar da
+// regra da organização. "Responsável" é a MESMA pessoa do e-mail de retorno
+// (Fluxo 3): no modo carteira o dono do lead (o responsável da campanha só
+// quando o lead não tem dono); fora dele, o responsável da campanha. Com
+// handoff, o sorteado já está gravado no lead e prevalece. Campanha antiga
+// (sem a escolha) não muda nada: só a regra da organização vale.
 export function avisoPedidoPelaCampanha(
   contextoCampanha: ContextoCampanhaResposta | null,
   lead: Pick<Lead, 'responsavel_id'>,
   responsavelHandoff: UsuarioBasico | null,
-): Pick<EntradaAvisoResposta, 'incluirResponsavel' | 'responsavelPerfil'> {
-  if (!contextoCampanha?.canaisRetorno) return {}
+): Pick<EntradaAvisoResposta, 'destinosCampanha' | 'responsavelPerfil' | 'grupoIdCampanha'> {
+  const aviso = contextoCampanha?.avisoRetorno
+  if (!contextoCampanha || !aviso) return {}
   const daCampanha = contextoCampanha.responsavel
     ? { id: contextoCampanha.responsavel.id, nome: contextoCampanha.responsavel.nome }
     : null
   const usarDaCampanha = !responsavelHandoff
     && (!contextoCampanha.retornoParaResponsavelDoLead || !lead.responsavel_id)
-  return { incluirResponsavel: true, responsavelPerfil: usarDaCampanha ? daCampanha : null }
+  return {
+    destinosCampanha: [...aviso.whatsapp],
+    responsavelPerfil: usarDaCampanha ? daCampanha : null,
+    grupoIdCampanha: aviso.grupoWhatsappId ?? null,
+  }
 }
 
 // Origem da resposta é PROSPECÇÃO (entra no handoff)? Usa o contexto REAL da

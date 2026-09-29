@@ -1,4 +1,4 @@
-import type { Publico, MensagemCampanha, FollowupCampanha, CanaisRetorno } from '@/components/automacao/tiposCampanha'
+import type { Publico, MensagemCampanha, FollowupCampanha, AvisoRetorno } from '@/components/automacao/tiposCampanha'
 import type { CamposModeloEmail } from './modelosEmail'
 import type { DefinicaoWorkflow } from '@/lib/workflows/types'
 
@@ -232,8 +232,26 @@ function normalizarFollowups(raw: unknown): FollowupCampanha[] | undefined {
   return itens.length ? itens : undefined
 }
 
-function lerCanaisRetorno(valor: unknown): CanaisRetorno | null {
-  return valor === 'email_whatsapp' || valor === 'whatsapp' ? valor : null
+// ID de grupo da Z-API: "120363019502650977-group" (ou o formato antigo
+// "5511999998888-1623281429-group").
+export const FORMATO_GRUPO_WHATSAPP = /^\d[\d-]*-group$/
+
+// Escolha do aviso de resposta gravada em resposta.aviso. Aceita também o
+// formato curto que existiu entre 85c2ac6 e esta versão (resposta.canais:
+// 'email_whatsapp' | 'whatsapp', sempre para o responsável). null = campanha
+// anterior à escolha.
+function lerAvisoRetorno(respostaRaw: Record<string, unknown>): AvisoRetorno | null {
+  const bruto = respostaRaw.aviso
+  if (bruto && typeof bruto === 'object' && !Array.isArray(bruto)) {
+    const a = bruto as Record<string, unknown>
+    const destinos = Array.isArray(a.whatsapp) ? a.whatsapp : []
+    const whatsapp = (['responsavel', 'grupo'] as const).filter((d) => destinos.includes(d))
+    const grupo = typeof a.grupoWhatsappId === 'string' ? a.grupoWhatsappId.trim() : ''
+    return { email: a.email === true, whatsapp, ...(grupo ? { grupoWhatsappId: grupo } : {}) }
+  }
+  if (respostaRaw.canais === 'email_whatsapp') return { email: true, whatsapp: ['responsavel'] }
+  if (respostaRaw.canais === 'whatsapp') return { email: false, whatsapp: ['responsavel'] }
+  return null
 }
 
 function operacaoCrua(publico: unknown): Record<string, unknown> {
@@ -251,11 +269,11 @@ export function responsavelRecebeCopiaDosEnvios(publico: unknown): boolean {
   return operacaoCrua(publico).responsavelRecebe !== 'somente_respostas'
 }
 
-/** Canais do aviso de resposta escolhidos na campanha; null = campanha antiga. */
-export function canaisRetornoCampanha(publico: unknown): CanaisRetorno | null {
+/** Aviso de resposta escolhido na campanha; null = campanha antiga. */
+export function avisoRetornoCampanha(publico: unknown): AvisoRetorno | null {
   const resposta = operacaoCrua(publico).resposta
   return resposta && typeof resposta === 'object' && !Array.isArray(resposta)
-    ? lerCanaisRetorno((resposta as Record<string, unknown>).canais)
+    ? lerAvisoRetorno(resposta as Record<string, unknown>)
     : null
 }
 
@@ -283,7 +301,7 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
   const pararCadencia = typeof respostaRaw.pararCadencia === 'boolean'
     ? respostaRaw.pararCadencia
     : typeof agendaRaw.pararAoResponder === 'boolean' ? agendaRaw.pararAoResponder : true
-  const canais = lerCanaisRetorno(respostaRaw.canais)
+  const aviso = lerAvisoRetorno(respostaRaw)
 
   return {
     objetivo: texto(obj.objetivo),
@@ -337,13 +355,13 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
       followups: normalizarFollowups(operacaoRaw.followups),
       responsavelRecebe: operacaoRaw.responsavelRecebe === 'somente_respostas' ? 'somente_respostas' : 'envios_e_respostas',
       resposta: {
-        ...(canais ? { canais } : {}),
+        ...(aviso ? { aviso } : {}),
         pararCadencia,
         criarTarefa: respostaRaw.criarTarefa === true,
         prazoHoras: numeroPositivo(respostaRaw.prazoHoras) ?? 24,
-        // "Somente WhatsApp" desliga o e-mail de retorno — os dois campos
-        // nunca podem se contradizer, então o canal manda.
-        notificarResponsavel: canais === 'whatsapp' ? false : respostaRaw.notificarResponsavel !== false,
+        // Com a escolha do aviso, o e-mail marcado nela manda — os dois campos
+        // nunca podem se contradizer.
+        notificarResponsavel: aviso ? aviso.email : respostaRaw.notificarResponsavel !== false,
         notificarAdministradores: respostaRaw.notificarAdministradores === true,
         prepararSugestao: respostaRaw.prepararSugestao === true,
         emailAssunto: texto(respostaRaw.emailAssunto),
@@ -384,6 +402,13 @@ export function validarCampanhaGuiada(publico: Publico): string[] {
     erros.push(publico.retornoPara === 'lead'
       ? 'Defina o responsável de fallback para leads sem responsável.'
       : 'Defina o responsável pelos retornos.')
+  }
+  const aviso = op?.resposta?.aviso
+  if (aviso && !aviso.email && !aviso.whatsapp.length) {
+    erros.push('Escolha ao menos um canal para o aviso de resposta (e-mail ou WhatsApp).')
+  }
+  if (aviso?.grupoWhatsappId && !FORMATO_GRUPO_WHATSAPP.test(aviso.grupoWhatsappId)) {
+    erros.push('O grupo do WhatsApp precisa estar no formato 120363019502650977-group.')
   }
   if (op?.resposta?.notificarResponsavel !== false && !op?.resposta?.emailAssunto) {
     erros.push('Informe o assunto do e-mail de resposta ao responsável.')
