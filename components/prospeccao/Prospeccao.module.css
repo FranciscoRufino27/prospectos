@@ -3,7 +3,6 @@
    painéis azul-marinho, indicadores com cor por métrica. */
 
 .workspace {
-  --profile-width: 390px;
   height: 100dvh;
   overflow: hidden;
   background: var(--m-bg-elevated, #031426);
@@ -428,7 +427,7 @@
 }
 .profilePanel {
   display: flex;
-  width: min(var(--profile-width), 100%);
+  width: min(680px, 100%);
   height: 100dvh;
   flex-direction: column;
   animation: drawerIn 180ms ease-out;
@@ -1040,12 +1039,10 @@
 .readOnlyNotice { border: 1px solid var(--m-border, #17557f); background: var(--m-surface-inset, rgba(4, 28, 52, 0.6)); color: var(--m-text-soft, #9dacbf); }
 
 @media (max-width: 1536px) {
-  .workspace { --profile-width: 360px; }
   .filterGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1280px) {
-  .workspace { --profile-width: 340px; }
   .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .page { padding: 18px; }
 }
