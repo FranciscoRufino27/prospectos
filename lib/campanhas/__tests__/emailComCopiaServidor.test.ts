@@ -129,3 +129,26 @@ describe('e-mail de campanha no modo carteira', () => {
     expect(escolherResponsavelCampanha({ preferirResponsavelDoLead: true })).toBeNull()
   })
 })
+
+describe('e-mail de campanha em "somente as respostas"', () => {
+  it('sai sem cópia, mas devolve quem assina', async () => {
+    const email = provider()
+    const quem = await enviarEmailCampanhaComCopia(email, {
+      para: 'lead@empresa.com',
+      assunto: 'Assunto',
+      corpo: 'Mensagem',
+      responsavelCampanha: { id: 'perfil-1', nome: 'Aline', email: 'aline@empresa.com' },
+      copiarResponsavel: false,
+    })
+    expect(email.enviar).toHaveBeenCalledWith('lead@empresa.com', 'Assunto', 'Mensagem', undefined, undefined)
+    expect(quem.nome).toBe('Aline')
+  })
+
+  it('continua exigindo um responsável com e-mail (é quem recebe o retorno)', async () => {
+    const email = provider()
+    await expect(enviarEmailCampanhaComCopia(email, {
+      para: 'lead@empresa.com', assunto: 'A', corpo: 'M', copiarResponsavel: false,
+    })).rejects.toThrow('Envio bloqueado')
+    expect(email.enviar).not.toHaveBeenCalled()
+  })
+})

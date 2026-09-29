@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  BellRing,
   Building2,
   CalendarDays,
   Check,
@@ -17,6 +18,7 @@ import {
   Loader2,
   Mail,
   Megaphone,
+  MessageCircle,
   RefreshCcw,
   Save,
   Search,
@@ -29,9 +31,11 @@ import {
 import {
   mensagemCampanhaVazia,
   type Campanha,
+  type CanaisRetorno,
   type FollowupCampanha,
   type MensagemCampanha,
   type Publico,
+  type ResponsavelRecebe,
 } from './tiposCampanha'
 import HtmlEmailEditor from './HtmlEmailEditor'
 import {
@@ -69,6 +73,12 @@ interface Membro {
   id: string
   nome: string | null
   email: string | null
+}
+
+interface WhatsappRetornoOpcoes {
+  provedorConfigurado: boolean
+  // Perfis com WhatsApp de avisos ligado; null = não foi possível verificar.
+  perfisComNumero: string[] | null
 }
 
 interface PreviaPublico {
@@ -137,6 +147,74 @@ function mensagemVazia(): MensagemCampanha {
   return mensagemCampanhaVazia()
 }
 
+const OPCOES_RESPONSAVEL_RECEBE: { id: ResponsavelRecebe; titulo: string; descricao: string; Icone: typeof Mail }[] = [
+  {
+    id: 'envios_e_respostas',
+    titulo: 'Mensagens e respostas',
+    descricao: 'Vai em cópia de cada e-mail enviado ao cliente (primeiro contato e follow-ups) e é avisado quando ele responder.',
+    Icone: Mail,
+  },
+  {
+    id: 'somente_respostas',
+    titulo: 'Somente as respostas',
+    descricao: 'Os e-mails saem sem cópia. O responsável só é avisado quando o cliente responder.',
+    Icone: BellRing,
+  },
+]
+
+const OPCOES_CANAIS_RETORNO: { id: CanaisRetorno; titulo: string; descricao: string; Icone: typeof Mail }[] = [
+  {
+    id: 'email_whatsapp',
+    titulo: 'E-mail e WhatsApp',
+    descricao: 'WhatsApp de avisos a cada resposta, mais o e-mail de retorno configurado na etapa Cadência.',
+    Icone: Mail,
+  },
+  {
+    id: 'whatsapp',
+    titulo: 'Somente WhatsApp',
+    descricao: 'Só o WhatsApp de avisos, a cada resposta. O e-mail de retorno fica desligado.',
+    Icone: MessageCircle,
+  },
+]
+
+const ROTULO_RESPONSAVEL_RECEBE: Record<ResponsavelRecebe, string> = {
+  envios_e_respostas: 'Mensagens e respostas (cópia de cada envio)',
+  somente_respostas: 'Somente as respostas (envios sem cópia)',
+}
+
+const ROTULO_CANAIS_RETORNO: Record<CanaisRetorno, string> = {
+  email_whatsapp: 'E-mail e WhatsApp',
+  whatsapp: 'Somente WhatsApp',
+}
+
+function CartaoOpcao({ ativa, desabilitada, titulo, descricao, Icone, onClick }: {
+  ativa: boolean
+  desabilitada?: boolean
+  titulo: string
+  descricao: string
+  Icone: typeof Mail
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={ativa}
+      disabled={desabilitada}
+      onClick={onClick}
+      className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50 ${ativa ? 'border-indigo-400 bg-gradient-to-br from-indigo-500/20 to-violet-500/10' : 'border-[var(--border)] bg-[var(--bg-subtle)] hover:border-[var(--border-strong)]'}`}
+    >
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${ativa ? 'bg-indigo-500 text-white' : 'bg-indigo-500/10 text-indigo-300'}`}>
+        <Icone size={15} />
+      </span>
+      <span>
+        <span className="block text-sm font-semibold text-slate-100">{titulo}</span>
+        <span className="mt-1 block text-xs leading-5 text-slate-500">{descricao}</span>
+      </span>
+      {ativa && <CheckCircle2 size={16} className="ml-auto shrink-0 text-indigo-200" />}
+    </button>
+  )
+}
+
 export default function CampanhaWizardPage({
   campanha,
   inicial,
@@ -200,6 +278,7 @@ export default function CampanhaWizardPage({
   const [destinatarioTeste, setDestinatarioTeste] = useState('')
   const [buscaEmpresa, setBuscaEmpresa] = useState('')
   const [paginaEmpresas, setPaginaEmpresas] = useState(1)
+  const [whatsappRetorno, setWhatsappRetorno] = useState<WhatsappRetornoOpcoes | null>(null)
 
   const responsavel = membros.find((membro) => membro.id === publico.responsavel_id)
   // Modo carteira: o retorno vai para o responsável de cada lead e `responsavel`
@@ -208,6 +287,23 @@ export default function CampanhaWizardPage({
   const destinoRetorno = retornoPorCarteira
     ? `responsável de cada lead (fallback: ${nomeMembro(responsavel)})`
     : nomeMembro(responsavel)
+  // Campanha sem os campos (anterior a eles) abre com o padrão da tela: cópia
+  // ligada e aviso por e-mail e WhatsApp — salvar grava a escolha explícita.
+  const responsavelRecebe: ResponsavelRecebe = publico.operacao?.responsavelRecebe ?? 'envios_e_respostas'
+  const canaisRetorno: CanaisRetorno = publico.operacao?.resposta?.canais ?? 'email_whatsapp'
+  // Mesma regra do servidor (exigirWhatsappRetornoPronto) para o que dá para
+  // saber aqui: Z-API e o número do responsável geral. Na carteira, os donos
+  // dos leads são conferidos pelo servidor ao iniciar.
+  const responsavelTemWhatsapp = whatsappRetorno?.perfisComNumero && publico.responsavel_id
+    ? whatsappRetorno.perfisComNumero.includes(publico.responsavel_id)
+    : null
+  const bloqueioSomenteWhatsapp: string | null = !whatsappRetorno
+    ? null
+    : !whatsappRetorno.provedorConfigurado
+      ? 'O WhatsApp (Z-API) não está configurado no servidor.'
+      : !retornoPorCarteira && responsavelTemWhatsapp === false
+        ? `${nomeMembro(responsavel)} ainda não ligou o WhatsApp de avisos (Meu perfil > Avisos no WhatsApp).`
+        : null
   const mensagemInicial = publico.operacao?.mensagemInicial ?? mensagemVazia()
   const followups = publico.operacao?.followups ?? []
   const disparoUnico = campanhaEhDisparoUnico(tipo)
@@ -255,6 +351,7 @@ export default function CampanhaWizardPage({
       setNichos(opcoes.nichos ?? [])
       setTesteEmailDisponivel(opcoes.testeEmailDisponivel === true)
       setEnvioRealDisponivel(opcoes.envioRealDisponivel === true)
+      setWhatsappRetorno(opcoes.whatsappRetorno ?? null)
       setMembros((equipe.membros ?? []).filter((m: Membro) => m.nome || m.email))
       setPublico((atual) => ({
         ...atual,
@@ -346,6 +443,17 @@ export default function CampanhaWizardPage({
         ...atual.operacao,
         mensagemInicial: atual.operacao?.mensagemInicial ?? mensagemVazia(),
         resposta: { ...atual.operacao?.resposta, ...patch },
+      },
+    }))
+  }
+
+  function alterarResponsavelRecebe(valor: ResponsavelRecebe) {
+    setPublico((atual) => ({
+      ...atual,
+      operacao: {
+        ...atual.operacao,
+        mensagemInicial: atual.operacao?.mensagemInicial ?? mensagemVazia(),
+        responsavelRecebe: valor,
       },
     }))
   }
@@ -472,11 +580,14 @@ export default function CampanhaWizardPage({
       operacao: {
         ...publico.operacao,
         mensagemInicial,
+        responsavelRecebe,
         resposta: {
           ...publico.operacao?.resposta,
+          canais: canaisRetorno,
           pararCadencia: true,
           criarTarefa: false,
-          notificarResponsavel: true,
+          // "Somente WhatsApp" = sem e-mail de retorno ao responsável.
+          notificarResponsavel: canaisRetorno !== 'whatsapp',
           notificarAdministradores: false,
           prepararSugestao: false,
         },
@@ -616,6 +727,9 @@ export default function CampanhaWizardPage({
     const quantidade = previa?.elegiveis ?? 0
     if (!envioRealDisponivel) {
       erros.push('O envio real está indisponível. Confirme MODO_ENSAIO=false e a conta Gmail no Vercel.')
+    }
+    if (canaisRetorno === 'whatsapp' && bloqueioSomenteWhatsapp) {
+      erros.push(`"Somente WhatsApp" indisponível: ${bloqueioSomenteWhatsapp} Escolha "E-mail e WhatsApp" ou resolva antes de iniciar.`)
     }
     if (!quantidade) erros.push('O público precisa ter ao menos um contato elegível.')
     if (erros.length) {
@@ -778,6 +892,61 @@ export default function CampanhaWizardPage({
                     ? 'Obrigatório: é a rede de segurança para lead sem responsável ou com responsável sem e-mail cadastrado.'
                     : 'Vale para toda a campanha, independente de quem seja o dono do lead na base.'}
                 </p>
+              </div>
+
+              {/* O que o responsável acompanha e por onde a resposta chega. As
+                  duas escolhas são lidas no envio/na resposta (campanhas.publico). */}
+              <div className="mt-5 grid gap-5 border-t border-[var(--border)] pt-4 lg:grid-cols-2">
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">O responsável recebe</h4>
+                  <div className="mt-2 grid gap-2">
+                    {OPCOES_RESPONSAVEL_RECEBE.map((opcao) => (
+                      <CartaoOpcao
+                        key={opcao.id}
+                        ativa={responsavelRecebe === opcao.id}
+                        titulo={opcao.titulo}
+                        descricao={opcao.descricao}
+                        Icone={opcao.Icone}
+                        onClick={() => alterarResponsavelRecebe(opcao.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Aviso de resposta por</h4>
+                  <div className="mt-2 grid gap-2">
+                    {OPCOES_CANAIS_RETORNO.map((opcao) => (
+                      <CartaoOpcao
+                        key={opcao.id}
+                        ativa={canaisRetorno === opcao.id}
+                        desabilitada={opcao.id === 'whatsapp' && canaisRetorno !== 'whatsapp' && !!bloqueioSomenteWhatsapp}
+                        titulo={opcao.titulo}
+                        descricao={opcao.descricao}
+                        Icone={opcao.Icone}
+                        onClick={() => atualizarResposta({ canais: opcao.id })}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-2 text-[11px] leading-4">
+                    {!whatsappRetorno ? (
+                      <span className="text-slate-500">Verificando o WhatsApp de avisos…</span>
+                    ) : bloqueioSomenteWhatsapp ? (
+                      <span className={canaisRetorno === 'whatsapp' ? 'text-red-300' : 'text-amber-300/90'}>
+                        {canaisRetorno === 'whatsapp' ? 'A campanha não inicia assim: ' : '"Somente WhatsApp" indisponível: '}
+                        {bloqueioSomenteWhatsapp}
+                        {canaisRetorno !== 'whatsapp' && ' Até lá, o aviso chega só por e-mail.'}
+                      </span>
+                    ) : retornoPorCarteira ? (
+                      <span className="text-slate-500">O WhatsApp vai para o número de avisos do responsável de cada lead (Meu perfil &gt; Avisos no WhatsApp). {canaisRetorno === 'whatsapp' ? 'Ao iniciar, quem não tiver número ligado bloqueia a campanha.' : 'Quem não tiver número ligado recebe só o e-mail.'}</span>
+                    ) : responsavelTemWhatsapp ? (
+                      <span className="text-emerald-300/90">{nomeMembro(responsavel)} tem o WhatsApp de avisos ligado.</span>
+                    ) : whatsappRetorno.perfisComNumero === null ? (
+                      <span className="text-amber-300/90">Não foi possível verificar o WhatsApp de avisos agora; o servidor confere ao iniciar.</span>
+                    ) : (
+                      <span className="text-slate-500">Escolha o responsável acima para conferir o WhatsApp de avisos.</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -1152,7 +1321,9 @@ export default function CampanhaWizardPage({
           <section className={card}>
             <div className="mb-5">
               <h2 className="mb-1 font-semibold text-slate-100">Quando houver resposta</h2>
-              <p className="text-sm text-slate-500">{disparoUnico ? 'A resposta será registrada e encaminhada ao responsável configurado.' : 'A resposta interrompe a abordagem.'} Com e-mail configurado, o responsável recebe a notificação real descrita abaixo.</p>
+              <p className="text-sm text-slate-500">{disparoUnico ? 'A resposta será registrada e encaminhada ao responsável configurado.' : 'A resposta interrompe a abordagem.'} {canaisRetorno === 'whatsapp'
+                ? 'O responsável é avisado só no WhatsApp de avisos; o e-mail de retorno está desligado (escolha feita na etapa Público).'
+                : 'O responsável recebe o e-mail de retorno descrito abaixo e o aviso no WhatsApp de avisos.'}</p>
             </div>
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4">
@@ -1177,16 +1348,27 @@ export default function CampanhaWizardPage({
                   ? 'Cada resposta vai para o responsável gravado no lead; sem responsável com e-mail, o motor usa o fallback acima.'
                   : responsavel?.email ? 'A campanha prioriza este responsável quando encaminha a oportunidade.' : 'Sem e-mail neste perfil, o motor mantém os fallbacks existentes.'}</p>
               </div>
-              <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-indigo-200"><Mail size={16} /> E-mail ao responsável</div>
-                <div className="text-xs text-slate-500">Tipo</div>
-                <div className="mt-1 text-sm text-slate-200">Modelo da campanha, editável e persistido</div>
-                <div className="mt-3 text-xs text-slate-500">Assunto</div>
-                <div className="mt-1 break-words text-sm text-slate-300">{textoOuNaoConfigurado(resposta?.emailAssunto)}</div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">O modelo sugerido identifica o objetivo da campanha; assunto e conteúdo podem ser alterados abaixo.</p>
-              </div>
+              {canaisRetorno === 'whatsapp' ? (
+                <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-medium text-indigo-200"><MessageCircle size={16} /> WhatsApp ao responsável</div>
+                  <div className="text-sm text-slate-200">Somente WhatsApp</div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">A cada resposta, o número de avisos do responsável recebe empresa, contato, o trecho da resposta e o link do lead. Não há e-mail de retorno nesta campanha.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-medium text-indigo-200"><Mail size={16} /> E-mail e WhatsApp ao responsável</div>
+                  <div className="text-xs text-slate-500">Assunto do e-mail</div>
+                  <div className="mt-1 break-words text-sm text-slate-300">{textoOuNaoConfigurado(resposta?.emailAssunto)}</div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    O WhatsApp de avisos chega a cada resposta.
+                    {tipo === 'prospeccao'
+                      ? ' Na prospecção, o e-mail sai quando a leitura automática indica interesse.'
+                      : ' O e-mail usa o modelo abaixo, editável.'}
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="mt-4 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-subtle)] p-4">
+            {canaisRetorno !== 'whatsapp' && <div className="mt-4 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-subtle)] p-4">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-medium text-slate-200">Modelo do e-mail de resposta</h3>
@@ -1219,7 +1401,7 @@ export default function CampanhaWizardPage({
                   onErro={setErro}
                 />
               </div>
-            </div>
+            </div>}
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
               <div className="rounded-lg border border-[var(--border)] p-3 text-sm text-slate-500">Tarefa automática: <span className="text-slate-400">Não configurado</span></div>
               <div className="rounded-lg border border-[var(--border)] p-3 text-sm text-slate-500">Notificação a administradores: <span className="text-slate-400">Não configurado</span></div>
@@ -1245,7 +1427,11 @@ export default function CampanhaWizardPage({
                 <> A cadência será: <strong className="text-slate-100">{resumoCadencia}</strong>.</>
               )}
               {' '}Se alguém responder, o retorno será encaminhado {retornoPorCarteira ? 'ao' : 'a'}
-              {' '}<strong className="text-slate-100">{destinoRetorno}</strong>.
+              {' '}<strong className="text-slate-100">{destinoRetorno}</strong>
+              {' '}por <strong className="text-slate-100">{canaisRetorno === 'whatsapp' ? 'WhatsApp' : 'e-mail e WhatsApp'}</strong>.
+              {' '}{responsavelRecebe === 'somente_respostas'
+                ? <>Os e-mails ao cliente saem <strong className="text-slate-100">sem o responsável em cópia</strong>.</>
+                : <>O responsável vai <strong className="text-slate-100">em cópia de cada e-mail</strong> enviado ao cliente.</>}
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -1256,6 +1442,8 @@ export default function CampanhaWizardPage({
                 ['Mensagem', textoOuNaoConfigurado(mensagemInicial.assunto)],
                 [disparoUnico ? 'Envio' : 'Cadência', resumoCadencia],
                 ['Regra de resposta', disparoUnico ? 'Encaminhar ao responsável' : 'Parar cadência e encaminhar ao responsável'],
+                ['O responsável recebe', ROTULO_RESPONSAVEL_RECEBE[responsavelRecebe]],
+                ['Aviso de resposta', ROTULO_CANAIS_RETORNO[canaisRetorno]],
                 ['Status', campanha?.status ?? 'rascunho'],
                 ['Próxima ação', disparoUnico ? 'Disparar comunicação' : tipo === 'prospeccao' ? 'Iniciar prospecção' : 'Iniciar campanha'],
               ].map(([titulo, valor]) => (

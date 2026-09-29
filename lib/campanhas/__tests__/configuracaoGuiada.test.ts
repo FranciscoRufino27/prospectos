@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   aplicarRegraPublicoPorTipo,
   campanhaEhDisparoUnico,
+  canaisRetornoCampanha,
   corpoComLink,
   montarDefinicaoCampanha,
   modeloEmailRespostaCampanha,
   normalizarPublicoCampanha,
+  responsavelRecebeCopiaDosEnvios,
   tipoTemplateCampanha,
   validarCampanhaGuiada,
 } from '../configuracaoGuiada'
@@ -203,5 +205,63 @@ describe('configuração guiada de campanha', () => {
     }), 'renovacao')
     expect(publico.operacao?.resposta?.emailAssunto).toBe('Assunto próprio')
     expect(publico.operacao?.resposta?.emailCorpo).toBe('Corpo próprio')
+  })
+})
+
+describe('acompanhamento do responsável e canais do retorno', () => {
+  it('campanha anterior às opções: cópia ligada, sem canais, e-mail de retorno como antes', () => {
+    const publico = normalizarPublicoCampanha({ responsavel_id: 'perfil-1' })
+    expect(publico.operacao?.responsavelRecebe).toBe('envios_e_respostas')
+    expect(publico.operacao?.resposta?.canais).toBeUndefined()
+    expect(publico.operacao?.resposta?.notificarResponsavel).toBe(true)
+    expect(responsavelRecebeCopiaDosEnvios({})).toBe(true)
+    expect(responsavelRecebeCopiaDosEnvios(null)).toBe(true)
+    expect(canaisRetornoCampanha({ operacao: { resposta: {} } })).toBeNull()
+  })
+
+  it('só valores conhecidos passam; lixo cai no padrão seguro', () => {
+    const publico = normalizarPublicoCampanha({
+      operacao: { responsavelRecebe: 'nunca', resposta: { canais: 'sms' } },
+    })
+    expect(publico.operacao?.responsavelRecebe).toBe('envios_e_respostas')
+    expect(publico.operacao?.resposta?.canais).toBeUndefined()
+    expect(canaisRetornoCampanha({ operacao: { resposta: { canais: 'sms' } } })).toBeNull()
+  })
+
+  it('"somente as respostas" desliga a cópia dos envios', () => {
+    const cru = { operacao: { responsavelRecebe: 'somente_respostas' } }
+    expect(normalizarPublicoCampanha(cru).operacao?.responsavelRecebe).toBe('somente_respostas')
+    expect(responsavelRecebeCopiaDosEnvios(cru)).toBe(false)
+  })
+
+  it('"somente WhatsApp" desliga o e-mail de retorno mesmo com o flag antigo ligado, e não exige o modelo do e-mail', () => {
+    const publico = normalizarPublicoCampanha({
+      responsavel_id: 'perfil-1',
+      selecao: { modo: 'manual', leadIds: ['lead-1'] },
+      operacao: {
+        remetenteEmail: 'time@empresa.com',
+        mensagemInicial: { assunto: 'Oi', corpo: 'Olá' },
+        resposta: { canais: 'whatsapp', notificarResponsavel: true },
+      },
+    })
+    expect(publico.operacao?.resposta).toMatchObject({ canais: 'whatsapp', notificarResponsavel: false })
+    expect(canaisRetornoCampanha(publico)).toBe('whatsapp')
+    expect(validarCampanhaGuiada(publico)).toEqual([])
+  })
+
+  it('"e-mail e WhatsApp" mantém o e-mail de retorno e exige o modelo', () => {
+    const publico = normalizarPublicoCampanha({
+      responsavel_id: 'perfil-1',
+      selecao: { modo: 'manual', leadIds: ['lead-1'] },
+      operacao: {
+        remetenteEmail: 'time@empresa.com',
+        mensagemInicial: { assunto: 'Oi', corpo: 'Olá' },
+        resposta: { canais: 'email_whatsapp' },
+      },
+    })
+    expect(publico.operacao?.resposta).toMatchObject({ canais: 'email_whatsapp', notificarResponsavel: true })
+    expect(validarCampanhaGuiada(publico)).toEqual(expect.arrayContaining([
+      'Informe o assunto do e-mail de resposta ao responsável.',
+    ]))
   })
 })

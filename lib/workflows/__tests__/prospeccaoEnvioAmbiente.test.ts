@@ -497,3 +497,46 @@ describe('gates de resposta e cancelamento no envio de prospecção', () => {
     expect(enviosGmailMock).toHaveLength(0)
   })
 })
+
+describe('cópia ao responsável nos envios da campanha (publico.operacao.responsavelRecebe)', () => {
+  it('campanha sem a opção (anterior a ela): o responsável vai em cópia, como sempre', async () => {
+    const lead = leadBase({ estagio: 'novos_leads', followups_enviados: 0 })
+    const { motor } = motorFalso(lead, [template()])
+    const ambiente = new AmbienteSupabase(ORG, { client: banco({ tipo: 'prospeccao' }, configComRemetente).cliente(), motor })
+
+    const r = await comEnvioReal(() => ambiente.enviarEmailTemplate(LEAD, 'abordagem_1', CAMPANHA))
+
+    expect(r.enviado).toBe(true)
+    expect(enviosGmailMock).toHaveLength(1)
+    expect(enviosGmailMock[0].cc).toBe('aline@org.com.br')
+  })
+
+  it('"somente as respostas": o e-mail sai sem cópia e segue assinado pelo responsável', async () => {
+    const lead = leadBase({ estagio: 'primeiro_contato', followups_enviados: 0 })
+    const { motor } = motorFalso(lead, [template()])
+    const ambiente = new AmbienteSupabase(ORG, {
+      client: banco({ tipo: 'prospeccao', publico: { operacao: { responsavelRecebe: 'somente_respostas' } } }, configComRemetente).cliente(),
+      motor,
+    })
+
+    const r = await comEnvioReal(() => ambiente.enviarEmailTemplate(LEAD, 'follow_up_1', CAMPANHA))
+
+    expect(r.enviado).toBe(true)
+    expect(enviosGmailMock).toHaveLength(1)
+    expect(enviosGmailMock[0].cc).toBeUndefined()
+    expect(enviosGmailMock[0].html).toContain('Aline')
+  })
+
+  it('"mensagens e respostas" explícito mantém a cópia', async () => {
+    const lead = leadBase({ estagio: 'primeiro_contato', followups_enviados: 0 })
+    const { motor } = motorFalso(lead, [template()])
+    const ambiente = new AmbienteSupabase(ORG, {
+      client: banco({ tipo: 'prospeccao', publico: { operacao: { responsavelRecebe: 'envios_e_respostas' } } }, configComRemetente).cliente(),
+      motor,
+    })
+
+    await comEnvioReal(() => ambiente.enviarEmailTemplate(LEAD, 'follow_up_1', CAMPANHA))
+
+    expect(enviosGmailMock[0].cc).toBe('aline@org.com.br')
+  })
+})

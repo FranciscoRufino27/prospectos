@@ -1,4 +1,4 @@
-import type { Publico, MensagemCampanha, FollowupCampanha } from '@/components/automacao/tiposCampanha'
+import type { Publico, MensagemCampanha, FollowupCampanha, CanaisRetorno } from '@/components/automacao/tiposCampanha'
 import type { CamposModeloEmail } from './modelosEmail'
 import type { DefinicaoWorkflow } from '@/lib/workflows/types'
 
@@ -232,6 +232,33 @@ function normalizarFollowups(raw: unknown): FollowupCampanha[] | undefined {
   return itens.length ? itens : undefined
 }
 
+function lerCanaisRetorno(valor: unknown): CanaisRetorno | null {
+  return valor === 'email_whatsapp' || valor === 'whatsapp' ? valor : null
+}
+
+function operacaoCrua(publico: unknown): Record<string, unknown> {
+  const obj = publico && typeof publico === 'object' && !Array.isArray(publico) ? publico as Record<string, unknown> : {}
+  const op = obj.operacao
+  return op && typeof op === 'object' && !Array.isArray(op) ? op as Record<string, unknown> : {}
+}
+
+// Lidas no ENVIO e na RESPOSTA direto de `campanhas.publico` (jsonb cru), não
+// da versão do workflow. Campanha anterior a estes campos cai no comportamento
+// de sempre (cópia ligada; aviso só pela regra da organização).
+
+/** false = os e-mails da campanha saem sem o responsável em cópia (CC). */
+export function responsavelRecebeCopiaDosEnvios(publico: unknown): boolean {
+  return operacaoCrua(publico).responsavelRecebe !== 'somente_respostas'
+}
+
+/** Canais do aviso de resposta escolhidos na campanha; null = campanha antiga. */
+export function canaisRetornoCampanha(publico: unknown): CanaisRetorno | null {
+  const resposta = operacaoCrua(publico).resposta
+  return resposta && typeof resposta === 'object' && !Array.isArray(resposta)
+    ? lerCanaisRetorno((resposta as Record<string, unknown>).canais)
+    : null
+}
+
 export function normalizarPublicoCampanha(raw: unknown): Publico {
   const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
   const empresasRaw = obj.empresas && typeof obj.empresas === 'object' && !Array.isArray(obj.empresas)
@@ -256,6 +283,7 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
   const pararCadencia = typeof respostaRaw.pararCadencia === 'boolean'
     ? respostaRaw.pararCadencia
     : typeof agendaRaw.pararAoResponder === 'boolean' ? agendaRaw.pararAoResponder : true
+  const canais = lerCanaisRetorno(respostaRaw.canais)
 
   return {
     objetivo: texto(obj.objetivo),
@@ -307,11 +335,15 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
       remetenteEmail: texto(operacaoRaw.remetenteEmail),
       mensagemInicial: normalizarMensagem(operacaoRaw.mensagemInicial),
       followups: normalizarFollowups(operacaoRaw.followups),
+      responsavelRecebe: operacaoRaw.responsavelRecebe === 'somente_respostas' ? 'somente_respostas' : 'envios_e_respostas',
       resposta: {
+        ...(canais ? { canais } : {}),
         pararCadencia,
         criarTarefa: respostaRaw.criarTarefa === true,
         prazoHoras: numeroPositivo(respostaRaw.prazoHoras) ?? 24,
-        notificarResponsavel: respostaRaw.notificarResponsavel !== false,
+        // "Somente WhatsApp" desliga o e-mail de retorno — os dois campos
+        // nunca podem se contradizer, então o canal manda.
+        notificarResponsavel: canais === 'whatsapp' ? false : respostaRaw.notificarResponsavel !== false,
         notificarAdministradores: respostaRaw.notificarAdministradores === true,
         prepararSugestao: respostaRaw.prepararSugestao === true,
         emailAssunto: texto(respostaRaw.emailAssunto),

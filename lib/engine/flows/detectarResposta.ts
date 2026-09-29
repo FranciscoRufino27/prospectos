@@ -103,6 +103,26 @@ async function avisarRespostaSemFalhar(opts: DetectarRespostaOpts, entrada: Entr
   }
 }
 
+// Campanha que escolheu os canais do retorno (publico.operacao.resposta.canais)
+// liga o WhatsApp do responsável para esta resposta e aponta a MESMA pessoa do
+// e-mail de retorno (Fluxo 3): no modo carteira o dono do lead (o responsável
+// da campanha só quando o lead não tem dono); fora dele, o responsável da
+// campanha. Com handoff, o sorteado já está gravado no lead e prevalece.
+// Campanha antiga (sem canais) não muda nada: só a regra da organização vale.
+export function avisoPedidoPelaCampanha(
+  contextoCampanha: ContextoCampanhaResposta | null,
+  lead: Pick<Lead, 'responsavel_id'>,
+  responsavelHandoff: UsuarioBasico | null,
+): Pick<EntradaAvisoResposta, 'incluirResponsavel' | 'responsavelPerfil'> {
+  if (!contextoCampanha?.canaisRetorno) return {}
+  const daCampanha = contextoCampanha.responsavel
+    ? { id: contextoCampanha.responsavel.id, nome: contextoCampanha.responsavel.nome }
+    : null
+  const usarDaCampanha = !responsavelHandoff
+    && (!contextoCampanha.retornoParaResponsavelDoLead || !lead.responsavel_id)
+  return { incluirResponsavel: true, responsavelPerfil: usarDaCampanha ? daCampanha : null }
+}
+
 // Origem da resposta é PROSPECÇÃO (entra no handoff)? Usa o contexto REAL da
 // execução, e o contexto de CAMPANHA tem precedência sobre o estágio: um lead
 // importado só para follow-up pode estar num estágio de cadência e ainda assim
@@ -349,7 +369,7 @@ export async function detectarResposta(
         : `email:${lead.id}:${new Date(msg.em).toISOString()}`
       // O aviso só diz a classificação quando ela foi de fato feita agora — o
       // "positivo" padrão de quem não classifica não é leitura da resposta.
-      const avisoDaResposta = (grupoJaAvisado: boolean): EntradaAvisoResposta => ({
+      const avisoDaResposta = (grupoJaAvisado: boolean, responsavelHandoff: UsuarioBasico | null = null): EntradaAvisoResposta => ({
         organizacaoId: store.organizacaoId ?? '',
         leadId: lead.id,
         eventoId: eventoResposta,
@@ -357,6 +377,7 @@ export async function detectarResposta(
         classificacao: classificou ? (classificacao.classificacao as ClassificacaoAviso) : null,
         texto: msg.corpo,
         grupoJaAvisado,
+        ...avisoPedidoPelaCampanha(contextoCampanha, lead, responsavelHandoff),
       })
 
       // Estado do lead conforme a classificação — SEMPRE fora da cadência:
@@ -453,7 +474,7 @@ export async function detectarResposta(
 
       // 5.2) Aviso no WhatsApp da equipe. Depois do handoff, para já nomear o
       // responsável sorteado. Com handoff, o grupo já recebeu o aviso dele.
-      await avisarRespostaSemFalhar(opts, avisoDaResposta(!!opts.handoffProspeccao && deProspeccao))
+      await avisarRespostaSemFalhar(opts, avisoDaResposta(!!opts.handoffProspeccao && deProspeccao, responsavelHandoff))
 
       // 6) Enfileirar o Fluxo 3 (direcionar ao closer), uma vez por lead — SÓ
       // para resposta positiva. Se o handoff atribuiu um comercial, o aviso vai

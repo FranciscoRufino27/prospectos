@@ -3,7 +3,9 @@
 // fakes nos testes).
 //
 // Invariantes:
-//   - modo ausente na organização = desligado: nada é registrado nem enviado;
+//   - modo ausente na organização = desligado: nada é registrado nem enviado,
+//     salvo quando a campanha da resposta pediu o WhatsApp do responsável
+//     (incluirResponsavel) — aí só esse destino;
 //   - um aviso por (resposta, destino): a mesma resposta nunca avisa duas vezes;
 //   - no máximo um aviso por lead por JANELA_ANTISPAM_MIN (cliente de WhatsApp
 //     costuma mandar várias mensagens seguidas);
@@ -39,6 +41,8 @@ export interface DepsAvisoResposta {
   // Número (dígitos) do responsável (id de `usuarios`, como em
   // leads.responsavel_id), só se o perfil dele ligou os avisos; senão null.
   lerWhatsappResponsavel: (organizacaoId: string, usuarioId: string) => Promise<string | null>
+  // Mesmo dado, a partir do perfil de login (responsável definido pela campanha).
+  lerWhatsappPerfil: (organizacaoId: string, perfilId: string) => Promise<string | null>
   enviarIndividual: EnviadorAviso
   enviarGrupo: EnviadorAviso
   // Z-API configurada no servidor? Sem ela o aviso fica em
@@ -65,9 +69,11 @@ export type ResultadoAvisoResposta =
   | { tipo: 'sem_destino' } // ex.: só grupo, e o grupo já foi avisado pelo handoff
   | { tipo: 'processado'; resultados: ResultadoProcessamentoAviso[] }
 
-function destinosDoModo(modo: ModoAvisoResposta): DestinoAvisoResposta[] {
-  if (modo === 'ambos') return ['responsavel', 'grupo']
-  return [modo]
+function destinosDoModo(modo: ModoAvisoResposta | null, incluirResponsavel: boolean): DestinoAvisoResposta[] {
+  const destinos: DestinoAvisoResposta[] = modo === 'ambos' ? ['responsavel', 'grupo'] : modo ? [modo] : []
+  // A campanha pediu o WhatsApp do responsável: soma ao que a org escolheu.
+  if (incluirResponsavel && !destinos.includes('responsavel')) destinos.unshift('responsavel')
+  return destinos
 }
 
 /** Registra (idempotente) e tenta entregar os avisos de UMA resposta. */
@@ -77,7 +83,8 @@ export async function avisarRespostaCliente(
 ): Promise<ResultadoAvisoResposta> {
   const org = entrada.organizacaoId
   const modo = await deps.lerModo(org)
-  if (!modo) return { tipo: 'desligado' }
+  const incluirResponsavel = entrada.incluirResponsavel === true
+  if (!modo && !incluirResponsavel) return { tipo: 'desligado' }
 
   // Retentativa da mesma resposta: reaproveita o que já foi registrado.
   let avisos = await deps.repo.listarPorEvento(org, entrada.eventoId)
@@ -89,9 +96,12 @@ export async function avisarRespostaCliente(
     const ctx = await deps.lerContextoLead(org, entrada.leadId)
     if (!ctx) return { tipo: 'lead_nao_encontrado' }
 
-    const destinos = destinosDoModo(modo).filter((d) => !(d === 'grupo' && entrada.grupoJaAvisado))
+    const destinos = destinosDoModo(modo, incluirResponsavel).filter((d) => !(d === 'grupo' && entrada.grupoJaAvisado))
     if (destinos.length === 0) return { tipo: 'sem_destino' }
 
+    // Responsável da campanha (quando a campanha define quem recebe) vale para
+    // o privado E para a menção no grupo: é ele quem vai tratar a resposta.
+    const daCampanha = entrada.responsavelPerfil?.id ? entrada.responsavelPerfil : null
     const dados: DadosAvisoResposta = {
       empresa: ctx.empresa,
       contato: ctx.contato,
@@ -99,7 +109,8 @@ export async function avisarRespostaCliente(
       classificacao: entrada.classificacao,
       trecho: extrairTrecho(entrada.texto),
       responsavelId: ctx.responsavel?.id ?? null,
-      responsavelNome: ctx.responsavel?.nome ?? '',
+      responsavelPerfilId: daCampanha?.id ?? null,
+      responsavelNome: daCampanha?.nome ?? ctx.responsavel?.nome ?? '',
       link: deps.linkLead?.(entrada.leadId) ?? null,
     }
     avisos = []
@@ -121,8 +132,12 @@ async function resolverDestino(deps: DepsAvisoResposta, a: AvisoResposta): Promi
     const grupo = await deps.lerGrupoId(a.organizacaoId)
     return grupo ? { destino: grupo } : { motivo: 'Grupo comercial não configurado (Configurações > Processo comercial > Distribuição).' }
   }
-  if (!a.dados.responsavelId) return { motivo: 'Lead sem responsável.' }
-  const numero = await deps.lerWhatsappResponsavel(a.organizacaoId, a.dados.responsavelId)
+  const numero = a.dados.responsavelPerfilId
+    ? await deps.lerWhatsappPerfil(a.organizacaoId, a.dados.responsavelPerfilId)
+    : a.dados.responsavelId
+      ? await deps.lerWhatsappResponsavel(a.organizacaoId, a.dados.responsavelId)
+      : undefined
+  if (numero === undefined) return { motivo: 'Lead sem responsável.' }
   return numero ? { destino: numero } : { motivo: 'Responsável sem WhatsApp de avisos ligado (Meu perfil > Avisos no WhatsApp).' }
 }
 

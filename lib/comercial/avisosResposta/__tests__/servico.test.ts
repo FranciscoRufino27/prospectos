@@ -16,6 +16,7 @@ function montar(modo: ModoAvisoResposta | null = 'ambos') {
     modo,
     grupo: '120363019502650977-group' as string | null,
     numero: '5511999998888' as string | null,
+    numeroPerfil: '5521988887777' as string | null,
     provedor: true,
     falhar: false,
     agora: new Date('2026-09-28T12:00:00Z'),
@@ -28,6 +29,7 @@ function montar(modo: ModoAvisoResposta | null = 'ambos') {
     lerContextoLead: async (org, leadId) =>
       org === ORG && leadId === 'lead-1' ? { empresa: 'ACME', contato: 'Ana', responsavel: { id: 'bruno', nome: 'Bruno' } } : null,
     lerWhatsappResponsavel: async (org, perfilId) => (org === ORG && perfilId === 'bruno' ? estado.numero : null),
+    lerWhatsappPerfil: async (org, perfilId) => (org === ORG && perfilId === 'perfil-aline' ? estado.numeroPerfil : null),
     enviarIndividual: async (destino, mensagem) => { enviados.push({ tipo: 'individual', destino, mensagem }); return resultado() },
     enviarGrupo: async (destino, mensagem) => { enviados.push({ tipo: 'grupo', destino, mensagem }); return resultado() },
     provedorConfigurado: () => estado.provedor,
@@ -161,5 +163,59 @@ describe('avisarRespostaCliente', () => {
     const r = await avisarRespostaCliente(t.deps, entrada())
     expect(r.tipo === 'processado' && r.resultados[0].tipo).toBe('incerta')
     expect(t.enviados).toHaveLength(1)
+  })
+})
+
+describe('avisarRespostaCliente — escolha da campanha (WhatsApp do responsável)', () => {
+  let t: ReturnType<typeof montar>
+  beforeEach(() => { t = montar(null) })
+
+  it('org desligada + campanha pede o WhatsApp: avisa só o responsável no privado', async () => {
+    const r = await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: true }))
+    expect(r.tipo).toBe('processado')
+    expect(t.enviados.map((e) => [e.tipo, e.destino])).toEqual([['individual', '5511999998888']])
+    expect(t.repo.linhas.map((a) => a.destinoTipo)).toEqual(['responsavel'])
+  })
+
+  it('org só no grupo + campanha pede o WhatsApp: privado E grupo', async () => {
+    t.estado.modo = 'grupo'
+    await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: true }))
+    expect(t.enviados.map((e) => e.tipo)).toEqual(['individual', 'grupo'])
+  })
+
+  it('org em "ambos" + campanha pede o WhatsApp: o responsável não é avisado duas vezes', async () => {
+    t.estado.modo = 'ambos'
+    await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: true }))
+    expect(t.repo.linhas.map((a) => a.destinoTipo)).toEqual(['responsavel', 'grupo'])
+    expect(t.enviados.map((e) => e.tipo)).toEqual(['individual', 'grupo'])
+  })
+
+  it('responsável definido pela campanha: vai para o número do PERFIL dele e é ele na menção do grupo', async () => {
+    t.estado.modo = 'grupo'
+    await avisarRespostaCliente(t.deps, entrada({
+      incluirResponsavel: true,
+      responsavelPerfil: { id: 'perfil-aline', nome: 'Aline' },
+    }))
+    expect(t.enviados.map((e) => [e.tipo, e.destino])).toEqual([
+      ['individual', '5521988887777'],
+      ['grupo', '120363019502650977-group'],
+    ])
+    expect(t.enviados[1].mensagem).toContain('@Aline, ACME respondeu por e-mail.')
+    expect(t.repo.linhas[0].dados).toMatchObject({ responsavelPerfilId: 'perfil-aline', responsavelId: 'bruno', responsavelNome: 'Aline' })
+  })
+
+  it('responsável da campanha sem WhatsApp de avisos: fica em configuracao_ausente e sai quando ele cadastrar', async () => {
+    t.estado.numeroPerfil = null
+    const r = await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: true, responsavelPerfil: { id: 'perfil-aline', nome: 'Aline' } }))
+    expect(r.tipo === 'processado' && r.resultados[0].tipo).toBe('configuracao_ausente')
+    expect(t.enviados).toHaveLength(0)
+    t.estado.numeroPerfil = '5521988887777'
+    expect(await reprocessarAvisosResposta(t.deps, ORG)).toEqual({ tentados: 1, enviados: 1 })
+    expect(t.enviados[0].destino).toBe('5521988887777')
+  })
+
+  it('sem o pedido da campanha, org desligada continua desligada', async () => {
+    expect(await avisarRespostaCliente(t.deps, entrada({ incluirResponsavel: false }))).toEqual({ tipo: 'desligado' })
+    expect(t.repo.linhas).toHaveLength(0)
   })
 })

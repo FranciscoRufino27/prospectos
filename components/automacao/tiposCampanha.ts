@@ -87,6 +87,9 @@ export interface FollowupCampanha extends MensagemCampanha {
   diasApos?: number;
 }
 
+export type ResponsavelRecebe = 'envios_e_respostas' | 'somente_respostas';
+export type CanaisRetorno = 'email_whatsapp' | 'whatsapp';
+
 export interface OperacaoCampanha {
   // Comunicados gerais são disparos únicos; renovação e objetivos comerciais
   // usam a cadência versionada. O servidor recalcula este valor a partir do tipo.
@@ -95,7 +98,18 @@ export interface OperacaoCampanha {
   remetenteEmail?: string;
   mensagemInicial?: MensagemCampanha;
   followups?: FollowupCampanha[];
+  // O que o responsável acompanha. 'envios_e_respostas' (padrão, e o que toda
+  // campanha anterior a este campo faz) = recebe cópia (CC) de cada e-mail
+  // enviado ao cliente; 'somente_respostas' = os e-mails saem sem cópia e ele
+  // só fica sabendo quando o cliente responde.
+  responsavelRecebe?: ResponsavelRecebe;
   resposta?: {
+    // Por onde o responsável recebe o aviso de resposta. 'email_whatsapp' =
+    // e-mail de retorno + WhatsApp de avisos; 'whatsapp' = só o WhatsApp (o
+    // e-mail de retorno fica desligado). Ausente = campanha anterior a este
+    // campo: e-mail conforme `notificarResponsavel` e WhatsApp só pela regra
+    // da organização.
+    canais?: CanaisRetorno;
     pararCadencia?: boolean;
     criarTarefa?: boolean;
     prazoHoras?: number;
