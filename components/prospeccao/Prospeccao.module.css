@@ -3,9 +3,6 @@
    painéis azul-marinho, indicadores com cor por métrica. */
 
 .workspace {
-  --profile-width: 390px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--profile-width);
   height: 100dvh;
   overflow: hidden;
   background: var(--m-bg-elevated, #031426);
@@ -393,7 +390,7 @@
 
 .selectionDock {
   left: 15rem;
-  right: var(--profile-width);
+  right: 0;
 }
 
 .primaryButton {
@@ -418,17 +415,31 @@
   text-align: center;
 }
 
-/* Coluna permanente do perfil de busca */
+/* Perfil de busca: gaveta lateral aberta pelo botão do cabeçalho */
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(2, 8, 18, 0.62);
+  backdrop-filter: blur(2px);
+}
 .profilePanel {
   display: flex;
-  min-width: 0;
+  width: min(680px, 100%);
   height: 100dvh;
   flex-direction: column;
+  animation: drawerIn 180ms ease-out;
   border-left: 1px solid var(--m-border, #1b68a8);
   background:
     radial-gradient(circle at 20% -10%, rgba(37, 99, 235, 0.16), transparent 40%),
     var(--m-kpi-bg, linear-gradient(160deg, #06213d, #04152a));
-  box-shadow: -18px 0 42px rgba(0, 0, 0, 0.24);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45);
+}
+@keyframes drawerIn {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 .profileHeader {
@@ -813,18 +824,17 @@
 }
 .inlineForm .field { width: 300px; max-width: 100%; }
 
-/* Cabeçalho do painel lateral */
-.profileHeaderIcon {
+/* Botão de fechar da gaveta do perfil */
+.profileClose {
   display: grid;
-  width: 31px;
-  height: 31px;
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
   place-items: center;
   border-radius: 7px;
-  background: rgba(14, 165, 233, 0.13);
-  color: #21c7ff;
-  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.18);
+  color: var(--m-text-soft, #9dacbf);
 }
+.profileClose:hover { color: var(--m-title, #f8fafc); background: rgba(148, 163, 184, 0.12); }
 
 /* Título de cada bloco do painel (usado como <label> ou <span>) */
 .profileLabel {
@@ -1029,34 +1039,17 @@
 .readOnlyNotice { border: 1px solid var(--m-border, #17557f); background: var(--m-surface-inset, rgba(4, 28, 52, 0.6)); color: var(--m-text-soft, #9dacbf); }
 
 @media (max-width: 1536px) {
-  .workspace { --profile-width: 360px; }
   .filterGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1280px) {
-  .workspace { --profile-width: 340px; }
   .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .page { padding: 18px; }
 }
 
 @media (max-width: 1100px) {
-  .workspace {
-    display: flex;
-    height: 100dvh;
-    flex-direction: column;
-    overflow-y: auto;
-  }
+  .workspace { overflow-y: auto; }
   .mainColumn { height: auto; overflow: visible; }
-  .profilePanel {
-    order: -1;
-    height: auto;
-    min-height: 100dvh;
-    border-left: 0;
-    border-bottom: 1px solid #1b68a8;
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
-  }
-  .profileBody { overflow: visible; }
-  .selectionDock { right: 0; }
 }
 
 @media (max-width: 720px) {
@@ -1224,10 +1217,6 @@
   border-color: rgba(43, 161, 132, 0.7);
   box-shadow: none;
 }
-:global([data-tema='escuro']) .profileHeaderIcon {
-  background: rgba(36, 123, 162, 0.13);
-  color: #209cc6;
-}
 :global([data-tema='escuro']) .geoTabAtiva,
 :global([data-tema='escuro']) .geoTabAtiva:hover:not(:disabled) {
   background: linear-gradient(135deg, #3a37bb, #2634b9);
@@ -1266,9 +1255,6 @@
 :global([data-tema='escuro']) .errorNotice {
   border: 1px solid rgba(197, 48, 48, 0.3);
   background: rgba(197, 48, 48, 0.08);
-}
-:global([data-tema='escuro']) .profilePanel {
-  border-bottom: 1px solid #255277;
 }
 
 /* Tema Claro: acentos escurecidos para contraste no fundo branco (gerado a partir das
@@ -1395,10 +1381,6 @@
 :global([data-tema='claro']) .savedChipAtivo:hover {
   border-color: rgba(17, 130, 103, 0.7);
   box-shadow: none;
-}
-:global([data-tema='claro']) .profileHeaderIcon {
-  background: rgba(15, 124, 174, 0.13);
-  color: #047ca4;
 }
 :global([data-tema='claro']) .criteriaRow:hover:not(:disabled) {
   border-color: #2379b8;
