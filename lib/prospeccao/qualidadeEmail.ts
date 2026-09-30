@@ -4,7 +4,7 @@
 
 export type QualidadeEmail = 'corporativo' | 'generico' | 'pessoal' | 'contabilidade' | 'digitacao' | 'sem_email'
 
-const PROVEDORES_PESSOAIS = new Set([
+export const PROVEDORES_PESSOAIS: ReadonlySet<string> = new Set([
   'gmail.com', 'hotmail.com', 'hotmail.com.br', 'outlook.com', 'outlook.com.br', 'live.com',
   'yahoo.com', 'yahoo.com.br', 'icloud.com', 'bol.com.br', 'uol.com.br', 'terra.com.br',
   'ig.com.br', 'globo.com', 'msn.com', 'r7.com',

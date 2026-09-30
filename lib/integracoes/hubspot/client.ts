@@ -18,12 +18,27 @@ export type ResultadoHubspot<T> =
       status?: number
     }
 
+// A search API do HubSpot limita a ~5 req/s por token: 429 é esperado em
+// rajadas curtas. Espera curta e tenta de novo; persistindo, devolve o erro.
+const TENTATIVAS_429 = 3
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+function atrasoRetry(resposta: Response, tentativa: number): number {
+  const s = Number(resposta.headers?.get?.('retry-after'))
+  const pedido = Number.isFinite(s) && s > 0 ? s * 1000 : 0
+  return Math.min(Math.max(pedido, 300 * tentativa), 2000)
+}
+
 async function chamarHubspot<T>(url: string, init: RequestInit, doFetch: typeof fetch): Promise<ResultadoHubspot<T>> {
   let resposta: Response
-  try {
-    resposta = await doFetch(url, init)
-  } catch (e) {
-    return { ok: false, codigo: 'falha_rede', mensagem: e instanceof Error ? e.message : String(e) }
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      resposta = await doFetch(url, init)
+    } catch (e) {
+      return { ok: false, codigo: 'falha_rede', mensagem: e instanceof Error ? e.message : String(e) }
+    }
+    if (resposta.status !== 429 || tentativa >= TENTATIVAS_429) break
+    await esperar(atrasoRetry(resposta, tentativa))
   }
 
   let json: unknown

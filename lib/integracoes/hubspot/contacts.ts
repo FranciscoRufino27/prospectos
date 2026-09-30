@@ -11,6 +11,9 @@ export interface ListaHubspot<T> {
   paging?: { next?: { after?: string } }
 }
 
+// Propriedades lidas dos contatos associados na Central de Importação.
+export const PROPRIEDADES_CONTATO = ['firstname', 'lastname', 'email', 'jobtitle', 'hubspot_owner_id', 'notes_last_contacted'] as const
+
 // Somente leitura. `properties` limitado às colunas úteis p/ a validação da
 // Fase 1 — não traz a ficha completa do contato.
 export function listarContatos(

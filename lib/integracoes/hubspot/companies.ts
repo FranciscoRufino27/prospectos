@@ -1,5 +1,6 @@
 import 'server-only'
 import { buscarHubspot, consultarHubspot, type ResultadoHubspot } from './client'
+import { lerObjetosPorIds } from './leituraLote'
 import type { ListaHubspot } from './contacts'
 
 export interface EmpresaHubspot {
@@ -28,6 +29,11 @@ export const PROPRIEDADES_IMPORTACAO = [
   'hubspot_owner_id',
   'num_associated_contacts',
   'num_associated_deals',
+  'hs_num_open_deals',
+  'recent_deal_close_date',
+  'notes_last_updated',
+  'notes_last_contacted',
+  'lifecyclestage',
 ] as const
 
 export interface RespostaBuscaEmpresas {
@@ -45,26 +51,12 @@ export function pesquisarEmpresas(
   return consultarHubspot('/crm/v3/objects/companies/search', accessToken, corpo, doFetch)
 }
 
-export const LIMITE_LEITURA_LOTE = 100 // máximo de inputs do batch/read
-
 // Leitura por IDs (batch/read). Leitura, apesar do POST. IDs inexistentes
 // simplesmente não voltam.
-export async function lerEmpresasPorIds(
+export function lerEmpresasPorIds(
   accessToken: string,
   ids: readonly string[],
   doFetch?: typeof fetch,
 ): Promise<ResultadoHubspot<EmpresaHubspot[]>> {
-  const todas: EmpresaHubspot[] = []
-  for (let i = 0; i < ids.length; i += LIMITE_LEITURA_LOTE) {
-    const fatia = ids.slice(i, i + LIMITE_LEITURA_LOTE)
-    const r = await consultarHubspot<{ results: EmpresaHubspot[] }>(
-      '/crm/v3/objects/companies/batch/read',
-      accessToken,
-      { inputs: fatia.map((id) => ({ id })), properties: [...PROPRIEDADES_IMPORTACAO] },
-      doFetch,
-    )
-    if (!r.ok) return r
-    todas.push(...(r.dados.results ?? []))
-  }
-  return { ok: true, dados: todas }
+  return lerObjetosPorIds('companies', accessToken, ids, PROPRIEDADES_IMPORTACAO, doFetch)
 }

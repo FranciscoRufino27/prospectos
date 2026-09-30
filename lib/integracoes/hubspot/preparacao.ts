@@ -5,21 +5,26 @@ import { NICHOS } from '@/lib/prospeccao/nichos'
 import { getValidHubSpotAccessToken } from './tokens'
 import { lerEmpresasPorIds } from './companies'
 import { mapaResponsaveis } from './comerciais'
+import { disponiveisEntre } from './indice'
 
 // Preparo da importação (microentrega 1): grava só a SELEÇÃO — um lote com o
 // nicho esperado e as empresas escolhidas. NÃO cria empresas, contatos nem
-// leads; a validação (OpenCNPJ/DGCBR) e a importação são as próximas etapas.
+// leads; o enriquecimento (lib/integracoes/hubspot/enriquecimento) e a
+// importação são etapas separadas.
 //
 // O navegador manda só os IDs. Nome, domínio, industry e owner são relidos do
 // HubSpot aqui (batch/read) — nada de dono/responsável vindo do payload.
-// Dedup: empresa já importada (organizacao_id + hubspot_company_id em
-// `empresas`) fica de fora do lote.
+// Só entra empresa DISPONÍVEL no índice (apta ou cliente, com comercial
+// mapeado) — a mesma regra que a Central aplica na tela. Cliente entra
+// marcado (item.cliente) para a importação tratá-lo como envio de novidades,
+// nunca como prospecção fria. Dedup: empresa já importada (organizacao_id +
+// hubspot_company_id em `empresas`) fica de fora do lote.
 
 export const LIMITE_EMPRESAS_LOTE = 200
 const ID_COMPANY = /^\d{1,20}$/
 
 export type ResultadoPreparo =
-  | { ok: true; loteId: string; nicho: string; incluidas: number; jaImportadas: number; naoEncontradas: number }
+  | { ok: true; loteId: string; nicho: string; incluidas: number; clientes: number; jaImportadas: number; indisponiveis: number; naoEncontradas: number }
   | {
       ok: false
       motivo:
@@ -72,10 +77,12 @@ export async function prepararLote(
     .eq('organizacao_id', org)
     .in('hubspot_company_id', selecao.ids)
   const importadas = new Set((jaExistentes ?? []).map((r) => String(r.hubspot_company_id)))
-  const elegiveis = encontradas.filter((e) => !importadas.has(e.id))
-  if (elegiveis.length === 0) return { ok: false, motivo: 'nenhuma_elegivel' }
+  const naoImportadas = encontradas.filter((e) => !importadas.has(e.id))
 
   const responsaveis = await mapaResponsaveis(admin, org)
+  const disponiveis = await disponiveisEntre(admin, org, naoImportadas.map((e) => e.id), [...responsaveis.keys()])
+  const elegiveis = naoImportadas.filter((e) => disponiveis.has(e.id))
+  if (elegiveis.length === 0) return { ok: false, motivo: 'nenhuma_elegivel' }
 
   const { data: lote, error: erroLote } = await admin
     .from('hubspot_importacao_lotes')
@@ -102,6 +109,7 @@ export async function prepararLote(
       industry_hubspot: p.industry ?? null,
       hubspot_owner_id: ownerId,
       usuario_id: ownerId ? responsaveis.get(ownerId) ?? null : null,
+      cliente: disponiveis.get(e.id)?.cliente === true,
     }
   })
   const { error: erroItens } = await admin.from('hubspot_importacao_itens').insert(itens)
@@ -116,7 +124,9 @@ export async function prepararLote(
     loteId: String(lote.id),
     nicho: selecao.nicho,
     incluidas: elegiveis.length,
-    jaImportadas: encontradas.length - elegiveis.length,
+    clientes: itens.filter((i) => i.cliente).length,
+    jaImportadas: encontradas.length - naoImportadas.length,
+    indisponiveis: naoImportadas.length - elegiveis.length,
     naoEncontradas: selecao.ids.length - encontradas.length,
   }
 }
