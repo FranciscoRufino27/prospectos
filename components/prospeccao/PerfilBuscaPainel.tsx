@@ -13,15 +13,17 @@ import {
   CARGOS_ALVO_PROSPECCAO,
   FAIXAS_FUNCIONARIOS,
   PESQUISAS_LIMITES,
+  PORTES_CORTE_DECISOR,
   PROSPECCAO_LIMITES,
   quantidadeValida,
   type AreaAlvoProspeccao,
   type CargoAlvoProspeccao,
   type FaixaFuncionarios,
+  type PorteCorteDecisor,
   type ProspeccaoConfig,
 } from '@/lib/config/workspaceConfig';
 import { NICHOS, nichoDaAtividade } from '@/lib/prospeccao/nichos';
-import { formatarCnae } from '@/lib/prospeccao/rotulos';
+import { formatarCnae, ROTULO_PORTE } from '@/lib/prospeccao/rotulos';
 import s from './Prospeccao.module.css';
 
 const LIMITE_CNAES = PROSPECCAO_LIMITES.cnaes;
@@ -246,6 +248,29 @@ export default function PerfilBuscaPainel({
           </section>
 
           <section className={s.profileSection}>
+            <label className={s.profileLabel} htmlFor="porte-outro-decisor">Sócio não basta a partir de</label>
+            <p className={s.labelHelp}>Nessas empresas o &quot;analisar&quot; avisa que falta outro decisor, mesmo com sócio no cargo-alvo. Usa o porte da Receita.</p>
+            <select
+              id="porte-outro-decisor"
+              value={perfil.porteOutroDecisor ?? ''}
+              disabled={!podeEditar}
+              onChange={(evento) => {
+                const valor = evento.target.value as PorteCorteDecisor | '';
+                setPerfil((atual) => {
+                  const { porteOutroDecisor: _anterior, ...resto } = atual;
+                  return valor ? { ...resto, porteOutroDecisor: valor } : resto;
+                });
+              }}
+              className={`${s.field} px-3 focus-ring`}
+            >
+              <option value="">Sem corte (o sócio sempre pode servir)</option>
+              {PORTES_CORTE_DECISOR.map((porte) => (
+                <option key={porte} value={porte}>{ROTULO_PORTE[porte]}{porte === 'pequeno' ? ' ou maior' : ''}</option>
+              ))}
+            </select>
+          </section>
+
+          <section className={s.profileSection}>
             <span className={s.profileLabel}>Área (opcional)</span>
             <SeletorOpcoesPerfil
               rotuloAcessivel="Áreas desejadas"
@@ -310,7 +335,7 @@ export default function PerfilBuscaPainel({
             )}
           </section>
 
-          <p className={s.profilePendingNote}><Info size={12} /> Funcionários, cargos e áreas ficam salvos no perfil; serão aplicados à busca quando a fonte de enriquecimento for conectada.</p>
+          <p className={s.profilePendingNote}><Info size={12} /> Cargos-alvo e porte de corte já avaliam o decisor no &quot;analisar&quot;. Funcionários e áreas ficam salvos e serão aplicados quando a fonte de enriquecimento for conectada.</p>
           {foraDoCatalogo.length > 0 && <p className={s.infoNotice}>{foraDoCatalogo.length} atividade{foraDoCatalogo.length === 1 ? '' : 's'} ainda não {foraDoCatalogo.length === 1 ? 'está' : 'estão'} no catálogo atual.</p>}
           {aviso && <p className={s.warningNotice}><AlertCircle size={14} /> {aviso}</p>}
           {cnaes.length === 0 && <p className={s.warningNotice}><AlertCircle size={14} /> Selecione ao menos um nicho ou CNAE para habilitar a busca.</p>}

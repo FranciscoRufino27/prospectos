@@ -39,8 +39,10 @@ describe('filtros da busca', () => {
     expect(limitePagina('10')).toBe(LIMITE_PAGINA)
   })
 
-  it('cursor só aceita CNPJ de 14 dígitos', () => {
-    expect(cursorValido('12345678000199')).toBe('12345678000199')
+  it('cursor só aceita "<nota>-<cnpj>"', () => {
+    expect(cursorValido('41-12345678000199')).toBe('41-12345678000199')
+    expect(cursorValido('12345678000199')).toBeNull()
+    expect(cursorValido('411-12345678000199')).toBeNull()
     expect(cursorValido("1' or 1=1")).toBeNull()
     expect(cursorValido(123)).toBeNull()
   })
@@ -179,7 +181,7 @@ describe('buscarProspeccao', () => {
     cnpj, razao_social: 'HOTEL', nome_fantasia: null, cnae_principal: '5510801', cnaes_secundarios: [],
     porte: 'micro', mei: false, capital_social: '1000.00', data_inicio_atividade: null, logradouro: null,
     numero: null, bairro: null, cep: null, uf: 'SP', municipio: 'SAO PAULO', telefone: null,
-    email: 'reservas@hotel.com.br', ja_na_base: false, lead_id: null,
+    email: 'reservas@hotel.com.br', ja_na_base: false, lead_id: null, nota: 30,
   })
 
   it('sem CNAE não consulta o catálogo', async () => {
@@ -192,19 +194,23 @@ describe('buscarProspeccao', () => {
   it('pagina por cursor, classifica e-mail e só conta na primeira página', async () => {
     const pagina = Array.from({ length: LIMITE_PAGINA }, (_, i) => linha(String(10000000000000 + i)))
     const { admin, rpc } = adminFake({
-      prospeccao_buscar: { data: pagina, error: null },
+      prospeccao_buscar_por_nota: { data: pagina, error: null },
       prospeccao_contar: { data: 123, error: null },
     })
     const filtros = normalizarFiltros({}, PERFIL)
     const r = await buscarProspeccao(admin, 'org-a', filtros, null, { contar: true })
     expect(r.total).toBe(123)
-    expect(r.proximoCursor).toBe(pagina[pagina.length - 1].cnpj)
+    expect(r.proximoCursor).toBe(`30-${pagina[pagina.length - 1].cnpj}`)
     expect(r.itens[0]).toMatchObject({ qualidade_email: 'generico', capital_social: 1000 })
+    expect(r.itens[0]).not.toHaveProperty('nota')
     expect(r.catalogo).toEqual({ mesRf: '2026-09', concluidaEm: '2026-09-23T15:00:00Z', cnaes: ['5510801'] })
-    expect(rpc).toHaveBeenCalledWith('prospeccao_buscar', expect.objectContaining({ p_org: 'org-a', p_apos_cnpj: null }))
+    expect(rpc).toHaveBeenCalledWith('prospeccao_buscar_por_nota', expect.objectContaining({ p_org: 'org-a', p_apos_nota: null, p_apos_cnpj: null }))
 
     rpc.mockClear()
     const r2 = await buscarProspeccao(admin, 'org-a', filtros, r.proximoCursor, { contar: false })
+    expect(rpc).toHaveBeenCalledWith('prospeccao_buscar_por_nota', expect.objectContaining({
+      p_apos_nota: 30, p_apos_cnpj: pagina[pagina.length - 1].cnpj,
+    }))
     expect(r2.total).toBeNull()
     expect(rpc).not.toHaveBeenCalledWith('prospeccao_contar', expect.anything())
   })
@@ -215,7 +221,7 @@ describe('buscarProspeccao', () => {
     ))
     const admin = {
       rpc: vi.fn((nome: string, params?: Record<string, unknown>) => (
-        nome === 'prospeccao_buscar'
+        nome === 'prospeccao_buscar_por_nota'
           ? Promise.resolve({ data: [linha('10000000000001')], error: null })
           : contagens(nome, params as { p_so_com_email: boolean })
       )),
@@ -233,17 +239,17 @@ describe('buscarProspeccao', () => {
   })
 
   it('última página não devolve cursor', async () => {
-    const { admin } = adminFake({ prospeccao_buscar: { data: [linha('10000000000001')], error: null } })
+    const { admin } = adminFake({ prospeccao_buscar_por_nota: { data: [linha('10000000000001')], error: null } })
     const r = await buscarProspeccao(admin, 'org-a', normalizarFiltros({}, PERFIL), null, { contar: false })
     expect(r.proximoCursor).toBeNull()
   })
 
   it('quantidade desejada: pede só o que falta e devolve cursor se a página veio cheia', async () => {
     const pagina = Array.from({ length: 12 }, (_, i) => linha(String(10000000000000 + i)))
-    const { admin, rpc } = adminFake({ prospeccao_buscar: { data: pagina, error: null } })
+    const { admin, rpc } = adminFake({ prospeccao_buscar_por_nota: { data: pagina, error: null } })
     const r = await buscarProspeccao(admin, 'org-a', normalizarFiltros({}, PERFIL), null, { contar: false, limite: 12 })
-    expect(rpc).toHaveBeenCalledWith('prospeccao_buscar', expect.objectContaining({ p_limite: 12 }))
-    expect(r.proximoCursor).toBe(pagina[11].cnpj)
+    expect(rpc).toHaveBeenCalledWith('prospeccao_buscar_por_nota', expect.objectContaining({ p_limite: 12 }))
+    expect(r.proximoCursor).toBe(`30-${pagina[11].cnpj}`)
   })
 })
 

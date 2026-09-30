@@ -1,22 +1,31 @@
 // Quadro societário de um CNPJ via OpenCNPJ, para o passo "analisar".
 // Só consulta CNPJ presente no catálogo: a rota não é um proxy aberto.
+// A avaliação (sócio serve ou precisa de outro decisor) usa o perfil de busca
+// da organização da sessão; o e-mail nominal compara o e-mail do catálogo com
+// os nomes do quadro.
 import { NextRequest, NextResponse } from 'next/server'
 import { resolverAcesso } from '@/lib/rbac/servidor'
-import { consultarSocios, sugerirDecisor } from '@/lib/prospeccao/socios'
+import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
+import { consultarSocios } from '@/lib/prospeccao/socios'
+import { avaliarDecisor } from '@/lib/prospeccao/adequacaoDecisor'
+import { donoDoEmail } from '@/lib/prospeccao/emailNominal'
 
 export const runtime = 'nodejs'
 
 export async function GET(req: NextRequest) {
   const acc = await resolverAcesso()
   if ('erro' in acc) return acc.erro
-  const { admin } = acc.acesso
+  const { admin, org } = acc.acesso
 
   const cnpj = (req.nextUrl.searchParams.get('cnpj') ?? '').replace(/\D/g, '')
   if (!/^\d{14}$/.test(cnpj)) return NextResponse.json({ erro: 'CNPJ inválido.' }, { status: 400 })
 
-  const { data, error } = await admin.from('catalogo_estabelecimentos').select('cnpj').eq('cnpj', cnpj).maybeSingle()
-  if (error) return NextResponse.json({ erro: 'Não foi possível consultar agora.' }, { status: 500 })
-  if (!data) return NextResponse.json({ erro: 'CNPJ fora do catálogo.' }, { status: 404 })
+  const [empresa, orgRow] = await Promise.all([
+    admin.from('catalogo_estabelecimentos').select('cnpj, porte, mei, email').eq('cnpj', cnpj).maybeSingle(),
+    admin.from('organizacoes').select('configuracoes').eq('id', org).maybeSingle(),
+  ])
+  if (empresa.error || orgRow.error) return NextResponse.json({ erro: 'Não foi possível consultar agora.' }, { status: 500 })
+  if (!empresa.data) return NextResponse.json({ erro: 'CNPJ fora do catálogo.' }, { status: 404 })
 
   const r = await consultarSocios(cnpj)
   if (!r.ok) {
@@ -25,5 +34,15 @@ export async function GET(req: NextRequest) {
       { status: r.motivo === 'nao_encontrado' ? 404 : 502 },
     )
   }
-  return NextResponse.json({ socios: r.socios, sugerido: sugerirDecisor(r.socios) })
+  const perfil = parseWorkspaceConfig(orgRow.data?.configuracoes).prospeccao
+  const dono = donoDoEmail(empresa.data.email, r.socios)
+  const avaliacao = avaliarDecisor(r.socios, empresa.data, perfil, dono)
+  return NextResponse.json({
+    socios: avaliacao.socios,
+    sugerido: avaliacao.sugerido,
+    status: avaliacao.status,
+    motivo: avaliacao.motivo,
+    // Nome do sócio dono do e-mail cadastral; null = e-mail não é nominal.
+    emailNominalDe: dono?.nome ?? null,
+  })
 }

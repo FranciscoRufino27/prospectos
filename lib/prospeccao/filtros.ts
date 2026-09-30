@@ -73,8 +73,15 @@ export function limitePagina(v: unknown): number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 1 ? Math.min(v, LIMITE_PAGINA) : LIMITE_PAGINA
 }
 
+// Cursor da busca por nota (migration 0054): "<nota>-<cnpj>". Opaco para a tela.
 export function cursorValido(v: unknown): string | null {
-  return typeof v === 'string' && /^\d{14}$/.test(v) ? v : null
+  return typeof v === 'string' && /^\d{1,2}-\d{14}$/.test(v) ? v : null
+}
+
+export function lerCursor(cursor: string | null): { nota: number; cnpj: string } | null {
+  if (!cursor) return null
+  const [nota, cnpj] = cursor.split('-')
+  return { nota: Number(nota), cnpj }
 }
 
 /** Parâmetros comuns de prospeccao_buscar / prospeccao_contar. */

@@ -2,8 +2,9 @@
 // `org` vem SEMPRE da sessão (resolverAcesso), nunca do payload.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { limitePagina, paramsRpc, type FiltrosBusca } from './filtros'
+import { lerCursor, limitePagina, paramsRpc, type FiltrosBusca } from './filtros'
 import { classificarEmail, type QualidadeEmail } from './qualidadeEmail'
+import { dominioDaEmpresa, type DominioEmpresa } from './dominioEmpresa'
 
 export interface ResultadoCatalogo {
   cnpj: string
@@ -26,6 +27,7 @@ export interface ResultadoCatalogo {
   ja_na_base: boolean
   lead_id: string | null
   qualidade_email: QualidadeEmail
+  dominio: DominioEmpresa | null
 }
 
 export interface StatusCatalogo {
@@ -71,8 +73,15 @@ export async function buscarProspeccao(
   const params = paramsRpc(org, filtros)
   // Quantidade desejada: a página traz só o que falta (nunca mais que LIMITE_PAGINA).
   const limite = limitePagina(opcoes.limite)
+  const apos = lerCursor(cursor)
   const [pagina, contagemGeral, contagemComEmail, catalogo] = await Promise.all([
-    admin.rpc('prospeccao_buscar', { ...params, p_apos_cnpj: cursor, p_limite: limite }),
+    // Ordenada por nota (0054): as empresas de dado melhor vêm primeiro.
+    admin.rpc('prospeccao_buscar_por_nota', {
+      ...params,
+      p_apos_nota: apos?.nota ?? null,
+      p_apos_cnpj: apos?.cnpj ?? null,
+      p_limite: limite,
+    }),
     // Contagem só na primeira página: paginar não muda o total. Sempre as duas
     // (geral e com e-mail), independente do toggle atual — os cards precisam
     // dos dois números ao mesmo tempo.
@@ -84,15 +93,16 @@ export async function buscarProspeccao(
   if (contagemGeral.error) throw new Error(`Falha na contagem: ${contagemGeral.error.message}`)
   if (contagemComEmail.error) throw new Error(`Falha na contagem com e-mail: ${contagemComEmail.error.message}`)
 
-  const linhas = (pagina.data ?? []) as Omit<ResultadoCatalogo, 'qualidade_email'>[]
-  const itens = linhas.map((l) => ({
+  const linhas = (pagina.data ?? []) as (Omit<ResultadoCatalogo, 'qualidade_email' | 'dominio'> & { nota: number })[]
+  const itens: ResultadoCatalogo[] = linhas.map(({ nota: _nota, ...l }) => ({
     ...l,
     capital_social: l.capital_social === null ? null : Number(l.capital_social),
     qualidade_email: classificarEmail(l.email),
+    dominio: dominioDaEmpresa(l.email, [l.nome_fantasia, l.razao_social]),
   }))
   return {
     itens,
-    proximoCursor: itens.length === limite ? itens[itens.length - 1].cnpj : null,
+    proximoCursor: linhas.length === limite ? `${linhas[linhas.length - 1].nota}-${linhas[linhas.length - 1].cnpj}` : null,
     total: contagemGeral.data === null ? null : Number(contagemGeral.data),
     totalComEmail: contagemComEmail.data === null ? null : Number(contagemComEmail.data),
     catalogo,

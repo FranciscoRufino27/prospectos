@@ -11,7 +11,7 @@ export const runtime = 'nodejs'
 export async function POST(req: Request) {
   const acc = await resolverAcesso()
   if ('erro' in acc) return acc.erro
-  const { admin, org } = acc.acesso
+  const { admin, org, role } = acc.acesso
 
   try {
     const corpo = (await req.json().catch(() => ({}))) as { filtros?: unknown; cursor?: unknown; limite?: unknown }
@@ -24,7 +24,14 @@ export async function POST(req: Request) {
       contar: cursor === null,
       limite: limitePagina(corpo.limite),
     })
-    return NextResponse.json({ ...resposta, filtros, perfil: filtrosDoPerfil(perfil), temPerfil: !!perfil?.cnaes?.length })
+    return NextResponse.json({
+      ...resposta,
+      filtros,
+      perfil: filtrosDoPerfil(perfil),
+      temPerfil: !!perfil?.cnaes?.length,
+      // Só exibição: administradores veem o selo de procedência da Receita.
+      ehAdmin: role === 'admin',
+    })
   } catch (err) {
     console.error('[prospeccao/busca] erro:', err)
     return NextResponse.json({ erro: 'Não foi possível buscar agora.' }, { status: 500 })

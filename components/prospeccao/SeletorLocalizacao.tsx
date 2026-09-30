@@ -33,15 +33,17 @@ export default function SeletorLocalizacao({
         </button>
       </div>
 
-      <label className={s.profileFieldLabel}>
+      {/* div, não <label>: dentro de um label, o clique numa opção do menu
+          "clica" também o primeiro botão do campo (o X da 1ª etiqueta). */}
+      <div className={s.profileFieldLabel}>
         <span>Estados</span>
         <SeletorEstados selecionadas={ufs} desabilitado={desabilitado} onChange={onChangeUfs} />
-      </label>
+      </div>
 
-      <label className={s.profileFieldLabel}>
+      <div className={s.profileFieldLabel}>
         <span>Municípios</span>
         <SeletorMunicipios selecionados={municipios} ufs={ufs} desabilitado={desabilitado} onChange={onChangeMunicipios} />
-      </label>
+      </div>
 
       <p className={s.fieldHelp}>
         <Info size={12} />

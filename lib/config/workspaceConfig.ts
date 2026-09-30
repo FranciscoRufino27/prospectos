@@ -15,7 +15,7 @@
 // junto com as fases). Se a superfície crescer muito, aí sim avaliamos um zod.
 
 // Suba este número ao mudar o formato do blob, e adicione o passo em `migrar()`.
-export const WORKSPACE_CONFIG_SCHEMA_VERSION = 7
+export const WORKSPACE_CONFIG_SCHEMA_VERSION = 8
 
 // Objetivos que o produto já consegue medir de ponta a ponta. Novos objetivos
 // só entram nesta allowlist quando houver dado operacional real para dashboard,
@@ -171,6 +171,12 @@ export type FaixaFuncionarios = (typeof FAIXAS_FUNCIONARIOS)[number]
 export const CARGOS_ALVO_PROSPECCAO = ['proprietario', 'socio', 'founder', 'diretor', 'gerente'] as const
 export type CargoAlvoProspeccao = (typeof CARGOS_ALVO_PROSPECCAO)[number]
 
+// Porte da Receita a partir do qual o sócio não basta como decisor: a empresa
+// precisa de outro contato (ex.: gerente da área). A RF não tem número de
+// funcionários, então o corte é pelo porte jurídico.
+export const PORTES_CORTE_DECISOR = ['pequeno', 'demais'] as const
+export type PorteCorteDecisor = (typeof PORTES_CORTE_DECISOR)[number]
+
 export const AREAS_ALVO_PROSPECCAO = ['ti', 'rh', 'logistica', 'operacoes', 'comercial', 'marketing', 'financeiro', 'compras'] as const
 export type AreaAlvoProspeccao = (typeof AREAS_ALVO_PROSPECCAO)[number]
 
@@ -184,6 +190,7 @@ export interface ProspeccaoConfig {
   faixasFuncionarios?: FaixaFuncionarios[]
   cargosAlvo?: CargoAlvoProspeccao[]
   areasAlvo?: AreaAlvoProspeccao[]
+  porteOutroDecisor?: PorteCorteDecisor
   excluirMei?: boolean
   // Casar também pelo CNAE secundário. Desligado por padrão: traz empresas de
   // outro ramo que só listam a atividade como acessória.
@@ -212,6 +219,9 @@ export function parseProspeccaoConfig(bruto: unknown): ProspeccaoConfig | undefi
   if (faixasFuncionarios.length) p.faixasFuncionarios = faixasFuncionarios as FaixaFuncionarios[]
   if (cargosAlvo.length) p.cargosAlvo = cargosAlvo as CargoAlvoProspeccao[]
   if (areasAlvo.length) p.areasAlvo = areasAlvo as AreaAlvoProspeccao[]
+  if ((PORTES_CORTE_DECISOR as readonly unknown[]).includes(bruto.porteOutroDecisor)) {
+    p.porteOutroDecisor = bruto.porteOutroDecisor as PorteCorteDecisor
+  }
   if (typeof bruto.excluirMei === 'boolean') p.excluirMei = bruto.excluirMei
   if (typeof bruto.incluirCnaesSecundarios === 'boolean') p.incluirCnaesSecundarios = bruto.incluirCnaesSecundarios
   return Object.keys(p).length ? p : undefined
@@ -328,6 +338,8 @@ function migrar(bruto: Record<string, unknown>): Record<string, unknown> {
   if (v < 6) cfg = { ...cfg, _schema_version: 6 }
   // v6 -> v7: adiciona preferências de qualificação da Prospecção. Ausência = nenhuma.
   if (v < 7) cfg = { ...cfg, _schema_version: 7 }
+  // v7 -> v8: adiciona prospeccao.porteOutroDecisor. Ausência = sem corte por porte.
+  if (v < 8) cfg = { ...cfg, _schema_version: 8 }
   return cfg
 }
 

@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import {
   Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, Filter, LayoutGrid, Mail,
-  Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2, UserRound, X,
+  Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2,
 } from 'lucide-react';
 import { filtrosDoPerfil, LIMITE_PAGINA, type FiltrosBusca } from '@/lib/prospeccao/filtros';
 import type { ResultadoCatalogo, StatusCatalogo } from '@/lib/prospeccao/buscaServidor';
@@ -17,12 +17,12 @@ import {
   PESQUISAS_LIMITES, PORTES_PROSPECCAO, quantidadeValida,
   type PesquisaSalva, type PorteProspeccao, type ProspeccaoConfig,
 } from '@/lib/config/workspaceConfig';
-import DetalheEmpresa, { type Decisor } from '@/components/prospeccao/DetalheEmpresa';
+import DetalheEmpresa, { type AvaliacaoTela, type Decisor } from '@/components/prospeccao/DetalheEmpresa';
+import DecisorCelula from '@/components/prospeccao/DecisorCelula';
 import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoModal';
 import CaixaSelecao from '@/components/prospeccao/CaixaSelecao';
 import PerfilBuscaPainel from '@/components/prospeccao/PerfilBuscaPainel';
-import SeletorEstados from '@/components/prospeccao/SeletorEstados';
-import SeletorMunicipios from '@/components/prospeccao/SeletorMunicipios';
+import SeloReceita, { ProvedorSeloReceita } from '@/components/prospeccao/SeloReceita';
 import PesquisasSalvas, { SalvarPesquisa } from '@/components/prospeccao/PesquisasSalvas';
 import { iconeDoNicho } from '@/components/prospeccao/iconesNicho';
 import s from '@/components/prospeccao/Prospeccao.module.css';
@@ -86,18 +86,22 @@ interface RespostaApi {
   filtros: FiltrosBusca;
   perfil: FiltrosBusca;
   temPerfil: boolean;
+  ehAdmin: boolean;
 }
 
 const ROTULO_STATUS_EMAIL = { todos: 'Todos', com_email: 'Com e-mail', sem_email: 'Sem e-mail' } as const;
 type StatusEmailResultado = keyof typeof ROTULO_STATUS_EMAIL;
 
 // Rótulo em cima, campo embaixo: cada filtro lê como um item de formulário.
+// div, não <label>: dentro de um label, o clique numa opção dos seletores de
+// estado/município "clica" também o primeiro botão do campo (o X da 1ª
+// etiqueta) e desfaz a escolha. Cada controle leva o próprio aria-label.
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
-    <label className={s.fieldLabel}>
+    <div className={s.fieldLabel}>
       <span>{rotulo}</span>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -201,6 +205,7 @@ export default function ProspeccaoPage() {
   const [perfilAberto, setPerfilAberto] = useState(false);
   const [temPerfil, setTemPerfil] = useState<boolean | null>(null);
   const [catalogo, setCatalogo] = useState<StatusCatalogo | null>(null);
+  const [ehAdmin, setEhAdmin] = useState(false);
   const [itens, setItens] = useState<ResultadoCatalogo[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [total, setTotal] = useState<number | null>(null);
@@ -220,9 +225,10 @@ export default function ProspeccaoPage() {
   const [aberto, setAberto] = useState<string | null>(null);
   const [selecionados, setSelecionados] = useState<Map<string, ResultadoCatalogo>>(() => new Map());
   const [decisores, setDecisores] = useState<Record<string, Decisor | null>>({});
+  // Resultado da consulta de sócios por CNPJ, para o destaque da coluna Decisor.
+  const [avaliacoes, setAvaliacoes] = useState<Record<string, AvaliacaoTela>>({});
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
   const [importando, setImportando] = useState(false);
-  const [texto, setTexto] = useState('');
   // '' = todos os nichos do perfil.
   const [nicho, setNicho] = useState('');
   // Quantidade desejada: a lista para nela (null = sem limite). O texto do
@@ -250,6 +256,7 @@ export default function ProspeccaoPage() {
       if (id !== buscaAtual.current) return;
       if (!res.ok) throw new Error(corpo.erro || 'Falha na busca');
       setCatalogo(corpo.catalogo ?? null);
+      setEhAdmin(corpo.ehAdmin === true);
       setTemPerfil(!!corpo.temPerfil);
       setPerfil(corpo.perfil ?? null);
       if (!f) setFiltros(corpo.filtros ?? null);
@@ -296,15 +303,6 @@ export default function ProspeccaoPage() {
     return () => clearTimeout(t);
   }, [quantidadeTexto, quantidade]);
 
-  // Texto com debounce; demais filtros disparam na hora.
-  useEffect(() => {
-    if (!filtros) return;
-    const t = setTimeout(() => {
-      if (texto !== filtros.texto) setFiltros((f) => (f ? { ...f, texto } : f));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [texto, filtros]);
-
   const primeiraExecucao = useRef(true);
   useEffect(() => {
     if (!filtros) return;
@@ -318,7 +316,6 @@ export default function ProspeccaoPage() {
   function aoSalvarPerfil(novoPerfil: ProspeccaoConfig | null) {
     setPerfilAberto(false);
     setNicho('');
-    setTexto('');
     primeiraExecucao.current = true;
     if (!novoPerfil) {
       buscar(null, null, quantidade ? Math.min(quantidade, LIMITE_PAGINA) : undefined);
@@ -350,7 +347,6 @@ export default function ProspeccaoPage() {
     const cnaes = f.cnaes ?? [];
     const grupo = grupos.find((g) => g.cnaes.length === cnaes.length && g.cnaes.every((c) => cnaes.includes(c)));
     setNicho(grupo?.id ?? '');
-    setTexto('');
     definirQuantidade(p.quantidade);
     setFiltros({
       cnaes,
@@ -518,10 +514,9 @@ export default function ProspeccaoPage() {
       filtros.soComEmail !== perfil.soComEmail,
       filtros.excluirMei !== perfil.excluirMei,
       filtros.incluirCnaesSecundarios !== perfil.incluirCnaesSecundarios,
-      !!texto,
       quantidade !== null,
     ].filter(Boolean).length;
-  }, [filtros, perfil, texto, quantidade]);
+  }, [filtros, perfil, quantidade]);
 
   const semPerfil = temPerfil === false;
 
@@ -539,6 +534,7 @@ export default function ProspeccaoPage() {
   }
 
   return (
+    <ProvedorSeloReceita value={{ visivel: ehAdmin, mesRf: catalogo?.mesRf ?? null }}>
     <div className={s.workspace}>
       <div className={s.mainColumn}>
         <div className={s.page}>
@@ -640,7 +636,7 @@ export default function ProspeccaoPage() {
                     {ajustesAtivos > 0 && (
                       <button
                         type="button"
-                        onClick={() => { setTexto(''); setNicho(''); definirQuantidade(null); setPesquisaAtiva(null); setFiltros({ ...perfil }); }}
+                        onClick={() => { setNicho(''); definirQuantidade(null); setPesquisaAtiva(null); setFiltros({ ...perfil }); }}
                         className={`${s.linkAction} focus-ring rounded`}
                       >
                         <RotateCcw size={12} /> Voltar ao perfil
@@ -659,24 +655,8 @@ export default function ProspeccaoPage() {
                     </div>
                   )}
 
-                  <div className={s.filterGrid}>
-                    <Campo rotulo="Buscar">
-                      <div className="relative">
-                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-sky-300" />
-                        <input
-                          value={texto}
-                          onChange={(e) => setTexto(e.target.value)}
-                          placeholder="Nome da empresa ou CNPJ"
-                          className={`${s.field} pl-9 pr-9 focus-ring`}
-                        />
-                        {texto && (
-                          <button type="button" onClick={() => setTexto('')} aria-label="Limpar busca" className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-100">
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </Campo>
-
+                  {/* Busca por nome/CNPJ, estado e município ficam só no perfil de busca. */}
+                  <div className={`${s.filterGrid} ${s.filterGridBusca}`}>
                     <Campo rotulo="Atividade">
                       <Selecao
                         rotuloAcessivel="Atividade"
@@ -688,14 +668,6 @@ export default function ProspeccaoPage() {
                         </option>
                         {atividadesBase.map((c) => <option key={c} value={c}>{rotuloAtividade(c)}</option>)}
                       </Selecao>
-                    </Campo>
-
-                    <Campo rotulo="Estado">
-                      <SeletorEstados selecionadas={filtros.ufs} onChange={(ufs) => atualizar({ ufs })} />
-                    </Campo>
-
-                    <Campo rotulo="Município">
-                      <SeletorMunicipios selecionados={filtros.municipios} ufs={filtros.ufs} onChange={(municipios) => atualizar({ municipios })} />
                     </Campo>
 
                     <Campo rotulo="Porte">
@@ -801,6 +773,7 @@ export default function ProspeccaoPage() {
                           value={filtroResultadoTexto}
                           onChange={(e) => setFiltroResultadoTexto(e.target.value)}
                           placeholder="Empresa, cidade ou nicho…"
+                          aria-label="Filtrar nesta lista"
                           className={`${s.field} pl-9 pr-9 focus-ring`}
                         />
                       </div>
@@ -845,11 +818,11 @@ export default function ProspeccaoPage() {
                     <tr>
                       <th className="w-12"><span className="sr-only">Selecionar</span></th>
                       <th className="w-[24%]">Empresa</th>
-                      <th className="w-[14%]">Localização</th>
+                      <th className="w-[12%]">Localização</th>
                       <th className="w-[10%]">Porte</th>
                       <th className="w-[13%]">Nicho</th>
                       <th className="w-[19%]">E-mail</th>
-                      <th className="w-[14%]">Decisor</th>
+                      <th className="w-[16%]">Decisor</th>
                       <th className="w-28"><span className="sr-only">Situação</span></th>
                     </tr>
                   </thead>
@@ -901,22 +874,27 @@ export default function ProspeccaoPage() {
                                   <div className="min-w-0">
                                     <div className="flex min-w-0 items-center gap-1.5">
                                       <span className="min-w-0 font-medium text-slate-100 truncate">{nome}</span>
+                                      <SeloReceita />
                                       <ChevronRight size={14} className={`shrink-0 text-slate-600 transition-transform group-hover:text-slate-400 ${expandido ? 'rotate-90 text-slate-300' : ''}`} />
                                     </div>
-                                    <span className="mt-1 block font-mono text-xs text-slate-500">{formatarCnpj(i.cnpj)}</span>
+                                    <span className="mt-1 flex items-center gap-1 font-mono text-xs text-slate-500">{formatarCnpj(i.cnpj)} <SeloReceita /></span>
                                   </div>
                                 </div>
                               </td>
                               <td className="px-4 py-2.5">
-                                <div className="truncate text-slate-200">{nomeLegivel(i.municipio) || '—'}</div>
+                                <div className="flex min-w-0 items-center gap-1"><span className="truncate text-slate-200">{nomeLegivel(i.municipio) || '—'}</span> <SeloReceita /></div>
                                 <div className="mt-0.5 text-xs text-slate-500">{i.uf ?? ''}</div>
                               </td>
                               <td className="px-4 py-2.5 whitespace-nowrap text-slate-300">
                                 {rotuloPorte(i.porte)}
                                 {i.mei && <span className="chip chip-warning ml-2">MEI</span>}
+                                <span className="ml-1"><SeloReceita /></span>
                               </td>
                               <td className="px-4 py-2.5">
-                                <span className={s.activityTag} title={formatarCnae(i.cnae_principal)}>{atividade ?? formatarCnae(i.cnae_principal)}</span>
+                                <span className="inline-flex items-center gap-1">
+                                  <span className={s.activityTag} title={formatarCnae(i.cnae_principal)}>{atividade ?? formatarCnae(i.cnae_principal)}</span>
+                                  <SeloReceita />
+                                </span>
                               </td>
                               <td className="px-4 py-2.5">
                                 {i.email ? (
@@ -924,6 +902,7 @@ export default function ProspeccaoPage() {
                                     <div className="flex items-center gap-2 min-w-0">
                                       <Mail size={13} className="shrink-0 text-slate-500" />
                                       <span className="min-w-0 truncate text-slate-200" title={i.email}>{i.email}</span>
+                                      <SeloReceita />
                                     </div>
                                     <div className={`mt-1 flex items-center gap-1.5 pl-5 text-xs ${COR_QUALIDADE[i.qualidade_email]}`}>
                                       <span className={`h-1.5 w-1.5 rounded-full ${PONTO_QUALIDADE[i.qualidade_email]}`} />
@@ -935,17 +914,7 @@ export default function ProspeccaoPage() {
                                 )}
                               </td>
                               <td className="px-4 py-2.5">
-                                {decisor?.nome ? (
-                                  <div className="flex items-start gap-1.5 text-xs text-indigo-300">
-                                    <UserRound size={13} className="mt-0.5 shrink-0" />
-                                    <span>
-                                      <span className="block text-slate-200">{decisor.nome}</span>
-                                      {decisor.cargo && <span className="block text-slate-500">{decisor.cargo}</span>}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-slate-500">Não verificado</span>
-                                )}
+                                <DecisorCelula decisor={decisor ?? null} avaliacao={avaliacoes[i.cnpj] ?? null} />
                               </td>
                               <td className="w-28 px-5 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                 {i.ja_na_base && (
@@ -958,7 +927,9 @@ export default function ProspeccaoPage() {
                             {expandido && (
                               <tr>
                                 <td colSpan={8} className="p-0">
-                                  <DetalheEmpresa empresa={i} decisor={decisor ?? null} onDecisor={(d) => setDecisores((m) => ({ ...m, [i.cnpj]: d }))} />
+                                  <DetalheEmpresa empresa={i} decisor={decisor ?? null} onDecisor={(d) => setDecisores((m) => ({ ...m, [i.cnpj]: d }))}
+                                    onAvaliacao={(a) => setAvaliacoes((m) => ({ ...m, [i.cnpj]: a }))}
+                                  />
                                 </td>
                               </tr>
                             )}
@@ -1034,5 +1005,6 @@ export default function ProspeccaoPage() {
         <ImportarProspeccaoModal itens={itensImportacao} onFechar={() => setImportando(false)} onImportado={aoImportar} />
       )}
     </div>
+    </ProvedorSeloReceita>
   );
 }

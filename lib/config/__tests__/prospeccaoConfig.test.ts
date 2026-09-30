@@ -10,7 +10,7 @@ describe('workspaceConfig.prospeccao (perfil de busca)', () => {
   it('blob v4 sem perfil migra para a versão atual sem inventar perfil', () => {
     const r = parseWorkspaceConfig({ _schema_version: 4, roi: { custoMensal: 10 } })
     expect(r._schema_version).toBe(WORKSPACE_CONFIG_SCHEMA_VERSION)
-    expect(WORKSPACE_CONFIG_SCHEMA_VERSION).toBe(7)
+    expect(WORKSPACE_CONFIG_SCHEMA_VERSION).toBe(8)
     expect(r.prospeccao).toBeUndefined()
     expect(r.roi).toEqual({ custoMensal: 10 })
   })
@@ -40,6 +40,12 @@ describe('workspaceConfig.prospeccao (perfil de busca)', () => {
       areasAlvo: ['ti'],
       excluirMei: true,
     })
+  })
+
+  it('porte de corte do decisor aceita só pequeno/demais', () => {
+    expect(parseWorkspaceConfig({ prospeccao: { cnaes: ['5510801'], porteOutroDecisor: 'demais' } }).prospeccao?.porteOutroDecisor).toBe('demais')
+    expect(parseWorkspaceConfig({ prospeccao: { cnaes: ['5510801'], porteOutroDecisor: 'micro' } }).prospeccao?.porteOutroDecisor).toBeUndefined()
+    expect(parseWorkspaceConfig({ prospeccao: { cnaes: ['5510801'], porteOutroDecisor: 3 } }).prospeccao?.porteOutroDecisor).toBeUndefined()
   })
 
   it('perfil sem nenhum valor válido some do blob', () => {

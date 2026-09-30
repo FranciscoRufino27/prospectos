@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DestinoCatalogo, RegistroCatalogo, ResumoCarga } from './carga'
+import { notaDoCatalogo } from '../notaCatalogo'
 
 export function criarDestinoSupabase(admin: SupabaseClient): DestinoCatalogo {
   return {
@@ -11,7 +12,8 @@ export function criarDestinoSupabase(admin: SupabaseClient): DestinoCatalogo {
       const agora = new Date().toISOString()
       const { error } = await admin
         .from('catalogo_estabelecimentos')
-        .upsert(lote.map((r) => ({ ...r, atualizado_em: agora })), { onConflict: 'cnpj' })
+        // qualidade_email/nota (0054) ordenam a busca da Prospecção.
+        .upsert(lote.map((r) => ({ ...r, ...notaDoCatalogo(r), atualizado_em: agora })), { onConflict: 'cnpj' })
       if (error) throw new Error(`Falha ao gravar lote do catálogo: ${error.message}`)
     },
 
