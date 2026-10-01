@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   PESQUISAS_LIMITES,
   mesclarWorkspaceConfig,
+  parseFiltrosPesquisa,
   parseWorkspaceConfig,
   type PesquisaSalva,
 } from '@/lib/config/workspaceConfig'
@@ -13,6 +14,28 @@ const FILTROS = { cnaes: ['5510801'], ufs: ['SP'], portes: ['micro'] }
 function pesquisa(id: string, nome: string): PesquisaSalva {
   return { id, nome, filtros: { cnaes: ['5510801'] }, quantidade: null, criadaEm: AGORA }
 }
+
+describe('pesquisa salva com tempo de empresa, capital e telefone (0058)', () => {
+  it('guarda as opções válidas e ignora as inválidas', () => {
+    expect(parseFiltrosPesquisa({ ...FILTROS, anosMinimos: 10, capitalMinimo: 100_000, telefone: 'celular' }))
+      .toMatchObject({ anosMinimos: 10, capitalMinimo: 100_000, telefone: 'celular' })
+    const invalida = parseFiltrosPesquisa({ ...FILTROS, anosMinimos: 7, capitalMinimo: '100000', telefone: 'fixo' })
+    expect(invalida).not.toHaveProperty('anosMinimos')
+    expect(invalida).not.toHaveProperty('capitalMinimo')
+    expect(invalida).not.toHaveProperty('telefone')
+  })
+
+  it('pesquisa antiga, sem os campos, continua válida e sem filtro extra', () => {
+    const antiga = parseFiltrosPesquisa(FILTROS)
+    expect(antiga?.cnaes).toEqual(['5510801'])
+    expect(antiga).not.toHaveProperty('anosMinimos')
+  })
+
+  it('resumo mostra os filtros extras', () => {
+    const p: PesquisaSalva = { ...pesquisa('a', 'A'), filtros: { cnaes: ['5510801'], ufs: ['SP'], anosMinimos: 10, capitalMinimo: 1_000_000, telefone: 'celular' } }
+    expect(resumoPesquisa(p)).toContain('10+ anos · capital ≥ 1 mi · com celular')
+  })
+})
 
 describe('config: prospeccaoPesquisas', () => {
   it('lê só pesquisas válidas, sem duplicar id, e respeita o limite', () => {

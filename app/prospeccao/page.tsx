@@ -414,9 +414,9 @@ export default function ProspeccaoPage() {
       incluirCnaesSecundarios: !!f.incluirCnaesSecundarios,
       soComEmail: !!f.soComEmail,
       texto: '',
-      anosMinimos: null,
-      capitalMinimo: null,
-      telefone: '',
+      anosMinimos: f.anosMinimos ?? null,
+      capitalMinimo: f.capitalMinimo ?? null,
+      telefone: f.telefone ?? '',
     });
     setPesquisaAtiva(p.id);
   }
@@ -429,6 +429,10 @@ export default function ProspeccaoPage() {
     excluirMei: filtros.excluirMei,
     incluirCnaesSecundarios: filtros.incluirCnaesSecundarios,
     soComEmail: filtros.soComEmail,
+    // Só grava os filtros extras ligados (ausente = sem filtro).
+    ...(filtros.anosMinimos !== null ? { anosMinimos: filtros.anosMinimos } : {}),
+    ...(filtros.capitalMinimo !== null ? { capitalMinimo: filtros.capitalMinimo } : {}),
+    ...(filtros.telefone ? { telefone: filtros.telefone } : {}),
   };
 
   // Chamada às rotas de pesquisas salvas; devolve a mensagem de erro, se houver.

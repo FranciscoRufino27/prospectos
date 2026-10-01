@@ -3,6 +3,8 @@
 // antes de virar parâmetro das RPCs (migration 0051).
 
 import {
+  OPCOES_ANOS_MINIMOS,
+  OPCOES_CAPITAL_MINIMO,
   PORTES_PROSPECCAO,
   PROSPECCAO_LIMITES,
   UFS_BRASIL,
@@ -28,8 +30,7 @@ export interface FiltrosBusca {
 }
 
 export type FiltroTelefone = '' | 'com' | 'celular'
-export const OPCOES_ANOS_MINIMOS = [1, 2, 5, 10, 20] as const
-export const OPCOES_CAPITAL_MINIMO = [10_000, 50_000, 100_000, 500_000, 1_000_000] as const
+export { OPCOES_ANOS_MINIMOS, OPCOES_CAPITAL_MINIMO }
 
 export const LIMITE_PAGINA = 50
 const TEXTO_MAX = 80

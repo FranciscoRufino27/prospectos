@@ -232,8 +232,17 @@ export function parseProspeccaoConfig(bruto: unknown): ProspeccaoConfig | undefi
 // o perfil não pode apagar as pesquisas da equipe.
 export const PESQUISAS_LIMITES = { total: 20, nome: 60, quantidadeMax: 500 } as const
 
+// Opções dos filtros de tempo de empresa e capital (migration 0058): a tela
+// oferece só estas, e a busca/pesquisa salva só aceita estas.
+export const OPCOES_ANOS_MINIMOS = [1, 2, 5, 10, 20] as const
+export const OPCOES_CAPITAL_MINIMO = [10_000, 50_000, 100_000, 500_000, 1_000_000] as const
+
 export interface FiltrosPesquisaSalva extends ProspeccaoConfig {
   soComEmail?: boolean
+  // Ausentes = sem o filtro (pesquisas salvas antes da 0058 seguem iguais).
+  anosMinimos?: number
+  capitalMinimo?: number
+  telefone?: 'com' | 'celular'
 }
 
 export interface PesquisaSalva {
@@ -249,7 +258,12 @@ export function parseFiltrosPesquisa(bruto: unknown): FiltrosPesquisaSalva | und
   // Sem atividade a busca não roda: pesquisa sem CNAE não é válida.
   if (!base?.cnaes?.length) return undefined
   const f: FiltrosPesquisaSalva = { ...base }
-  if (ehObjeto(bruto) && bruto.soComEmail === true) f.soComEmail = true
+  if (ehObjeto(bruto)) {
+    if (bruto.soComEmail === true) f.soComEmail = true
+    if ((OPCOES_ANOS_MINIMOS as readonly unknown[]).includes(bruto.anosMinimos)) f.anosMinimos = bruto.anosMinimos as number
+    if ((OPCOES_CAPITAL_MINIMO as readonly unknown[]).includes(bruto.capitalMinimo)) f.capitalMinimo = bruto.capitalMinimo as number
+    if (bruto.telefone === 'com' || bruto.telefone === 'celular') f.telefone = bruto.telefone
+  }
   return f
 }
 

@@ -88,6 +88,11 @@ export function resumoPesquisa(p: PesquisaSalva): string {
     ...(p.filtros.municipios?.length
       ? [`${p.filtros.municipios.length} município${p.filtros.municipios.length === 1 ? '' : 's'}`]
       : []),
+    ...(p.filtros.anosMinimos ? [`${p.filtros.anosMinimos}+ ano${p.filtros.anosMinimos === 1 ? '' : 's'}`] : []),
+    ...(p.filtros.capitalMinimo
+      ? [`capital ≥ ${p.filtros.capitalMinimo >= 1_000_000 ? `${(p.filtros.capitalMinimo / 1_000_000).toLocaleString('pt-BR')} mi` : `${(p.filtros.capitalMinimo / 1000).toLocaleString('pt-BR')} mil`}`]
+      : []),
+    ...(p.filtros.telefone ? [p.filtros.telefone === 'celular' ? 'com celular' : 'com telefone'] : []),
     p.quantidade ? `até ${p.quantidade} empresas` : 'sem limite',
   ].join(' · ')
 }
