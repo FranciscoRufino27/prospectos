@@ -29,7 +29,7 @@ import { ProvedorSeloReceita } from '@/components/prospeccao/SeloReceita';
 import PesquisasSalvas, { SalvarPesquisa } from '@/components/prospeccao/PesquisasSalvas';
 import { iconeDoNicho } from '@/components/prospeccao/iconesNicho';
 import BuscaInternacional, { type PedidoBusca } from '@/components/prospeccao/BuscaInternacional';
-import ForaDoCatalogo from '@/components/prospeccao/ForaDoCatalogo';
+import ForaDoCatalogo, { EmpresaNaoEncontrada } from '@/components/prospeccao/ForaDoCatalogo';
 import s from '@/components/prospeccao/Prospeccao.module.css';
 
 // Prospecção: buscar no catálogo da Receita → analisar → selecionar →
@@ -412,6 +412,12 @@ export default function ProspeccaoPage() {
     setPerfil(novosFiltros);
     setFiltros(novosFiltros);
     buscar(novosFiltros, null, quantidade ? Math.min(quantidade, LIMITE_PAGINA) : undefined);
+  }
+
+  // Atalho "Procurar fora do catálogo": aba internacional já buscando no Brasil.
+  function buscarForaDoCatalogo(nome: string) {
+    setPedidoInternacional({ nome, pais: 'BRA', id: Date.now() });
+    setModo('internacional');
   }
 
   function atualizar(patch: Partial<FiltrosBusca>) {
@@ -973,10 +979,7 @@ export default function ProspeccaoPage() {
                 <ForaDoCatalogo
                   texto={filtros.texto}
                   semResultado={carregados === 0}
-                  onBuscarFora={(nome) => {
-                    setPedidoInternacional({ nome, pais: 'BRA', id: Date.now() });
-                    setModo('internacional');
-                  }}
+                  onBuscarFora={buscarForaDoCatalogo}
                 />
               )}
 
@@ -1074,6 +1077,20 @@ export default function ProspeccaoPage() {
                   <tbody>
                     {carregando && carregados === 0 ? (
                       <LinhasEsqueleto />
+                    ) : carregados === 0 && filtros?.texto ? (
+                      <tr>
+                        <td colSpan={8}>
+                          <EmpresaNaoEncontrada
+                            texto={filtros.texto}
+                            // `total` ignora o filtro de e-mail: se há empresas e nenhuma
+                            // apareceu, o "só com e-mail" é que as escondeu.
+                            escondidasPorEmail={filtros.soComEmail && total ? total : 0}
+                            onMostrarSemEmail={() => atualizar({ soComEmail: false })}
+                            onBuscarFora={buscarForaDoCatalogo}
+                            onLimpar={() => setNomeBusca('')}
+                          />
+                        </td>
+                      </tr>
                     ) : carregados === 0 ? (
                       <tr>
                         <td colSpan={8} className="py-24 text-center">

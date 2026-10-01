@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Building2, ChevronDown, ExternalLink, Globe2, Loader2, Search } from 'lucide-react';
+import { Building2, ChevronDown, ExternalLink, Globe2, Loader2, Search, SearchX } from 'lucide-react';
 import {
   PAISES_INTERNACIONAL, type EmpresaInternacional, type RespostaInternacional,
 } from '@/lib/prospeccao/crustdata';
@@ -15,6 +15,8 @@ import s from './Prospeccao.module.css';
 
 /** Busca pedida de fora (atalho "Procurar fora do catálogo"); `id` novo = nova busca. */
 export interface PedidoBusca { nome: string; pais: string; id: number }
+
+const nomePais = (codigo: string) => PAISES_INTERNACIONAL.find((p) => p.codigo === codigo)?.nome ?? codigo;
 
 export default function BuscaInternacional({ pedido }: { pedido?: PedidoBusca | null }) {
   const [nome, setNome] = useState(pedido?.nome ?? '');
@@ -136,10 +138,27 @@ export default function BuscaInternacional({ pedido }: { pedido?: PedidoBusca | 
             <tbody>
               {itens.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-20 text-center">
-                    <Globe2 size={30} className="mx-auto text-slate-600" />
-                    <p className="mt-4 text-sm font-medium text-slate-300">Nenhuma empresa encontrada</p>
-                    <p className="mt-1 text-sm text-slate-500">Confira a grafia do nome ou troque o país.</p>
+                  <td colSpan={5}>
+                    <div className="mx-auto max-w-md py-16 text-center">
+                      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-slate-400"><SearchX size={22} /></span>
+                      <p className="mt-4 text-base font-semibold text-slate-100">Empresa não encontrada</p>
+                      <p className="mt-1.5 text-sm text-slate-400">
+                        {buscaFeita.nome ? <>Não achamos “{buscaFeita.nome}”</> : <>Não achamos empresas</>}
+                        {buscaFeita.pais ? <> em {nomePais(buscaFeita.pais)}</> : null} na base da Crustdata.
+                      </p>
+                      <ul className="mx-auto mt-4 max-w-sm space-y-1 text-left text-xs text-slate-500">
+                        <li>• Confira a grafia ou tente só a parte principal do nome.</li>
+                        {buscaFeita.pais && <li>• A sede pode estar cadastrada em outro país.</li>}
+                        <li>• Empresas muito pequenas ou sem página no LinkedIn costumam não estar na base.</li>
+                      </ul>
+                      {buscaFeita.pais && buscaFeita.nome && (
+                        <button type="button" disabled={carregando}
+                          onClick={() => { setPais(''); buscar({ nome: buscaFeita.nome, pais: '' }, null); }}
+                          className={`${s.outlineButton} mt-5 disabled:opacity-50 focus-ring`}>
+                          <Globe2 size={15} /> Buscar em qualquer país
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : itens.map((e) => (
