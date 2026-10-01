@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, Filter, LayoutGrid, Mail,
+  Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, FileSpreadsheet, Filter, LayoutGrid, Mail,
   Loader2, Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2, UserSearch,
 } from 'lucide-react';
 import { filtrosDoPerfil, LIMITE_PAGINA, OPCOES_ANOS_MINIMOS, OPCOES_CAPITAL_MINIMO, type FiltroTelefone, type FiltrosBusca } from '@/lib/prospeccao/filtros';
@@ -19,6 +19,7 @@ import {
 } from '@/lib/config/workspaceConfig';
 import DetalheEmpresa, { consultarSociosApi, type ConsultaSocios, type Decisor, type EstadoSalvamento } from '@/components/prospeccao/DetalheEmpresa';
 import { emLote, normalizarPerfilLinkedIn } from '@/lib/prospeccao/contato';
+import { linhaCsv, montarCsv, nomeArquivoCsv } from '@/lib/prospeccao/exportarCsv';
 import DecisorCelula from '@/components/prospeccao/DecisorCelula';
 import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoModal';
 import CaixaSelecao from '@/components/prospeccao/CaixaSelecao';
@@ -534,6 +535,17 @@ export default function ProspeccaoPage() {
     );
     setFalhasDecisores(resultados.filter((r) => !r.ok).length);
     setBuscaDecisores(null);
+  }
+
+  // Baixa os selecionados em CSV, com o que já está na tela (sem ir ao servidor).
+  function exportarSelecionados() {
+    const linhas = [...selecionados.values()].map((i) => linhaCsv(i, decisores[i.cnpj], consultas[i.cnpj]));
+    const url = URL.createObjectURL(new Blob([montarCsv(linhas)], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nomeArquivoCsv();
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   const selecionadosSemConsulta = [...selecionados.keys()].filter((cnpj) => !consultas[cnpj]).length;
@@ -1159,6 +1171,9 @@ export default function ProspeccaoPage() {
             {!buscaDecisores && falhasDecisores > 0 && (
               <span className="text-xs text-amber-300" role="status">{falhasDecisores} sem resposta da OpenCNPJ</span>
             )}
+            <button type="button" onClick={exportarSelecionados} className="flex h-10 items-center gap-2 rounded-lg px-4 text-sm text-slate-300 hover:bg-white/5 focus-ring" title="Baixa as empresas selecionadas em planilha (CSV)">
+              <FileSpreadsheet size={15} /> Exportar CSV
+            </button>
             {confirmandoDescarte ? (
               <button type="button" onClick={descartar} className="flex h-10 items-center gap-2 rounded-lg bg-red-500/15 px-4 text-sm font-medium text-red-300 ring-1 ring-inset ring-red-500/40 hover:bg-red-500/25 focus-ring">
                 <Trash2 size={15} /> Confirmar descarte
