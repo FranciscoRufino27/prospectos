@@ -36,11 +36,12 @@ describe('analiseDaLinha', () => {
     expect(analiseDaLinha({ nome: 'Ana', cargo: null, linkedin: 'linkedin.com/in/ana', consulta })).toEqual({
       decisor: { nome: 'Ana', cargo: '', linkedin: 'linkedin.com/in/ana' },
       consulta,
+      enriquecimento: null,
     })
   })
 
   it('linha só com consulta, ou consulta malformada', () => {
-    expect(analiseDaLinha({ nome: null, cargo: null, linkedin: null, consulta })).toEqual({ decisor: null, consulta })
+    expect(analiseDaLinha({ nome: null, cargo: null, linkedin: null, consulta })).toEqual({ decisor: null, consulta, enriquecimento: null })
     expect(analiseDaLinha({ nome: 'Ana', cargo: 'Sócia', linkedin: null, consulta: { x: 1 } }).consulta).toBeNull()
   })
 })

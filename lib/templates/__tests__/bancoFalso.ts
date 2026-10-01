@@ -19,7 +19,7 @@ export interface Filtro {
 
 export interface OperacaoRegistrada {
   tabela: string
-  tipo: 'select' | 'insert' | 'update' | 'delete'
+  tipo: 'select' | 'insert' | 'update' | 'delete' | 'upsert'
   filtros: Filtro[]
   payload?: unknown
 }
@@ -85,6 +85,7 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
   private modo: 'lista' | 'single' | 'maybe' = 'lista'
   private limite: number | null = null
   private readonly ordens: { coluna: string; asc: boolean }[] = []
+  private conflito: string[] = []
 
   constructor(private readonly banco: BancoFalso, private readonly tabela: string) {}
 
@@ -98,6 +99,13 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
   insert(payload: unknown) { this.tipo = 'insert'; this.payload = payload; return this }
   update(payload: unknown) { this.tipo = 'update'; this.payload = payload; return this }
   delete() { this.tipo = 'delete'; return this }
+  /** ON CONFLICT (onConflict) DO UPDATE SET <só as colunas enviadas>, como o PostgREST. */
+  upsert(payload: unknown, opcoes?: { onConflict?: string }) {
+    this.tipo = 'upsert'
+    this.payload = payload
+    this.conflito = (opcoes?.onConflict ?? 'id').split(',').map((c) => c.trim()).filter(Boolean)
+    return this
+  }
   eq(coluna: string, valor: unknown) { this.filtros.push({ op: 'eq', coluna, valor }); return this }
   neq(coluna: string, valor: unknown) { this.filtros.push({ op: 'neq', coluna, valor }); return this }
   is(coluna: string, valor: unknown) { this.filtros.push({ op: 'is', coluna, valor }); return this }
@@ -187,6 +195,26 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
       const inseridas = novas.map((linha) => ({ id: randomUUID(), created_at: agora, ...linha }))
       tabela.push(...inseridas)
       return this.retornarLinhas ? this.resposta(inseridas) : { data: null, error: null }
+    }
+
+    if (this.tipo === 'upsert') {
+      const novas = (Array.isArray(this.payload) ? this.payload : [this.payload]) as Linha[]
+      if (!TABELAS_SEM_ORGANIZACAO.has(this.tabela) && novas.some((linha) => !linha.organizacao_id)) {
+        return { data: null, error: { message: 'null value in column "organizacao_id"', code: '23502' } }
+      }
+      const afetadas: Linha[] = []
+      for (const nova of novas) {
+        const existente = tabela.find((linha) => this.conflito.every((c) => linha[c] === nova[c]))
+        if (existente) {
+          Object.assign(existente, nova)
+          afetadas.push(existente)
+        } else {
+          const inserida = { ...nova }
+          tabela.push(inserida)
+          afetadas.push(inserida)
+        }
+      }
+      return this.retornarLinhas ? this.resposta(afetadas) : { data: null, error: null }
     }
 
     if (this.filtros.length === 0) {

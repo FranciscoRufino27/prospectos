@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { analiseDaLinha, type AnaliseSalva, type ConsultaSocios } from './decisores'
+import { lerEnriquecimento, type Enriquecimento } from './enriquecimento'
 
 /** Análises salvas da org para os CNPJs de uma página da busca. */
 export async function carregarAnalises(
@@ -12,14 +13,19 @@ export async function carregarAnalises(
   cnpjs: readonly string[],
 ): Promise<Record<string, AnaliseSalva>> {
   if (cnpjs.length === 0) return {}
-  const { data, error } = await admin
+  const ler = (colunas: string) => admin
     .from('prospeccao_decisores')
-    .select('cnpj, nome, cargo, linkedin, consulta')
+    .select(colunas)
     .eq('organizacao_id', org)
     .in('cnpj', [...cnpjs])
+  let { data, error } = await ler('cnpj, nome, cargo, linkedin, consulta, enriquecimento')
+  // Banco ainda sem a 0060: segue com o que já existia (decisor e sócios).
+  if (error && /enriquecimento/.test(error.message)) ({ data, error } = await ler('cnpj, nome, cargo, linkedin, consulta'))
   if (error) throw new Error(`Falha ao ler decisores salvos: ${error.message}`)
   const saida: Record<string, AnaliseSalva> = {}
-  for (const linha of data ?? []) saida[linha.cnpj] = analiseDaLinha(linha)
+  // select() com colunas dinâmicas perde a tipagem da linha.
+  type Linha = Parameters<typeof analiseDaLinha>[0] & { cnpj: string }
+  for (const linha of (data ?? []) as unknown as Linha[]) saida[linha.cnpj] = analiseDaLinha(linha)
   return saida
 }
 
@@ -57,4 +63,36 @@ export async function salvarConsulta(
     { onConflict: 'organizacao_id,cnpj' },
   )
   if (error) throw new Error(`Falha ao salvar consulta de sócios: ${error.message}`)
+}
+
+/** Enriquecimento já salvo de um CNPJ da org (null = nada pago ainda). */
+export async function lerEnriquecimentoSalvo(admin: SupabaseClient, org: string, cnpj: string): Promise<Enriquecimento | null> {
+  const { data, error } = await admin
+    .from('prospeccao_decisores')
+    .select('enriquecimento')
+    .eq('organizacao_id', org)
+    .eq('cnpj', cnpj)
+    .maybeSingle()
+  if (error) throw new Error(`Falha ao ler enriquecimento: ${error.message}`)
+  return lerEnriquecimento(data?.enriquecimento)
+}
+
+/**
+ * Grava uma consulta paga sem apagar a outra (Crustdata e Anymail convivem no
+ * mesmo jsonb) nem mexer em decisor/sócios. Só o servidor chama.
+ */
+export async function salvarEnriquecimento(
+  admin: SupabaseClient,
+  org: string,
+  cnpj: string,
+  parte: Enriquecimento,
+): Promise<Enriquecimento> {
+  const atual = (await lerEnriquecimentoSalvo(admin, org, cnpj)) ?? {}
+  const novo: Enriquecimento = { ...atual, ...parte }
+  const { error } = await admin.from('prospeccao_decisores').upsert(
+    { organizacao_id: org, cnpj, enriquecimento: novo },
+    { onConflict: 'organizacao_id,cnpj' },
+  )
+  if (error) throw new Error(`Falha ao salvar enriquecimento: ${error.message}`)
+  return novo
 }

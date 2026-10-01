@@ -197,7 +197,7 @@
   gap: 12px;
   margin-top: 12px;
 }
-.filterGridBusca { grid-template-columns: repeat(5, minmax(0, 240px)); }
+.filterGridBusca { grid-template-columns: minmax(0, 300px) repeat(5, minmax(0, 220px)); }
 
 .fieldLabel { display: grid; gap: 6px; }
 .fieldLabel > span { color: var(--m-title, #eef4ff); font-size: 12px; font-weight: 600; }

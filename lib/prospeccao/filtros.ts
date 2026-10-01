@@ -63,7 +63,10 @@ export function normalizarFiltros(bruto: unknown, perfil: ProspeccaoConfig | und
   const base = filtrosDoPerfil(perfil)
   if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return base
   const b = bruto as Record<string, unknown>
-  const texto = typeof b.texto === 'string' ? b.texto.trim().slice(0, TEXTO_MAX) : ''
+  // A RF grava os nomes sem acento: "Pousada São João" precisa achar "POUSADA SAO JOAO".
+  const texto = typeof b.texto === 'string'
+    ? b.texto.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().slice(0, TEXTO_MAX)
+    : ''
   return {
     cnaes: Array.isArray(b.cnaes) ? lista(b.cnaes, (s) => /^\d{7}$/.test(s), PROSPECCAO_LIMITES.cnaes) : base.cnaes,
     incluirCnaesSecundarios:
@@ -83,6 +86,12 @@ export function normalizarFiltros(bruto: unknown, perfil: ProspeccaoConfig | und
     capitalMinimo: (OPCOES_CAPITAL_MINIMO as readonly unknown[]).includes(b.capitalMinimo) ? (b.capitalMinimo as number) : null,
     telefone: b.telefone === 'com' || b.telefone === 'celular' ? b.telefone : '',
   }
+}
+
+/** O texto da busca é um CNPJ (14 dígitos, com ou sem máscara)? Devolve só os dígitos. */
+export function cnpjDoTexto(texto: string): string | null {
+  const digitos = texto.replace(/\D/g, '')
+  return digitos.length === 14 && !/[a-z]/i.test(texto) ? digitos : null
 }
 
 /** Tamanho da página pedido pelo cliente, sempre entre 1 e LIMITE_PAGINA. */

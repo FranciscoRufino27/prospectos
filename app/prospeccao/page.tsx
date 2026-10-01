@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, FileSpreadsheet, Filter, LayoutGrid, Mail,
+  Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, FileSpreadsheet, Filter, Globe2, LayoutGrid, Mail,
   Loader2, Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2, UserSearch,
 } from 'lucide-react';
 import { filtrosDoPerfil, LIMITE_PAGINA, OPCOES_ANOS_MINIMOS, OPCOES_CAPITAL_MINIMO, type FiltroTelefone, type FiltrosBusca } from '@/lib/prospeccao/filtros';
@@ -20,6 +20,7 @@ import {
 import DetalheEmpresa, { consultarSociosApi, type ConsultaSocios, type Decisor, type EstadoSalvamento } from '@/components/prospeccao/DetalheEmpresa';
 import { emLote, normalizarPerfilLinkedIn } from '@/lib/prospeccao/contato';
 import { linhaCsv, montarCsv, nomeArquivoCsv } from '@/lib/prospeccao/exportarCsv';
+import { emailDoDecisor, type Enriquecimento } from '@/lib/prospeccao/enriquecimento';
 import DecisorCelula from '@/components/prospeccao/DecisorCelula';
 import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoModal';
 import CaixaSelecao from '@/components/prospeccao/CaixaSelecao';
@@ -27,6 +28,8 @@ import PerfilBuscaPainel from '@/components/prospeccao/PerfilBuscaPainel';
 import { ProvedorSeloReceita } from '@/components/prospeccao/SeloReceita';
 import PesquisasSalvas, { SalvarPesquisa } from '@/components/prospeccao/PesquisasSalvas';
 import { iconeDoNicho } from '@/components/prospeccao/iconesNicho';
+import BuscaInternacional, { type PedidoBusca } from '@/components/prospeccao/BuscaInternacional';
+import ForaDoCatalogo from '@/components/prospeccao/ForaDoCatalogo';
 import s from '@/components/prospeccao/Prospeccao.module.css';
 
 // Prospecção: buscar no catálogo da Receita → analisar → selecionar →
@@ -266,6 +269,8 @@ export default function ProspeccaoPage() {
   const timersSalvar = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   // Consulta de sócios por CNPJ: alimenta a coluna Decisor e o detalhe.
   const [consultas, setConsultas] = useState<Record<string, ConsultaSocios>>({});
+  // Consultas pagas (Crustdata/Anymail) por CNPJ; o servidor guarda (0060).
+  const [enriquecimentos, setEnriquecimentos] = useState<Record<string, Enriquecimento>>({});
   // Busca de decisores dos selecionados em andamento (concluídos/total).
   const [buscaDecisores, setBuscaDecisores] = useState<{ feitos: number; total: number } | null>(null);
   const [falhasDecisores, setFalhasDecisores] = useState(0);
@@ -281,6 +286,12 @@ export default function ProspeccaoPage() {
   const [podeEditarPesquisas, setPodeEditarPesquisas] = useState(false);
   const [pesquisaAtiva, setPesquisaAtiva] = useState<string | null>(null);
   const [salvandoPesquisa, setSalvandoPesquisa] = useState(false);
+  // Brasil = catálogo da Receita; internacional = Crustdata (paga, só no clique).
+  const [modo, setModo] = useState<'brasil' | 'internacional'>('brasil');
+  // Atalho "Procurar fora do catálogo": abre a aba internacional já buscando.
+  const [pedidoInternacional, setPedidoInternacional] = useState<PedidoBusca | null>(null);
+  // Nome/CNPJ digitado: vai para filtros.texto com debounce.
+  const [nomeBusca, setNomeBusca] = useState('');
   // Só a resposta da busca mais recente pode escrever no estado.
   const buscaAtual = useRef(0);
 
@@ -316,6 +327,11 @@ export default function ProspeccaoPage() {
         setConsultas((m) => {
           const n = { ...m };
           for (const i of salvos) if (!n[i.cnpj] && i.analise?.consulta) n[i.cnpj] = i.analise.consulta;
+          return n;
+        });
+        setEnriquecimentos((m) => {
+          const n = { ...m };
+          for (const i of salvos) if (!n[i.cnpj] && i.analise?.enriquecimento) n[i.cnpj] = i.analise.enriquecimento;
           return n;
         });
       }
@@ -360,6 +376,15 @@ export default function ProspeccaoPage() {
     }, 400);
     return () => clearTimeout(t);
   }, [quantidadeTexto, quantidade]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const valor = nomeBusca.trim();
+      if (!filtros || valor === filtros.texto || (valor.length === 1 && !/\d/.test(valor))) return;
+      atualizar({ texto: valor });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [nomeBusca, filtros]);
 
   const primeiraExecucao = useRef(true);
   useEffect(() => {
@@ -406,6 +431,7 @@ export default function ProspeccaoPage() {
     const grupo = grupos.find((g) => g.cnaes.length === cnaes.length && g.cnaes.every((c) => cnaes.includes(c)));
     setNicho(grupo?.id ?? '');
     definirQuantidade(p.quantidade);
+    setNomeBusca('');
     setFiltros({
       cnaes,
       ufs: f.ufs ?? [],
@@ -630,7 +656,8 @@ export default function ProspeccaoPage() {
   const itensImportacao = [...selecionados.values()].map((i) => ({
     cnpj: i.cnpj,
     nome: i.nome_fantasia ?? i.razao_social ?? i.cnpj,
-    email: i.email,
+    // E-mail válido achado para o decisor atual (Anymail) substitui o da Receita.
+    email: emailDoDecisor(enriquecimentos[i.cnpj], decisores[i.cnpj]?.nome) ?? i.email,
     contato_nome: decisores[i.cnpj]?.nome?.trim() || null,
     contato_cargo: decisores[i.cnpj]?.cargo?.trim() || null,
     contato_linkedin: normalizarPerfilLinkedIn(decisores[i.cnpj]?.linkedin),
@@ -651,6 +678,7 @@ export default function ProspeccaoPage() {
       filtros.anosMinimos !== null,
       filtros.capitalMinimo !== null,
       filtros.telefone !== '',
+      filtros.texto !== '',
       quantidade !== null,
     ].filter(Boolean).length;
   }, [filtros, perfil, quantidade]);
@@ -702,8 +730,20 @@ export default function ProspeccaoPage() {
             </div>
           </div>
 
+          {/* Origem: catálogo da Receita ou busca internacional (Crustdata) */}
+          <div className={s.nichoRow}>
+            <div className={s.nichoTabs} role="group" aria-label="Origem da busca">
+              <button type="button" onClick={() => { setPedidoInternacional(null); setModo('brasil'); }} aria-pressed={modo === 'brasil'} className={`${modo === 'brasil' ? s.nichoAtivo : ''} focus-ring`}>
+                <Database size={15} aria-hidden="true" /> Brasil · Receita Federal
+              </button>
+              <button type="button" onClick={() => { setPedidoInternacional(null); setModo('internacional'); }} aria-pressed={modo === 'internacional'} className={`${modo === 'internacional' ? s.nichoAtivo : ''} focus-ring`}>
+                <Globe2 size={15} aria-hidden="true" /> Internacional · nome e país
+              </button>
+            </div>
+          </div>
+
           {/* Nichos do perfil */}
-          {!semPerfil && perfil && grupos.length > 0 && (
+          {modo === 'brasil' && !semPerfil && perfil && grupos.length > 0 && (
             <div className={s.nichoRow}>
               <div className={s.nichoTabs} role="group" aria-label="Nicho">
                 <button type="button" onClick={() => escolherNicho('')} aria-pressed={nicho === ''} className={`${nicho === '' ? s.nichoAtivo : ''} focus-ring`}>
@@ -721,7 +761,7 @@ export default function ProspeccaoPage() {
             </div>
           )}
 
-          {!semPerfil && (
+          {modo === 'brasil' && !semPerfil && (
             <PesquisasSalvas
               pesquisas={pesquisas}
               ativa={pesquisaAtiva}
@@ -738,7 +778,9 @@ export default function ProspeccaoPage() {
         </header>
 
         <div className={s.content}>
-          {semPerfil ? (
+          {modo === 'internacional' ? (
+            <BuscaInternacional pedido={pedidoInternacional} />
+          ) : semPerfil ? (
             <section className={`${s.panel} ${s.emptyHero}`}>
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-300 shadow-[0_0_24px_rgba(14,165,233,0.25)]">
                 <SlidersHorizontal size={24} />
@@ -773,7 +815,7 @@ export default function ProspeccaoPage() {
                     {ajustesAtivos > 0 && (
                       <button
                         type="button"
-                        onClick={() => { setNicho(''); definirQuantidade(null); setPesquisaAtiva(null); setFiltros({ ...perfil }); }}
+                        onClick={() => { setNicho(''); definirQuantidade(null); setPesquisaAtiva(null); setNomeBusca(''); setFiltros({ ...perfil }); }}
                         className={`${s.linkAction} focus-ring rounded`}
                       >
                         <RotateCcw size={12} /> Voltar ao perfil
@@ -792,8 +834,22 @@ export default function ProspeccaoPage() {
                     </div>
                   )}
 
-                  {/* Busca por nome/CNPJ, estado e município ficam só no perfil de busca. */}
+                  {/* Estado e município ficam só no perfil de busca. */}
                   <div className={`${s.filterGrid} ${s.filterGridBusca}`}>
+                    <Campo rotulo="Nome ou CNPJ">
+                      <div className="relative">
+                        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input
+                          value={nomeBusca}
+                          onChange={(e) => setNomeBusca(e.target.value)}
+                          maxLength={80}
+                          placeholder="Razão social, fantasia ou CNPJ"
+                          aria-label="Buscar por nome ou CNPJ"
+                          className={`${s.field} pl-9 pr-3 focus-ring`}
+                        />
+                      </div>
+                    </Campo>
+
                     <Campo rotulo="Atividade">
                       <Selecao
                         rotuloAcessivel="Atividade"
@@ -911,6 +967,17 @@ export default function ProspeccaoPage() {
 
               {erro && (
                 <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{erro}</p>
+              )}
+
+              {filtros?.texto && !carregando && (
+                <ForaDoCatalogo
+                  texto={filtros.texto}
+                  semResultado={carregados === 0}
+                  onBuscarFora={(nome) => {
+                    setPedidoInternacional({ nome, pais: 'BRA', id: Date.now() });
+                    setModo('internacional');
+                  }}
+                />
               )}
 
               {/* Resultados */}
@@ -1103,6 +1170,8 @@ export default function ProspeccaoPage() {
                                 <td colSpan={8} className="p-0">
                                   <DetalheEmpresa empresa={i} decisor={decisor ?? null} onDecisor={(d) => alterarDecisor(i.cnpj, d)} salvamento={salvamentos[i.cnpj] ?? null}
                                     consulta={consultas[i.cnpj] ?? null} onConsulta={(c) => registrarConsulta(i.cnpj, c)}
+                                    enriquecimento={enriquecimentos[i.cnpj] ?? null}
+                                    onEnriquecimento={(e) => setEnriquecimentos((m) => ({ ...m, [i.cnpj]: e }))}
                                   />
                                 </td>
                               </tr>

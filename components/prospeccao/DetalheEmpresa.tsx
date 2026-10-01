@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, Building2, Calendar, Check, CheckCircle2, Copy, Globe, Landmark, Loader2, Mail, MapPin, MessageCircle, Phone, Tag, UserRound, Users } from 'lucide-react'
+import { AlertTriangle, AtSign, Building2, Calendar, Check, CheckCircle2, Copy, Globe, Landmark, Loader2, Mail, MapPin, MessageCircle, Phone, Search, Tag, UserRound, Users } from 'lucide-react'
 import type { ResultadoCatalogo } from '@/lib/prospeccao/buscaServidor'
 import type { MotivoOutroDecisor, StatusDecisor } from '@/lib/prospeccao/adequacaoDecisor'
 import type { ConsultaSocios, Decisor } from '@/lib/prospeccao/decisores'
@@ -9,6 +9,8 @@ import { formatarCnae, nomeLegivel, rotuloPorte } from '@/lib/prospeccao/rotulos
 import { ROTULO_QUALIDADE } from '@/lib/prospeccao/qualidadeEmail'
 import { formatarTelefone, linkWhatsApp, normalizarPerfilLinkedIn, urlBuscaLinkedIn } from '@/lib/prospeccao/contato'
 import SeloReceita from './SeloReceita'
+import type { CandidatoDecisor, EmailDecisor, Enriquecimento } from '@/lib/prospeccao/enriquecimento'
+import { soLetras } from '@/lib/prospeccao/emailNominal'
 
 export type { AvaliacaoTela, ConsultaSocios, Decisor } from '@/lib/prospeccao/decisores'
 
@@ -27,6 +29,20 @@ export async function consultarSociosApi(cnpj: string): Promise<ConsultaSocios> 
     motivo: corpo.motivo ?? null,
     emailNominalDe: typeof corpo.emailNominalDe === 'string' ? corpo.emailNominalDe : null,
   }
+}
+
+/** Chama uma rota de enriquecimento pago; lança com a mensagem do servidor. */
+async function postarEnriquecimento<T>(url: string, corpo: unknown): Promise<T> {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) })
+  const r = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(r?.erro || 'Não foi possível consultar agora.')
+  return r as T
+}
+
+const ROTULO_EMAIL_DECISOR: Record<EmailDecisor['status'], { texto: string; classe: string }> = {
+  valido: { texto: 'válido', classe: 'bg-emerald-500/15 text-emerald-300' },
+  arriscado: { texto: 'arriscado', classe: 'bg-amber-500/15 text-amber-300' },
+  nao_encontrado: { texto: 'não encontrado', classe: 'bg-white/5 text-slate-400' },
 }
 
 function BotaoCopiar({ valor, rotulo }: { valor: string; rotulo: string }) {
@@ -111,6 +127,8 @@ export default function DetalheEmpresa({
   consulta,
   onConsulta,
   salvamento = null,
+  enriquecimento = null,
+  onEnriquecimento,
 }: {
   empresa: ResultadoCatalogo
   decisor: Decisor | null
@@ -118,6 +136,9 @@ export default function DetalheEmpresa({
   consulta: ConsultaSocios | null
   onConsulta: (c: ConsultaSocios) => void
   salvamento?: EstadoSalvamento
+  /** Consultas pagas já feitas (Crustdata/Anymail). */
+  enriquecimento?: Enriquecimento | null
+  onEnriquecimento?: (e: Enriquecimento) => void
 }) {
   const socios = consulta?.socios ?? null
   const avaliacao = consulta?.status ? { status: consulta.status, motivo: consulta.motivo } : null
@@ -129,6 +150,46 @@ export default function DetalheEmpresa({
   const whatsapp = linkWhatsApp(telefone)
   const perfilLinkedIn = normalizarPerfilLinkedIn(decisor?.linkedin)
   const linkedinInvalido = !!decisor?.linkedin?.trim() && !perfilLinkedIn
+
+  const dominio = empresa.dominio?.dominio ?? null
+  const crustdata = enriquecimento?.crustdata ?? null
+  // O e-mail achado só vale para a mesma pessoa que está como decisor agora.
+  const emailAchado = enriquecimento?.anymail && decisor?.nome && soLetras(enriquecimento.anymail.nome) === soLetras(decisor.nome)
+    ? enriquecimento.anymail
+    : null
+  const [pago, setPago] = useState<'crustdata' | 'anymail' | null>(null)
+  const [erroPago, setErroPago] = useState<string | null>(null)
+
+  async function acharDecisor() {
+    setPago('crustdata')
+    setErroPago(null)
+    try {
+      const r = await postarEnriquecimento<NonNullable<Enriquecimento['crustdata']>>('/api/prospeccao/decisor-crustdata', { cnpj: empresa.cnpj })
+      onEnriquecimento?.({ ...enriquecimento, crustdata: { dominio: r.dominio, candidatos: r.candidatos ?? [], consultadoEm: r.consultadoEm } })
+    } catch (e) {
+      setErroPago(e instanceof Error ? e.message : 'Erro ao buscar o decisor')
+    } finally {
+      setPago(null)
+    }
+  }
+
+  async function acharEmail() {
+    if (!decisor?.nome) return
+    setPago('anymail')
+    setErroPago(null)
+    try {
+      const r = await postarEnriquecimento<EmailDecisor>('/api/prospeccao/email-decisor', { cnpj: empresa.cnpj, nome: decisor.nome })
+      onEnriquecimento?.({ ...enriquecimento, anymail: { nome: r.nome, dominio: r.dominio, status: r.status, email: r.email, consultadoEm: r.consultadoEm } })
+    } catch (e) {
+      setErroPago(e instanceof Error ? e.message : 'Erro ao buscar o e-mail')
+    } finally {
+      setPago(null)
+    }
+  }
+
+  function escolherCandidato(c: CandidatoDecisor) {
+    onDecisor({ nome: c.nome, cargo: c.cargo, ...(c.linkedin ? { linkedin: c.linkedin } : {}) })
+  }
 
   async function carregarSocios() {
     setCarregando(true)
@@ -322,6 +383,66 @@ export default function DetalheEmpresa({
           </ul>
         )}
 
+        {/* Crustdata: pessoas com cargo de decisão no domínio da empresa (pago, sob demanda). */}
+        {onEnriquecimento && (
+          <div className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+            {!dominio ? (
+              <p className="text-[11px] text-slate-500">Sem domínio próprio: a busca de decisor e e-mail (Crustdata/Anymail) precisa do site da empresa.</p>
+            ) : !crustdata || crustdata.dominio !== dominio ? (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-slate-400">
+                  {avaliacao?.status === 'precisa_outro_decisor' ? 'Ache quem decide em ' : 'Outras pessoas com cargo de decisão em '}
+                  <span className="text-slate-200">{dominio}</span>
+                </p>
+                <button type="button" onClick={acharDecisor} disabled={pago !== null}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1.5 text-xs font-medium text-indigo-200 ring-1 ring-inset ring-indigo-500/40 hover:bg-indigo-500/20 disabled:opacity-50 focus-ring">
+                  {pago === 'crustdata' ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Achar decisor
+                </button>
+              </div>
+            ) : crustdata.candidatos.length === 0 ? (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-slate-500">Crustdata não achou ninguém com cargo de decisão em {dominio}.</p>
+                <button type="button" onClick={acharDecisor} disabled={pago !== null} className={classeAcao}>
+                  {pago === 'crustdata' ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Tentar de novo
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Cargo de decisão em {dominio} · Crustdata</p>
+                <ul className="space-y-1.5">
+                  {crustdata.candidatos.map((c) => {
+                    const ativo = decisor?.nome === c.nome
+                    return (
+                      <li key={`${c.nome}-${c.cargo}`}
+                        className={`flex items-center gap-1 rounded-lg border pr-2 transition-colors ${
+                          ativo ? 'border-indigo-500/50 bg-[var(--accent-soft)]' : 'border-[var(--border-subtle)] hover:border-[var(--border-strong)]'
+                        }`}
+                      >
+                        <button onClick={() => escolherCandidato(c)} aria-pressed={ativo}
+                          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2 text-left focus-ring">
+                          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${ativo ? 'bg-[var(--accent)] text-white' : 'bg-white/5 text-slate-400'}`}>
+                            <UserRound size={14} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm text-slate-100">{c.nome}</span>
+                            <span className="block truncate text-xs text-slate-500">{c.cargo}{c.local ? ` · ${c.local}` : ''}</span>
+                          </span>
+                        </button>
+                        {c.linkedin && (
+                          <a href={c.linkedin} target="_blank" rel="noopener noreferrer" title={`Abrir o perfil de ${c.nome} no LinkedIn`}
+                            className={`${classeAcao} text-sky-300 hover:text-sky-200`}>
+                            <IconeLinkedIn /> Ver perfil
+                          </a>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-2 pt-1">
           <input
             value={decisor?.nome ?? ''}
@@ -350,6 +471,37 @@ export default function DetalheEmpresa({
             )}
           </div>
         </div>
+        {/* Anymail: e-mail do decisor escolhido (cobra só quando acha e-mail válido). */}
+        {onEnriquecimento && dominio && decisor?.nome && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2">
+            {emailAchado ? (
+              <div className="min-w-0 text-sm">
+                <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+                  <AtSign size={13} className="shrink-0 text-slate-500" />
+                  {emailAchado.email
+                    ? <><span className="break-all text-slate-100">{emailAchado.email}</span><BotaoCopiar valor={emailAchado.email} rotulo="e-mail do decisor" /></>
+                    : <span className="text-slate-400">Anymail não achou o e-mail de {decisor.nome}.</span>}
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${ROTULO_EMAIL_DECISOR[emailAchado.status].classe}`}>
+                    {ROTULO_EMAIL_DECISOR[emailAchado.status].texto}
+                  </span>
+                </span>
+                {emailAchado.status === 'valido' && <span className="mt-0.5 block text-[11px] text-emerald-300">Na importação, o lead usa este e-mail no lugar do da Receita.</span>}
+                {emailAchado.status === 'arriscado' && <span className="mt-0.5 block text-[11px] text-amber-300">Não confirmado pelo servidor de e-mail: a importação mantém o e-mail da Receita.</span>}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">E-mail de <span className="text-slate-200">{decisor.nome}</span> em {dominio}</p>
+            )}
+            {(!emailAchado || emailAchado.status === 'nao_encontrado') && (
+              <button type="button" onClick={acharEmail} disabled={pago !== null}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1.5 text-xs font-medium text-indigo-200 ring-1 ring-inset ring-indigo-500/40 hover:bg-indigo-500/20 disabled:opacity-50 focus-ring">
+                {pago === 'anymail' ? <Loader2 size={12} className="animate-spin" /> : <AtSign size={12} />}
+                {pago === 'anymail' ? 'Procurando…' : emailAchado ? 'Tentar de novo' : 'Achar e-mail'}
+              </button>
+            )}
+          </div>
+        )}
+        {erroPago && <p className="text-xs text-red-400">{erroPago}</p>}
+
         <p className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
           <span>Sem contato definido, o lead entra só com a empresa e o e-mail da Receita.</span>
           {salvamento && (

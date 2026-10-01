@@ -3,6 +3,7 @@
 
 import type { MotivoOutroDecisor, SocioAvaliado, StatusDecisor } from './adequacaoDecisor'
 import type { Socio } from './socios'
+import { lerEnriquecimento, type Enriquecimento } from './enriquecimento'
 
 /** Resultado da consulta de sócios, levado à lista (coluna Decisor). */
 export interface AvaliacaoTela {
@@ -28,6 +29,8 @@ export interface Decisor {
 export interface AnaliseSalva {
   decisor: Decisor | null
   consulta: ConsultaSocios | null
+  /** Consultas pagas já feitas (Crustdata/Anymail, 0060); null = nenhuma. */
+  enriquecimento: Enriquecimento | null
 }
 
 const LIMITES = { nome: 120, cargo: 120, linkedin: 400 } as const
@@ -59,6 +62,7 @@ export function analiseDaLinha(linha: {
   cargo: string | null
   linkedin: string | null
   consulta: unknown
+  enriquecimento?: unknown
 }): AnaliseSalva {
   const consulta = linha.consulta && typeof linha.consulta === 'object' && Array.isArray((linha.consulta as ConsultaSocios).socios)
     ? (linha.consulta as ConsultaSocios)
@@ -66,5 +70,6 @@ export function analiseDaLinha(linha: {
   return {
     decisor: linha.nome ? { nome: linha.nome, cargo: linha.cargo ?? '', ...(linha.linkedin ? { linkedin: linha.linkedin } : {}) } : null,
     consulta,
+    enriquecimento: lerEnriquecimento(linha.enriquecimento),
   }
 }
