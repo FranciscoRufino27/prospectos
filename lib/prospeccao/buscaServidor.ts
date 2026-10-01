@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { lerCursor, limitePagina, paramsRpc, type FiltrosBusca } from './filtros'
 import { classificarEmail, type QualidadeEmail } from './qualidadeEmail'
 import { dominioDaEmpresa, type DominioEmpresa } from './dominioEmpresa'
+import { descricoesCnae, nomeMunicipioIbge } from './referenciaIbge'
 
 export interface ResultadoCatalogo {
   cnpj: string
@@ -28,6 +29,10 @@ export interface ResultadoCatalogo {
   lead_id: string | null
   qualidade_email: QualidadeEmail
   dominio: DominioEmpresa | null
+  /** Nome oficial do IBGE (com acento); null quando não casou com a RF. */
+  municipio_nome: string | null
+  /** Descrição IBGE dos CNAEs principal e secundários, por código. */
+  atividades: Record<string, string>
 }
 
 export interface StatusCatalogo {
@@ -93,12 +98,14 @@ export async function buscarProspeccao(
   if (contagemGeral.error) throw new Error(`Falha na contagem: ${contagemGeral.error.message}`)
   if (contagemComEmail.error) throw new Error(`Falha na contagem com e-mail: ${contagemComEmail.error.message}`)
 
-  const linhas = (pagina.data ?? []) as (Omit<ResultadoCatalogo, 'qualidade_email' | 'dominio'> & { nota: number })[]
+  const linhas = (pagina.data ?? []) as (Omit<ResultadoCatalogo, 'qualidade_email' | 'dominio' | 'municipio_nome' | 'atividades'> & { nota: number })[]
   const itens: ResultadoCatalogo[] = linhas.map(({ nota: _nota, ...l }) => ({
     ...l,
     capital_social: l.capital_social === null ? null : Number(l.capital_social),
     qualidade_email: classificarEmail(l.email),
     dominio: dominioDaEmpresa(l.email, [l.nome_fantasia, l.razao_social]),
+    municipio_nome: nomeMunicipioIbge(l.municipio, l.uf),
+    atividades: descricoesCnae([l.cnae_principal, ...(l.cnaes_secundarios ?? [])]),
   }))
   return {
     itens,

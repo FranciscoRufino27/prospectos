@@ -1,10 +1,10 @@
 'use client'
 
 import { createContext, useContext, useState } from 'react'
-import { AlertCircle } from 'lucide-react'
+import { Info } from 'lucide-react'
 
-// Mini alerta ao lado de cada dado que veio da Receita Federal, só para
-// administradores. É aviso de procedência, não controle de acesso: os dados
+// Selo de procedência no título de um bloco de dados da Receita Federal,
+// um por bloco (não por campo), só para administradores. É aviso de procedência, não controle de acesso: os dados
 // em si são os mesmos para todos. Quem decide se aparece é o servidor
 // (role da sessão), via `ehAdmin` da busca.
 
@@ -43,16 +43,16 @@ export default function SeloReceita({ via }: { via?: string }) {
       onFocus={mostrar}
       onBlur={() => setPosicao(null)}
       onClick={(e) => e.stopPropagation()}
-      className="inline-flex shrink-0 cursor-help align-middle text-amber-400/80 hover:text-amber-300 focus-ring rounded-full"
+      className="inline-flex shrink-0 cursor-help align-middle text-slate-500 hover:text-slate-300 focus-ring rounded-full"
     >
-      <AlertCircle size={12} aria-hidden="true" />
+      <Info size={13} aria-hidden="true" />
       {posicao && (
         <span
           role="tooltip"
           style={{ left: posicao.x, top: posicao.y - 8 }}
           className="pointer-events-none fixed z-50 w-60 -translate-x-1/2 -translate-y-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-card)] px-3 py-2 text-left text-xs font-normal normal-case tracking-normal text-slate-300 shadow-lg"
         >
-          <strong className="block font-semibold text-amber-300">Informação da Receita Federal</strong>
+          <strong className="block font-semibold text-slate-100">Fonte: Receita Federal</strong>
           {detalhe}
         </span>
       )}

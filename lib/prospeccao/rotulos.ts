@@ -38,6 +38,20 @@ export function nomeLegivel(bruto: string | null | undefined): string {
     .join(' ')
 }
 
+// Sufixos societários no fim do nome: "LTDA", "LTDA - ME", "- EPP", "S/A",
+// "EIRELI", "ME"... Só para exibir na lista; a razão social completa segue
+// no detalhe.
+const SUFIXO_SOCIETARIO = /(?:[\s,.-]+(?:LTDA\.?|ME\.?|EPP|EIRELI|S\/A|S\.A\.?|SA|MEI|SPE|CIA\.?))+\.?\s*$/i
+
+/**
+ * "Hotel Hcboi LTDA - EPP" → "Hotel Hcboi". Se sobrar nada (nome só de
+ * sigla), devolve o nome original.
+ */
+export function nomeSemSufixo(nome: string): string {
+  const limpo = nome.replace(SUFIXO_SOCIETARIO, '').replace(/[\s,.-]+$/, '').trim()
+  return limpo || nome.trim()
+}
+
 /** Duas letras para o avatar: iniciais das duas primeiras palavras significativas. */
 export function iniciais(nome: string): string {
   const palavras = nome

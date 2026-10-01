@@ -11,6 +11,7 @@ export interface ItemSelecionado {
   email: string | null
   contato_nome: string | null
   contato_cargo: string | null
+  contato_linkedin: string | null
 }
 
 const ROTULO_STATUS: Record<StatusImportacao, string> = {
@@ -57,7 +58,7 @@ export default function ImportarProspeccaoModal({
         body: JSON.stringify({
           modo,
           segmento: segmento.trim() || null,
-          itens: itens.map(({ cnpj, email, contato_nome, contato_cargo }) => ({ cnpj, email, contato_nome, contato_cargo })),
+          itens: itens.map(({ cnpj, email, contato_nome, contato_cargo, contato_linkedin }) => ({ cnpj, email, contato_nome, contato_cargo, contato_linkedin })),
         }),
       })
       const corpo = await res.json().catch(() => ({}))

@@ -122,7 +122,16 @@ describe('validação do lote de importação', () => {
   it('normaliza CNPJ e campos opcionais', () => {
     expect(
       validarItens([{ cnpj: '12.345.678/0001-99', email: ' A@B.COM ', contato_nome: '  Ana ', contato_cargo: '' }])
-    ).toEqual({ ok: true, itens: [{ cnpj: '12345678000199', email: 'a@b.com', contato_nome: 'Ana', contato_cargo: null }] })
+    ).toEqual({ ok: true, itens: [{ cnpj: '12345678000199', email: 'a@b.com', contato_nome: 'Ana', contato_cargo: null, contato_linkedin: null }] })
+  })
+
+  it('LinkedIn do decisor: normaliza o perfil e descarta o que não é perfil', () => {
+    const r = validarItens([
+      { cnpj: '12345678000199', contato_linkedin: 'br.linkedin.com/in/ana-souza/?trk=x' },
+      { cnpj: '12345678000180', contato_linkedin: 'https://www.linkedin.com/company/hotel' },
+      { cnpj: '12345678000171', contato_linkedin: 42 },
+    ])
+    expect(r.ok && r.itens.map((i) => i.contato_linkedin)).toEqual(['https://www.linkedin.com/in/ana-souza', null, null])
   })
 
   it('recusa lote vazio, grande demais ou com CNPJ inválido', () => {
@@ -159,7 +168,7 @@ describe('importarProspeccao', () => {
     const { admin, rpc } = adminFake({
       prospeccao_importar: { data: [{ cnpj: '12345678000199', status: 'importavel', lead_id: null }], error: null },
     })
-    const itens = [{ cnpj: '12345678000199', email: null, contato_nome: null, contato_cargo: null }]
+    const itens = [{ cnpj: '12345678000199', email: null, contato_nome: null, contato_cargo: null, contato_linkedin: null }]
     const r = await importarProspeccao(admin, { org: 'org-a', responsavel: { id: null, nome: null }, segmento: 'hotelaria', itens, simular: true })
     expect(r.resumo.importavel).toBe(1)
     expect(rpc).toHaveBeenCalledWith('prospeccao_importar', expect.objectContaining({ p_org: 'org-a', p_simular: true, p_segmento: 'hotelaria' }))

@@ -4,12 +4,12 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import {
   Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, Filter, LayoutGrid, Mail,
-  Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2,
+  Loader2, Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2, UserSearch,
 } from 'lucide-react';
 import { filtrosDoPerfil, LIMITE_PAGINA, type FiltrosBusca } from '@/lib/prospeccao/filtros';
 import type { ResultadoCatalogo, StatusCatalogo } from '@/lib/prospeccao/buscaServidor';
 import { ROTULO_QUALIDADE, type QualidadeEmail } from '@/lib/prospeccao/qualidadeEmail';
-import { formatarCnae, iniciais, nomeLegivel, rotuloPorte, ROTULO_PORTE } from '@/lib/prospeccao/rotulos';
+import { formatarCnae, iniciais, nomeLegivel, nomeSemSufixo, rotuloPorte, ROTULO_PORTE } from '@/lib/prospeccao/rotulos';
 import { gruposDoPerfil, nichoDaAtividade, nomeAtividade } from '@/lib/prospeccao/nichos';
 import { nomeSugerido } from '@/lib/prospeccao/pesquisas';
 import { formatarCnpj } from '@/lib/empresas/cnpj';
@@ -17,12 +17,13 @@ import {
   PESQUISAS_LIMITES, PORTES_PROSPECCAO, quantidadeValida,
   type PesquisaSalva, type PorteProspeccao, type ProspeccaoConfig,
 } from '@/lib/config/workspaceConfig';
-import DetalheEmpresa, { type AvaliacaoTela, type Decisor } from '@/components/prospeccao/DetalheEmpresa';
+import DetalheEmpresa, { consultarSociosApi, type ConsultaSocios, type Decisor } from '@/components/prospeccao/DetalheEmpresa';
+import { emLote, normalizarPerfilLinkedIn } from '@/lib/prospeccao/contato';
 import DecisorCelula from '@/components/prospeccao/DecisorCelula';
 import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoModal';
 import CaixaSelecao from '@/components/prospeccao/CaixaSelecao';
 import PerfilBuscaPainel from '@/components/prospeccao/PerfilBuscaPainel';
-import SeloReceita, { ProvedorSeloReceita } from '@/components/prospeccao/SeloReceita';
+import { ProvedorSeloReceita } from '@/components/prospeccao/SeloReceita';
 import PesquisasSalvas, { SalvarPesquisa } from '@/components/prospeccao/PesquisasSalvas';
 import { iconeDoNicho } from '@/components/prospeccao/iconesNicho';
 import s from '@/components/prospeccao/Prospeccao.module.css';
@@ -225,8 +226,11 @@ export default function ProspeccaoPage() {
   const [aberto, setAberto] = useState<string | null>(null);
   const [selecionados, setSelecionados] = useState<Map<string, ResultadoCatalogo>>(() => new Map());
   const [decisores, setDecisores] = useState<Record<string, Decisor | null>>({});
-  // Resultado da consulta de sócios por CNPJ, para o destaque da coluna Decisor.
-  const [avaliacoes, setAvaliacoes] = useState<Record<string, AvaliacaoTela>>({});
+  // Consulta de sócios por CNPJ: alimenta a coluna Decisor e o detalhe.
+  const [consultas, setConsultas] = useState<Record<string, ConsultaSocios>>({});
+  // Busca de decisores dos selecionados em andamento (concluídos/total).
+  const [buscaDecisores, setBuscaDecisores] = useState<{ feitos: number; total: number } | null>(null);
+  const [falhasDecisores, setFalhasDecisores] = useState(0);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
   const [importando, setImportando] = useState(false);
   // '' = todos os nichos do perfil.
@@ -419,6 +423,36 @@ export default function ProspeccaoPage() {
     });
   }
 
+  // Guarda a consulta e, se ainda não há decisor escolhido, adota o sugerido.
+  function registrarConsulta(cnpj: string, consulta: ConsultaSocios) {
+    setConsultas((m) => ({ ...m, [cnpj]: consulta }));
+    const sugerido = consulta.sugerido;
+    if (sugerido) setDecisores((m) => (m[cnpj] ? m : { ...m, [cnpj]: { nome: sugerido.nome, cargo: sugerido.qualificacao } }));
+  }
+
+  // Consulta os sócios dos selecionados que ainda não foram consultados, poucos
+  // por vez para não sobrecarregar a OpenCNPJ.
+  async function buscarDecisoresSelecionados() {
+    const pendentes = [...selecionados.keys()].filter((cnpj) => !consultas[cnpj]);
+    if (pendentes.length === 0 || buscaDecisores) return;
+    setFalhasDecisores(0);
+    setBuscaDecisores({ feitos: 0, total: pendentes.length });
+    const resultados = await emLote(
+      pendentes,
+      3,
+      async (cnpj) => {
+        const consulta = await consultarSociosApi(cnpj);
+        registrarConsulta(cnpj, consulta);
+        return consulta;
+      },
+      (feitos) => setBuscaDecisores({ feitos, total: pendentes.length }),
+    );
+    setFalhasDecisores(resultados.filter((r) => !r.ok).length);
+    setBuscaDecisores(null);
+  }
+
+  const selecionadosSemConsulta = [...selecionados.keys()].filter((cnpj) => !consultas[cnpj]).length;
+
   // Opções dos filtros de resultado: só o que existe de verdade no que já
   // carregou (nunca oferece opção sem nenhuma empresa por trás).
   const nichosPresentes = useMemo(() => {
@@ -442,7 +476,7 @@ export default function ProspeccaoPage() {
       if (filtroResultadoUf && i.uf !== filtroResultadoUf) return false;
       if (!termo) return true;
       const nome = (i.nome_fantasia ?? i.razao_social ?? '').toLocaleLowerCase('pt-BR');
-      const cidade = (i.municipio ?? '').toLocaleLowerCase('pt-BR');
+      const cidade = `${i.municipio ?? ''} ${i.municipio_nome ?? ''}`.toLocaleLowerCase('pt-BR');
       const nicho = (nomeAtividade(i.cnae_principal) ?? '').toLocaleLowerCase('pt-BR');
       return nome.includes(termo) || cidade.includes(termo) || nicho.includes(termo) || i.cnpj.includes(termo.replace(/\D/g, ''));
     });
@@ -500,6 +534,7 @@ export default function ProspeccaoPage() {
     email: i.email,
     contato_nome: decisores[i.cnpj]?.nome?.trim() || null,
     contato_cargo: decisores[i.cnpj]?.cargo?.trim() || null,
+    contato_linkedin: normalizarPerfilLinkedIn(decisores[i.cnpj]?.linkedin),
   }));
 
   // Quantos filtros diferem do perfil — orienta o "Voltar ao perfil".
@@ -850,7 +885,7 @@ export default function ProspeccaoPage() {
                         const expandido = aberto === i.cnpj;
                         const selecionado = selecionados.has(i.cnpj);
                         const decisor = decisores[i.cnpj];
-                        const nome = nomeLegivel(i.nome_fantasia ?? i.razao_social) || formatarCnpj(i.cnpj);
+                        const nome = nomeSemSufixo(nomeLegivel(i.nome_fantasia ?? i.razao_social)) || formatarCnpj(i.cnpj);
                         const atividade = nomeAtividade(i.cnae_principal);
                         return (
                           <Fragment key={i.cnpj}>
@@ -874,26 +909,23 @@ export default function ProspeccaoPage() {
                                   <div className="min-w-0">
                                     <div className="flex min-w-0 items-center gap-1.5">
                                       <span className="min-w-0 font-medium text-slate-100 truncate">{nome}</span>
-                                      <SeloReceita />
                                       <ChevronRight size={14} className={`shrink-0 text-slate-600 transition-transform group-hover:text-slate-400 ${expandido ? 'rotate-90 text-slate-300' : ''}`} />
                                     </div>
-                                    <span className="mt-1 flex items-center gap-1 font-mono text-xs text-slate-500">{formatarCnpj(i.cnpj)} <SeloReceita /></span>
+                                    <span className="mt-1 flex items-center gap-1 font-mono text-xs text-slate-500">{formatarCnpj(i.cnpj)}</span>
                                   </div>
                                 </div>
                               </td>
                               <td className="px-4 py-2.5">
-                                <div className="flex min-w-0 items-center gap-1"><span className="truncate text-slate-200">{nomeLegivel(i.municipio) || '—'}</span> <SeloReceita /></div>
+                                <div className="flex min-w-0 items-center gap-1"><span className="truncate text-slate-200">{i.municipio_nome ?? (nomeLegivel(i.municipio) || '—')}</span></div>
                                 <div className="mt-0.5 text-xs text-slate-500">{i.uf ?? ''}</div>
                               </td>
                               <td className="px-4 py-2.5 whitespace-nowrap text-slate-300">
                                 {rotuloPorte(i.porte)}
                                 {i.mei && <span className="chip chip-warning ml-2">MEI</span>}
-                                <span className="ml-1"><SeloReceita /></span>
                               </td>
                               <td className="px-4 py-2.5">
                                 <span className="inline-flex items-center gap-1">
                                   <span className={s.activityTag} title={formatarCnae(i.cnae_principal)}>{atividade ?? formatarCnae(i.cnae_principal)}</span>
-                                  <SeloReceita />
                                 </span>
                               </td>
                               <td className="px-4 py-2.5">
@@ -902,7 +934,6 @@ export default function ProspeccaoPage() {
                                     <div className="flex items-center gap-2 min-w-0">
                                       <Mail size={13} className="shrink-0 text-slate-500" />
                                       <span className="min-w-0 truncate text-slate-200" title={i.email}>{i.email}</span>
-                                      <SeloReceita />
                                     </div>
                                     <div className={`mt-1 flex items-center gap-1.5 pl-5 text-xs ${COR_QUALIDADE[i.qualidade_email]}`}>
                                       <span className={`h-1.5 w-1.5 rounded-full ${PONTO_QUALIDADE[i.qualidade_email]}`} />
@@ -914,7 +945,7 @@ export default function ProspeccaoPage() {
                                 )}
                               </td>
                               <td className="px-4 py-2.5">
-                                <DecisorCelula decisor={decisor ?? null} avaliacao={avaliacoes[i.cnpj] ?? null} />
+                                <DecisorCelula decisor={decisor ?? null} avaliacao={consultas[i.cnpj] ?? null} />
                               </td>
                               <td className="w-28 px-5 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                 {i.ja_na_base && (
@@ -928,7 +959,7 @@ export default function ProspeccaoPage() {
                               <tr>
                                 <td colSpan={8} className="p-0">
                                   <DetalheEmpresa empresa={i} decisor={decisor ?? null} onDecisor={(d) => setDecisores((m) => ({ ...m, [i.cnpj]: d }))}
-                                    onAvaliacao={(a) => setAvaliacoes((m) => ({ ...m, [i.cnpj]: a }))}
+                                    consulta={consultas[i.cnpj] ?? null} onConsulta={(c) => registrarConsulta(i.cnpj, c)}
                                   />
                                 </td>
                               </tr>
@@ -985,6 +1016,18 @@ export default function ProspeccaoPage() {
               Limpar
             </button>
             <div className="h-6 w-px bg-[var(--m-border-subtle,#17496e)]" />
+            {buscaDecisores ? (
+              <span className="flex h-10 items-center gap-2 px-2 text-sm text-slate-300" role="status">
+                <Loader2 size={15} className="animate-spin" /> Buscando decisores {buscaDecisores.feitos}/{buscaDecisores.total}
+              </span>
+            ) : selecionadosSemConsulta > 0 ? (
+              <button type="button" onClick={buscarDecisoresSelecionados} className="flex h-10 items-center gap-2 rounded-lg px-4 text-sm text-slate-300 hover:bg-white/5 focus-ring" title="Consulta o quadro societário (OpenCNPJ) e sugere o decisor de cada empresa">
+                <UserSearch size={15} /> Buscar decisores ({selecionadosSemConsulta})
+              </button>
+            ) : null}
+            {!buscaDecisores && falhasDecisores > 0 && (
+              <span className="text-xs text-amber-300" role="status">{falhasDecisores} sem resposta da OpenCNPJ</span>
+            )}
             {confirmandoDescarte ? (
               <button type="button" onClick={descartar} className="flex h-10 items-center gap-2 rounded-lg bg-red-500/15 px-4 text-sm font-medium text-red-300 ring-1 ring-inset ring-red-500/40 hover:bg-red-500/25 focus-ring">
                 <Trash2 size={15} /> Confirmar descarte
