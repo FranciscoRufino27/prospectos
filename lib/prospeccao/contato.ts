@@ -14,26 +14,31 @@ export interface TelefoneFormatado {
 
 /**
  * Lê um telefone brasileiro em qualquer máscara ("(11) 55497787",
- * "+55 11 99876-5432", "011 5549 7787"). Devolve null quando não dá para
+ * "+55 11 99876-5432", "(0011) 55497787"). Devolve null quando não dá para
  * reconhecer DDD + assinante: aí a tela mostra o texto original, sem tipo.
  *
- * Tipo pelo plano de numeração da Anatel: assinante de 9 dígitos começando
- * em 9 = celular; de 8 dígitos começando em 2–5 = fixo. Os demais (8 dígitos
- * começando em 6–9, formato antigo de celular) ficam sem classificação.
+ * Tipo pelo plano de numeração da Anatel: 8 dígitos começando em 2–5 = fixo;
+ * 9 dígitos começando em 9 = celular. A Receita só guarda 8 dígitos (layout
+ * anterior ao nono dígito), então celular vem como 8 dígitos começando em
+ * 6–9: ganha o 9 da frente, que é o número discável hoje.
  */
 export function formatarTelefone(bruto: string | null | undefined): TelefoneFormatado | null {
-  let d = (bruto ?? '').replace(/\D/g, '')
+  const texto = (bruto ?? '').trim()
+  // "(0011) 55497787": DDD entre parênteses, com zeros de operadora/catálogo.
+  const comParenteses = texto.match(/^\(\s*0*(\d{2})\s*\)\s*([\d\s.-]+)$/)
+  let d = comParenteses ? comParenteses[1] + comParenteses[2].replace(/\D/g, '') : texto.replace(/\D/g, '')
   if (d.startsWith('55') && (d.length === 12 || d.length === 13)) d = d.slice(2)
-  if (d.startsWith('0') && (d.length === 11 || d.length === 12)) d = d.slice(1)
+  d = d.replace(/^0+(?=\d{10,11}$)/, '')
   if (d.length !== 10 && d.length !== 11) return null
   const ddd = d.slice(0, 2)
   if (!/^[1-9][1-9]$/.test(ddd)) return null
-  const assinante = d.slice(2)
+  let assinante = d.slice(2)
+  if (assinante.length === 8 && /^[6-9]/.test(assinante)) assinante = `9${assinante}`
   if (assinante.length === 9 && assinante[0] === '9') {
-    return { exibicao: `(${ddd}) ${assinante.slice(0, 5)}-${assinante.slice(5)}`, tipo: 'celular', digitos: d }
+    return { exibicao: `(${ddd}) ${assinante.slice(0, 5)}-${assinante.slice(5)}`, tipo: 'celular', digitos: ddd + assinante }
   }
   if (assinante.length === 8 && /^[2-5]/.test(assinante)) {
-    return { exibicao: `(${ddd}) ${assinante.slice(0, 4)}-${assinante.slice(4)}`, tipo: 'fixo', digitos: d }
+    return { exibicao: `(${ddd}) ${assinante.slice(0, 4)}-${assinante.slice(4)}`, tipo: 'fixo', digitos: ddd + assinante }
   }
   return null
 }

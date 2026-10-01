@@ -13,6 +13,7 @@ describe('filtros da busca', () => {
     expect(normalizarFiltros(undefined, PERFIL)).toEqual({
       cnaes: ['5510801'], incluirCnaesSecundarios: false, ufs: ['SP'], municipios: [],
       portes: [], excluirMei: true, soComEmail: true, texto: '',
+      anosMinimos: null, capitalMinimo: null, telefone: '',
     })
     expect(filtrosDoPerfil(undefined).cnaes).toEqual([])
   })

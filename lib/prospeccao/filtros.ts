@@ -19,7 +19,17 @@ export interface FiltrosBusca {
   excluirMei: boolean
   soComEmail: boolean
   texto: string
+  /** Aberta há pelo menos N anos (migration 0058); null = qualquer idade. */
+  anosMinimos: number | null
+  /** Capital social mínimo em reais (0058); null = qualquer. */
+  capitalMinimo: number | null
+  /** '' = qualquer; 'com' = fixo ou celular; 'celular' = só celular (0058). */
+  telefone: FiltroTelefone
 }
+
+export type FiltroTelefone = '' | 'com' | 'celular'
+export const OPCOES_ANOS_MINIMOS = [1, 2, 5, 10, 20] as const
+export const OPCOES_CAPITAL_MINIMO = [10_000, 50_000, 100_000, 500_000, 1_000_000] as const
 
 export const LIMITE_PAGINA = 50
 const TEXTO_MAX = 80
@@ -41,6 +51,9 @@ export function filtrosDoPerfil(perfil: ProspeccaoConfig | undefined): FiltrosBu
     // atual sustenta de verdade (migration 0051, p_so_com_email filtra no servidor).
     soComEmail: true,
     texto: '',
+    anosMinimos: null,
+    capitalMinimo: null,
+    telefone: '',
   }
 }
 
@@ -65,6 +78,9 @@ export function normalizarFiltros(bruto: unknown, perfil: ProspeccaoConfig | und
     soComEmail: b.soComEmail === true,
     // `%` e `_` são curingas do ILIKE: escapados para a busca ser literal.
     texto: texto.replace(/[\\%_]/g, (c) => `\\${c}`),
+    anosMinimos: (OPCOES_ANOS_MINIMOS as readonly unknown[]).includes(b.anosMinimos) ? (b.anosMinimos as number) : null,
+    capitalMinimo: (OPCOES_CAPITAL_MINIMO as readonly unknown[]).includes(b.capitalMinimo) ? (b.capitalMinimo as number) : null,
+    telefone: b.telefone === 'com' || b.telefone === 'celular' ? b.telefone : '',
   }
 }
 
@@ -82,6 +98,26 @@ export function lerCursor(cursor: string | null): { nota: number; cnpj: string }
   if (!cursor) return null
   const [nota, cnpj] = cursor.split('-')
   return { nota: Number(nota), cnpj }
+}
+
+/** Algum filtro da 0058 ligado? Sem eles a busca usa as RPCs antigas. */
+export function temFiltrosExtras(f: FiltrosBusca): boolean {
+  return f.anosMinimos !== null || f.capitalMinimo !== null || f.telefone !== ''
+}
+
+/** Data limite de abertura para "há mais de N anos" (UTC, AAAA-MM-DD). */
+export function aberturaAte(anos: number, hoje: Date = new Date()): string {
+  const d = new Date(Date.UTC(hoje.getUTCFullYear() - anos, hoje.getUTCMonth(), hoje.getUTCDate()))
+  return d.toISOString().slice(0, 10)
+}
+
+/** Parâmetros extras das RPCs _v2 (0058). */
+export function paramsExtras(f: FiltrosBusca, hoje?: Date) {
+  return {
+    p_abertura_ate: f.anosMinimos === null ? null : aberturaAte(f.anosMinimos, hoje),
+    p_capital_min: f.capitalMinimo,
+    p_telefone: f.telefone,
+  }
 }
 
 /** Parâmetros comuns de prospeccao_buscar / prospeccao_contar. */

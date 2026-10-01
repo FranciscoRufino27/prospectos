@@ -6,7 +6,7 @@ import {
   Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, Filter, LayoutGrid, Mail,
   Loader2, Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2, UserSearch,
 } from 'lucide-react';
-import { filtrosDoPerfil, LIMITE_PAGINA, type FiltrosBusca } from '@/lib/prospeccao/filtros';
+import { filtrosDoPerfil, LIMITE_PAGINA, OPCOES_ANOS_MINIMOS, OPCOES_CAPITAL_MINIMO, type FiltroTelefone, type FiltrosBusca } from '@/lib/prospeccao/filtros';
 import type { ResultadoCatalogo, StatusCatalogo } from '@/lib/prospeccao/buscaServidor';
 import { ROTULO_QUALIDADE, type QualidadeEmail } from '@/lib/prospeccao/qualidadeEmail';
 import { formatarCnae, iniciais, nomeLegivel, nomeSemSufixo, rotuloPorte, ROTULO_PORTE } from '@/lib/prospeccao/rotulos';
@@ -92,6 +92,36 @@ interface RespostaApi {
 
 const ROTULO_STATUS_EMAIL = { todos: 'Todos', com_email: 'Com e-mail', sem_email: 'Sem e-mail' } as const;
 type StatusEmailResultado = keyof typeof ROTULO_STATUS_EMAIL;
+
+// Situação do decisor de cada empresa, para o filtro de resultado que vira
+// fila de trabalho ("o que ainda falta analisar").
+const ROTULO_SITUACAO_DECISOR = {
+  todos: 'Todos',
+  nao_analisado: 'Não analisado',
+  socio_serve: 'Sócio serve',
+  precisa_outro: 'Precisa de outro',
+  sem_decisor: 'Analisado, sem decisor',
+  com_linkedin: 'Com LinkedIn',
+} as const;
+type SituacaoDecisor = keyof typeof ROTULO_SITUACAO_DECISOR;
+
+function situacaoConfere(situacao: SituacaoDecisor, decisor: Decisor | null | undefined, consulta: ConsultaSocios | undefined): boolean {
+  switch (situacao) {
+    case 'todos': return true;
+    case 'nao_analisado': return !consulta && !decisor?.nome;
+    case 'socio_serve': return consulta?.status === 'socio_serve';
+    case 'precisa_outro': return consulta?.status === 'precisa_outro_decisor';
+    case 'sem_decisor': return !!consulta && !decisor?.nome;
+    case 'com_linkedin': return !!normalizarPerfilLinkedIn(decisor?.linkedin);
+  }
+}
+
+/** 10000 → "R$ 10 mil"; 1000000 → "R$ 1 milhão". */
+function rotuloCapital(valor: number): string {
+  return valor >= 1_000_000
+    ? `R$ ${(valor / 1_000_000).toLocaleString('pt-BR')} milh${valor >= 2_000_000 ? 'ões' : 'ão'}`
+    : `R$ ${(valor / 1_000).toLocaleString('pt-BR')} mil`;
+}
 
 // Rótulo em cima, campo embaixo: cada filtro lê como um item de formulário.
 // div, não <label>: dentro de um label, o clique numa opção dos seletores de
@@ -221,6 +251,8 @@ export default function ProspeccaoPage() {
   const [filtroResultadoNicho, setFiltroResultadoNicho] = useState('');
   const [filtroResultadoPorte, setFiltroResultadoPorte] = useState('');
   const [filtroResultadoUf, setFiltroResultadoUf] = useState('');
+  const [filtroResultadoDecisor, setFiltroResultadoDecisor] = useState<SituacaoDecisor>('todos');
+  const [ocultarJaNaBase, setOcultarJaNaBase] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
@@ -382,6 +414,9 @@ export default function ProspeccaoPage() {
       incluirCnaesSecundarios: !!f.incluirCnaesSecundarios,
       soComEmail: !!f.soComEmail,
       texto: '',
+      anosMinimos: null,
+      capitalMinimo: null,
+      telefone: '',
     });
     setPesquisaAtiva(p.id);
   }
@@ -520,15 +555,17 @@ export default function ProspeccaoPage() {
       if (filtroResultadoNicho && nichoDaAtividade(i.cnae_principal)?.id !== filtroResultadoNicho) return false;
       if (filtroResultadoPorte && i.porte !== filtroResultadoPorte) return false;
       if (filtroResultadoUf && i.uf !== filtroResultadoUf) return false;
+      if (ocultarJaNaBase && i.ja_na_base) return false;
+      if (!situacaoConfere(filtroResultadoDecisor, decisores[i.cnpj], consultas[i.cnpj])) return false;
       if (!termo) return true;
       const nome = (i.nome_fantasia ?? i.razao_social ?? '').toLocaleLowerCase('pt-BR');
       const cidade = `${i.municipio ?? ''} ${i.municipio_nome ?? ''}`.toLocaleLowerCase('pt-BR');
       const nicho = (nomeAtividade(i.cnae_principal) ?? '').toLocaleLowerCase('pt-BR');
       return nome.includes(termo) || cidade.includes(termo) || nicho.includes(termo) || i.cnpj.includes(termo.replace(/\D/g, ''));
     });
-  }, [itens, filtroResultadoTexto, filtroResultadoEmail, filtroResultadoNicho, filtroResultadoPorte, filtroResultadoUf]);
+  }, [itens, filtroResultadoTexto, filtroResultadoEmail, filtroResultadoNicho, filtroResultadoPorte, filtroResultadoUf, ocultarJaNaBase, filtroResultadoDecisor, decisores, consultas]);
 
-  const haFiltroResultadoAtivo = !!filtroResultadoTexto || filtroResultadoEmail !== 'todos' || !!filtroResultadoNicho || !!filtroResultadoPorte || !!filtroResultadoUf;
+  const haFiltroResultadoAtivo = !!filtroResultadoTexto || filtroResultadoEmail !== 'todos' || !!filtroResultadoNicho || !!filtroResultadoPorte || !!filtroResultadoUf || ocultarJaNaBase || filtroResultadoDecisor !== 'todos';
 
   const selecionaveis = useMemo(() => itensFiltrados.filter((i) => !i.ja_na_base), [itensFiltrados]);
   const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every((i) => selecionados.has(i.cnpj));
@@ -595,6 +632,9 @@ export default function ProspeccaoPage() {
       filtros.soComEmail !== perfil.soComEmail,
       filtros.excluirMei !== perfil.excluirMei,
       filtros.incluirCnaesSecundarios !== perfil.incluirCnaesSecundarios,
+      filtros.anosMinimos !== null,
+      filtros.capitalMinimo !== null,
+      filtros.telefone !== '',
       quantidade !== null,
     ].filter(Boolean).length;
   }, [filtros, perfil, quantidade]);
@@ -763,10 +803,43 @@ export default function ProspeccaoPage() {
                       </Selecao>
                     </Campo>
 
+                    <Campo rotulo="Tempo de empresa">
+                      <Selecao
+                        rotuloAcessivel="Tempo de empresa"
+                        valor={filtros.anosMinimos === null ? '' : String(filtros.anosMinimos)}
+                        onChange={(v) => atualizar({ anosMinimos: v === '' ? null : Number(v) })}
+                      >
+                        <option value="">Qualquer idade</option>
+                        {OPCOES_ANOS_MINIMOS.map((n) => <option key={n} value={n}>Aberta há {n}+ ano{n === 1 ? '' : 's'}</option>)}
+                      </Selecao>
+                    </Campo>
+
+                    <Campo rotulo="Capital social">
+                      <Selecao
+                        rotuloAcessivel="Capital social mínimo"
+                        valor={filtros.capitalMinimo === null ? '' : String(filtros.capitalMinimo)}
+                        onChange={(v) => atualizar({ capitalMinimo: v === '' ? null : Number(v) })}
+                      >
+                        <option value="">Qualquer capital</option>
+                        {OPCOES_CAPITAL_MINIMO.map((n) => <option key={n} value={n}>A partir de {rotuloCapital(n)}</option>)}
+                      </Selecao>
+                    </Campo>
+
+                    <Campo rotulo="Telefone">
+                      <Selecao
+                        rotuloAcessivel="Telefone"
+                        valor={filtros.telefone}
+                        onChange={(v) => atualizar({ telefone: v as FiltroTelefone })}
+                      >
+                        <option value="">Com ou sem telefone</option>
+                        <option value="com">Com telefone</option>
+                        <option value="celular">Com celular (WhatsApp)</option>
+                      </Selecao>
+                    </Campo>
+
                   </div>
 
-                  <div className={s.toggleRow}>
-                    <Alternar ativo={filtros.excluirMei} onChange={(v) => atualizar({ excluirMei: v })}>Excluir MEI</Alternar>
+                  <div className={s.toggleRow}>                    <Alternar ativo={filtros.excluirMei} onChange={(v) => atualizar({ excluirMei: v })}>Excluir MEI</Alternar>
                     <Alternar ativo={filtros.incluirCnaesSecundarios} onChange={(v) => atualizar({ incluirCnaesSecundarios: v })}>Incluir atividade secundária</Alternar>
                   </div>
                 </section>
@@ -882,11 +955,19 @@ export default function ProspeccaoPage() {
                         {ufsPresentes.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
                       </Selecao>
                     </Campo>
+                    <Campo rotulo="Decisor">
+                      <Selecao rotuloAcessivel="Situação do decisor" valor={filtroResultadoDecisor} onChange={(v) => setFiltroResultadoDecisor(v as SituacaoDecisor)}>
+                        {(Object.keys(ROTULO_SITUACAO_DECISOR) as SituacaoDecisor[]).map((v) => <option key={v} value={v}>{ROTULO_SITUACAO_DECISOR[v]}</option>)}
+                      </Selecao>
+                    </Campo>
+                  </div>
+                  <div className={s.toggleRow}>
+                    <Alternar ativo={ocultarJaNaBase} onChange={setOcultarJaNaBase}>Ocultar empresas já na base</Alternar>
                   </div>
                   {haFiltroResultadoAtivo && (
                     <button
                       type="button"
-                      onClick={() => { setFiltroResultadoTexto(''); setFiltroResultadoEmail('todos'); setFiltroResultadoNicho(''); setFiltroResultadoPorte(''); setFiltroResultadoUf(''); }}
+                      onClick={() => { setFiltroResultadoTexto(''); setFiltroResultadoEmail('todos'); setFiltroResultadoNicho(''); setFiltroResultadoPorte(''); setFiltroResultadoUf(''); setFiltroResultadoDecisor('todos'); setOcultarJaNaBase(false); }}
                       className={`${s.linkAction} focus-ring rounded`}
                     >
                       <RotateCcw size={12} /> Limpar filtros de resultado

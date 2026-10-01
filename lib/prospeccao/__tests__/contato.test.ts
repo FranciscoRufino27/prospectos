@@ -12,14 +12,23 @@ describe('formatarTelefone', () => {
     expect(formatarTelefone('011 3239 0777')).toMatchObject({ exibicao: '(11) 3239-0777', tipo: 'fixo' })
   })
 
+  it('celular da Receita (8 dígitos, sem o nono) ganha o 9 da frente', () => {
+    expect(formatarTelefone('(11) 98765432')).toEqual({ exibicao: '(11) 99876-5432', tipo: 'celular', digitos: '11998765432' })
+    expect(formatarTelefone('(21) 76543210')?.digitos).toBe('21976543210')
+  })
+
+  it('DDD com zeros à esquerda, como vem em parte do catálogo', () => {
+    expect(formatarTelefone('(0011) 55497787')).toMatchObject({ exibicao: '(11) 5549-7787', tipo: 'fixo' })
+    expect(formatarTelefone('(011) 88776655')).toMatchObject({ exibicao: '(11) 98877-6655', tipo: 'celular' })
+  })
+
   it('não reconhece o que não é telefone BR válido', () => {
     expect(formatarTelefone(null)).toBeNull()
     expect(formatarTelefone('')).toBeNull()
     expect(formatarTelefone('998877')).toBeNull()
     expect(formatarTelefone('(01) 55497787')).toBeNull()
-    // 8 dígitos começando em 9: celular antigo, sem classificação segura.
-    expect(formatarTelefone('(11) 98765432')).toBeNull()
-    // 9 dígitos que não começam em 9.
+    // 7 dígitos (numeração antiga) e 9 dígitos que não começam em 9.
+    expect(formatarTelefone('(11) 5549778')).toBeNull()
     expect(formatarTelefone('(11) 555497787')).toBeNull()
   })
 })
@@ -28,6 +37,7 @@ describe('linkWhatsApp', () => {
   it('só para celular', () => {
     expect(linkWhatsApp(formatarTelefone('(11) 99876-5432'))).toBe('https://wa.me/5511998765432')
     expect(linkWhatsApp(formatarTelefone('(11) 55497787'))).toBeNull()
+    expect(linkWhatsApp(formatarTelefone('(11) 98765432'))).toBe('https://wa.me/5511998765432')
     expect(linkWhatsApp(null)).toBeNull()
   })
 })

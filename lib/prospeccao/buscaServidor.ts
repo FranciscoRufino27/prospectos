@@ -2,7 +2,7 @@
 // `org` vem SEMPRE da sessão (resolverAcesso), nunca do payload.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { lerCursor, limitePagina, paramsRpc, type FiltrosBusca } from './filtros'
+import { lerCursor, limitePagina, paramsExtras, paramsRpc, temFiltrosExtras, type FiltrosBusca } from './filtros'
 import { classificarEmail, type QualidadeEmail } from './qualidadeEmail'
 import { dominioDaEmpresa, type DominioEmpresa } from './dominioEmpresa'
 import { descricoesCnae, nomeMunicipioIbge } from './referenciaIbge'
@@ -79,13 +79,18 @@ export async function buscarProspeccao(
   if (filtros.cnaes.length === 0) {
     return { itens: [], proximoCursor: null, total: 0, totalComEmail: 0, catalogo: await statusCatalogo(admin) }
   }
-  const params = paramsRpc(org, filtros)
+  // Tempo de empresa/capital/telefone (0058) só existem nas RPCs _v2; sem eles,
+  // as RPCs antigas atendem (e a busca padrão não depende da 0058).
+  const extras = temFiltrosExtras(filtros)
+  const params = extras ? { ...paramsRpc(org, filtros), ...paramsExtras(filtros) } : paramsRpc(org, filtros)
+  const rpcBuscar = extras ? 'prospeccao_buscar_por_nota_v2' : 'prospeccao_buscar_por_nota'
+  const rpcContar = extras ? 'prospeccao_contar_v2' : 'prospeccao_contar'
   // Quantidade desejada: a página traz só o que falta (nunca mais que LIMITE_PAGINA).
   const limite = limitePagina(opcoes.limite)
   const apos = lerCursor(cursor)
   const [pagina, contagemGeral, contagemComEmail, catalogo] = await Promise.all([
     // Ordenada por nota (0054): as empresas de dado melhor vêm primeiro.
-    admin.rpc('prospeccao_buscar_por_nota', {
+    admin.rpc(rpcBuscar, {
       ...params,
       p_apos_nota: apos?.nota ?? null,
       p_apos_cnpj: apos?.cnpj ?? null,
@@ -94,8 +99,8 @@ export async function buscarProspeccao(
     // Contagem só na primeira página: paginar não muda o total. Sempre as duas
     // (geral e com e-mail), independente do toggle atual — os cards precisam
     // dos dois números ao mesmo tempo.
-    opcoes.contar ? admin.rpc('prospeccao_contar', { ...params, p_so_com_email: false }) : Promise.resolve({ data: null, error: null }),
-    opcoes.contar ? admin.rpc('prospeccao_contar', { ...params, p_so_com_email: true }) : Promise.resolve({ data: null, error: null }),
+    opcoes.contar ? admin.rpc(rpcContar, { ...params, p_so_com_email: false }) : Promise.resolve({ data: null, error: null }),
+    opcoes.contar ? admin.rpc(rpcContar, { ...params, p_so_com_email: true }) : Promise.resolve({ data: null, error: null }),
     statusCatalogo(admin),
   ])
   if (pagina.error) throw new Error(`Falha na busca: ${pagina.error.message}`)

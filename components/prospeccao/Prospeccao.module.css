@@ -193,11 +193,11 @@
 /* Campos dos filtros */
 .filterGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.5fr) repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-top: 12px;
 }
-.filterGridBusca { grid-template-columns: repeat(2, minmax(0, 320px)); }
+.filterGridBusca { grid-template-columns: repeat(5, minmax(0, 240px)); }
 
 .fieldLabel { display: grid; gap: 6px; }
 .fieldLabel > span { color: var(--m-title, #eef4ff); font-size: 12px; font-weight: 600; }
