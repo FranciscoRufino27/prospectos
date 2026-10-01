@@ -1,5 +1,5 @@
 /**
- * Teste de isolamento multi-tenant da prospecção (migrations 0050/0051).
+ * Teste de isolamento multi-tenant da prospecção (migrations 0050/0051/0057).
  *
  *   npx tsx scripts/prospeccao-isolamento.ts
  *
@@ -90,6 +90,16 @@ async function main() {
     checar('importação de B não criou nada em A', leadsA === 1)
     checar('CNPJ sem e-mail é recusado', (await importar(orgA, CNPJ3, false))[0]?.status === 'sem_email')
 
+    // Decisor salvo (0057): mesma chave de CNPJ em duas orgs, sem vazamento.
+    await q(`insert into prospeccao_decisores (organizacao_id, cnpj, nome) values ($1, $2, 'Ana de A'), ($3, $2, 'Bia de B')`, [orgA, CNPJ1, orgB])
+    const decisorDe = async (org: string) =>
+      (await q<{ nome: string }>(`select nome from prospeccao_decisores where organizacao_id = $1 and cnpj = $2`, [org, CNPJ1]))[0]?.nome
+    checar('cada org lê só o próprio decisor do mesmo CNPJ', (await decisorDe(orgA)) === 'Ana de A' && (await decisorDe(orgB)) === 'Bia de B')
+    await q(`update prospeccao_decisores set nome = 'Ana alterada' where organizacao_id = $1 and cnpj = $2`, [orgA, CNPJ1])
+    checar('alterar o decisor de A não muda o de B', (await decisorDe(orgB)) === 'Bia de B')
+    const [rls] = await q<{ rls: boolean }>(`select relrowsecurity as rls from pg_class where relname = 'prospeccao_decisores'`)
+    checar('prospeccao_decisores com RLS ligada', rls?.rls === true)
+
     // Privilégios: o cliente não chega às funções nem ao catálogo.
     const [priv] = await q<Record<string, boolean>>(`select
       has_function_privilege('authenticated', 'prospeccao_importar(uuid, uuid, text, text, jsonb, boolean)', 'execute') as auth_importar,
@@ -97,10 +107,13 @@ async function main() {
       has_function_privilege('authenticated', 'prospeccao_contar(uuid, text[], boolean, text[], text[], text[], boolean, boolean, text)', 'execute') as auth_contar,
       has_table_privilege('authenticated', 'catalogo_estabelecimentos', 'select') as auth_catalogo,
       has_table_privilege('authenticated', 'prospeccao_descartes', 'insert') as auth_insere_descarte,
+      has_table_privilege('authenticated', 'prospeccao_decisores', 'update') as auth_altera_decisor,
+      has_table_privilege('anon', 'prospeccao_decisores', 'select') as anon_le_decisor,
       has_function_privilege('service_role', 'prospeccao_importar(uuid, uuid, text, text, jsonb, boolean)', 'execute') as service_importar`)
     checar('authenticated/anon sem EXECUTE nas RPCs', !priv.auth_importar && !priv.anon_buscar && !priv.auth_contar)
     checar('authenticated sem leitura do catálogo e sem escrita em descartes', !priv.auth_catalogo && !priv.auth_insere_descarte)
     checar('service_role executa a importação', priv.service_importar)
+    checar('decisores: authenticated não escreve e anon não lê', !priv.auth_altera_decisor && !priv.anon_le_decisor)
   } finally {
     await c.query('rollback')
     await c.end()

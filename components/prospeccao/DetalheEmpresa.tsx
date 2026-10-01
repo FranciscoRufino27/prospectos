@@ -3,32 +3,17 @@
 import { useState } from 'react'
 import { AlertTriangle, Building2, Calendar, Check, CheckCircle2, Copy, Globe, Landmark, Loader2, Mail, MapPin, MessageCircle, Phone, Tag, UserRound, Users } from 'lucide-react'
 import type { ResultadoCatalogo } from '@/lib/prospeccao/buscaServidor'
-import type { MotivoOutroDecisor, SocioAvaliado, StatusDecisor } from '@/lib/prospeccao/adequacaoDecisor'
-import type { Socio } from '@/lib/prospeccao/socios'
+import type { MotivoOutroDecisor, StatusDecisor } from '@/lib/prospeccao/adequacaoDecisor'
+import type { ConsultaSocios, Decisor } from '@/lib/prospeccao/decisores'
 import { formatarCnae, nomeLegivel, rotuloPorte } from '@/lib/prospeccao/rotulos'
 import { ROTULO_QUALIDADE } from '@/lib/prospeccao/qualidadeEmail'
 import { formatarTelefone, linkWhatsApp, normalizarPerfilLinkedIn, urlBuscaLinkedIn } from '@/lib/prospeccao/contato'
 import SeloReceita from './SeloReceita'
 
-/** Resultado da consulta de sócios, levado à lista (coluna Decisor). */
-export interface AvaliacaoTela {
-  status: StatusDecisor
-  motivo: MotivoOutroDecisor | null
-  emailNominalDe: string | null
-}
+export type { AvaliacaoTela, ConsultaSocios, Decisor } from '@/lib/prospeccao/decisores'
 
-/** Resposta de /api/prospeccao/socios; guardada pela página por CNPJ. */
-export interface ConsultaSocios extends AvaliacaoTela {
-  socios: SocioAvaliado[]
-  sugerido: Socio | null
-}
-
-export interface Decisor {
-  nome: string
-  cargo: string
-  /** Perfil do LinkedIn confirmado pelo usuário (texto como colado). */
-  linkedin?: string
-}
+/** Estado do salvamento automático do decisor (0057). */
+export type EstadoSalvamento = 'salvando' | 'salvo' | 'erro' | null
 
 /** Consulta o quadro societário de um CNPJ do catálogo; lança com mensagem legível. */
 export async function consultarSociosApi(cnpj: string): Promise<ConsultaSocios> {
@@ -125,12 +110,14 @@ export default function DetalheEmpresa({
   onDecisor,
   consulta,
   onConsulta,
+  salvamento = null,
 }: {
   empresa: ResultadoCatalogo
   decisor: Decisor | null
   onDecisor: (d: Decisor | null) => void
   consulta: ConsultaSocios | null
   onConsulta: (c: ConsultaSocios) => void
+  salvamento?: EstadoSalvamento
 }) {
   const socios = consulta?.socios ?? null
   const avaliacao = consulta?.status ? { status: consulta.status, motivo: consulta.motivo } : null
@@ -363,7 +350,14 @@ export default function DetalheEmpresa({
             )}
           </div>
         </div>
-        <p className="text-[11px] text-slate-500">Sem contato definido, o lead entra só com a empresa e o e-mail da Receita.</p>
+        <p className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+          <span>Sem contato definido, o lead entra só com a empresa e o e-mail da Receita.</span>
+          {salvamento && (
+            <span role="status" className={`shrink-0 ${salvamento === 'erro' ? 'text-amber-300' : 'text-slate-500'}`}>
+              {salvamento === 'salvando' ? 'Salvando…' : salvamento === 'salvo' ? 'Salvo' : 'Não foi possível salvar'}
+            </span>
+          )}
+        </p>
       </section>
     </div>
   )

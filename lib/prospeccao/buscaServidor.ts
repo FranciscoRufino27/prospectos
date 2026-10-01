@@ -6,6 +6,8 @@ import { lerCursor, limitePagina, paramsRpc, type FiltrosBusca } from './filtros
 import { classificarEmail, type QualidadeEmail } from './qualidadeEmail'
 import { dominioDaEmpresa, type DominioEmpresa } from './dominioEmpresa'
 import { descricoesCnae, nomeMunicipioIbge } from './referenciaIbge'
+import { carregarAnalises } from './decisoresServidor'
+import type { AnaliseSalva } from './decisores'
 
 export interface ResultadoCatalogo {
   cnpj: string
@@ -33,6 +35,8 @@ export interface ResultadoCatalogo {
   municipio_nome: string | null
   /** Descrição IBGE dos CNAEs principal e secundários, por código. */
   atividades: Record<string, string>
+  /** Decisor e consulta de sócios que a org já salvou (0057); null = nada salvo. */
+  analise: AnaliseSalva | null
 }
 
 export interface StatusCatalogo {
@@ -98,7 +102,12 @@ export async function buscarProspeccao(
   if (contagemGeral.error) throw new Error(`Falha na contagem: ${contagemGeral.error.message}`)
   if (contagemComEmail.error) throw new Error(`Falha na contagem com e-mail: ${contagemComEmail.error.message}`)
 
-  const linhas = (pagina.data ?? []) as (Omit<ResultadoCatalogo, 'qualidade_email' | 'dominio' | 'municipio_nome' | 'atividades'> & { nota: number })[]
+  const linhas = (pagina.data ?? []) as (Omit<ResultadoCatalogo, 'qualidade_email' | 'dominio' | 'municipio_nome' | 'atividades' | 'analise'> & { nota: number })[]
+  // Sem a tabela da 0057 (ou falha de leitura) a busca segue, só sem o salvo.
+  const analises = await carregarAnalises(admin, org, linhas.map((l) => l.cnpj)).catch((e) => {
+    console.error('[prospeccao/busca] sem decisores salvos:', e)
+    return {} as Record<string, AnaliseSalva>
+  })
   const itens: ResultadoCatalogo[] = linhas.map(({ nota: _nota, ...l }) => ({
     ...l,
     capital_social: l.capital_social === null ? null : Number(l.capital_social),
@@ -106,6 +115,7 @@ export async function buscarProspeccao(
     dominio: dominioDaEmpresa(l.email, [l.nome_fantasia, l.razao_social]),
     municipio_nome: nomeMunicipioIbge(l.municipio, l.uf),
     atividades: descricoesCnae([l.cnae_principal, ...(l.cnaes_secundarios ?? [])]),
+    analise: analises[l.cnpj] ?? null,
   }))
   return {
     itens,

@@ -17,7 +17,7 @@ import {
   PESQUISAS_LIMITES, PORTES_PROSPECCAO, quantidadeValida,
   type PesquisaSalva, type PorteProspeccao, type ProspeccaoConfig,
 } from '@/lib/config/workspaceConfig';
-import DetalheEmpresa, { consultarSociosApi, type ConsultaSocios, type Decisor } from '@/components/prospeccao/DetalheEmpresa';
+import DetalheEmpresa, { consultarSociosApi, type ConsultaSocios, type Decisor, type EstadoSalvamento } from '@/components/prospeccao/DetalheEmpresa';
 import { emLote, normalizarPerfilLinkedIn } from '@/lib/prospeccao/contato';
 import DecisorCelula from '@/components/prospeccao/DecisorCelula';
 import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoModal';
@@ -226,6 +226,11 @@ export default function ProspeccaoPage() {
   const [aberto, setAberto] = useState<string | null>(null);
   const [selecionados, setSelecionados] = useState<Map<string, ResultadoCatalogo>>(() => new Map());
   const [decisores, setDecisores] = useState<Record<string, Decisor | null>>({});
+  // Espelho síncrono de `decisores` (a consulta em lote decide sem esperar render).
+  const decisoresRef = useRef<Record<string, Decisor | null>>({});
+  // Salvamento automático do decisor por CNPJ (0057), com debounce.
+  const [salvamentos, setSalvamentos] = useState<Record<string, EstadoSalvamento>>({});
+  const timersSalvar = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   // Consulta de sócios por CNPJ: alimenta a coluna Decisor e o detalhe.
   const [consultas, setConsultas] = useState<Record<string, ConsultaSocios>>({});
   // Busca de decisores dos selecionados em andamento (concluídos/total).
@@ -265,6 +270,22 @@ export default function ProspeccaoPage() {
       setPerfil(corpo.perfil ?? null);
       if (!f) setFiltros(corpo.filtros ?? null);
       setItens((atual) => (apos ? [...atual, ...(corpo.itens ?? [])] : corpo.itens ?? []));
+      // O que a org já salvou (0057) entra no estado; edição local, que pode
+      // ainda estar a caminho do servidor, prevalece.
+      const salvos = (corpo.itens ?? []).filter((i) => i.analise);
+      if (salvos.length) {
+        setDecisores((m) => {
+          const n = { ...m };
+          for (const i of salvos) if (!(i.cnpj in n) && i.analise?.decisor) n[i.cnpj] = i.analise.decisor;
+          decisoresRef.current = n;
+          return n;
+        });
+        setConsultas((m) => {
+          const n = { ...m };
+          for (const i of salvos) if (!n[i.cnpj] && i.analise?.consulta) n[i.cnpj] = i.analise.consulta;
+          return n;
+        });
+      }
       setCursor(corpo.proximoCursor ?? null);
       if (!apos) {
         setTotal(corpo.total ?? null);
@@ -423,11 +444,36 @@ export default function ProspeccaoPage() {
     });
   }
 
+  // Troca o decisor de um CNPJ e agenda o salvamento (o último valor vence).
+  function alterarDecisor(cnpj: string, decisor: Decisor | null) {
+    decisoresRef.current = { ...decisoresRef.current, [cnpj]: decisor };
+    setDecisores(decisoresRef.current);
+    setSalvamentos((m) => ({ ...m, [cnpj]: 'salvando' }));
+    const timers = timersSalvar.current;
+    clearTimeout(timers.get(cnpj));
+    timers.set(cnpj, setTimeout(async () => {
+      timers.delete(cnpj);
+      const atual = decisoresRef.current[cnpj];
+      try {
+        const res = await fetch('/api/prospeccao/decisores', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cnpj, nome: atual?.nome ?? null, cargo: atual?.cargo ?? null, linkedin: atual?.linkedin ?? null }),
+        });
+        // Outra edição agendada depois desta decide o estado final.
+        if (timers.has(cnpj)) return;
+        setSalvamentos((m) => ({ ...m, [cnpj]: res.ok ? 'salvo' : 'erro' }));
+      } catch {
+        if (!timers.has(cnpj)) setSalvamentos((m) => ({ ...m, [cnpj]: 'erro' }));
+      }
+    }, 700));
+  }
+
   // Guarda a consulta e, se ainda não há decisor escolhido, adota o sugerido.
   function registrarConsulta(cnpj: string, consulta: ConsultaSocios) {
     setConsultas((m) => ({ ...m, [cnpj]: consulta }));
     const sugerido = consulta.sugerido;
-    if (sugerido) setDecisores((m) => (m[cnpj] ? m : { ...m, [cnpj]: { nome: sugerido.nome, cargo: sugerido.qualificacao } }));
+    if (sugerido && !decisoresRef.current[cnpj]) alterarDecisor(cnpj, { nome: sugerido.nome, cargo: sugerido.qualificacao });
   }
 
   // Consulta os sócios dos selecionados que ainda não foram consultados, poucos
@@ -958,7 +1004,7 @@ export default function ProspeccaoPage() {
                             {expandido && (
                               <tr>
                                 <td colSpan={8} className="p-0">
-                                  <DetalheEmpresa empresa={i} decisor={decisor ?? null} onDecisor={(d) => setDecisores((m) => ({ ...m, [i.cnpj]: d }))}
+                                  <DetalheEmpresa empresa={i} decisor={decisor ?? null} onDecisor={(d) => alterarDecisor(i.cnpj, d)} salvamento={salvamentos[i.cnpj] ?? null}
                                     consulta={consultas[i.cnpj] ?? null} onConsulta={(c) => registrarConsulta(i.cnpj, c)}
                                   />
                                 </td>

@@ -9,6 +9,8 @@ import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
 import { consultarSocios } from '@/lib/prospeccao/socios'
 import { avaliarDecisor } from '@/lib/prospeccao/adequacaoDecisor'
 import { donoDoEmail } from '@/lib/prospeccao/emailNominal'
+import type { ConsultaSocios } from '@/lib/prospeccao/decisores'
+import { salvarConsulta } from '@/lib/prospeccao/decisoresServidor'
 
 export const runtime = 'nodejs'
 
@@ -37,12 +39,16 @@ export async function GET(req: NextRequest) {
   const perfil = parseWorkspaceConfig(orgRow.data?.configuracoes).prospeccao
   const dono = donoDoEmail(empresa.data.email, r.socios)
   const avaliacao = avaliarDecisor(r.socios, empresa.data, perfil, dono)
-  return NextResponse.json({
+  const consulta: ConsultaSocios = {
     socios: avaliacao.socios,
     sugerido: avaliacao.sugerido,
     status: avaliacao.status,
     motivo: avaliacao.motivo,
     // Nome do sócio dono do e-mail cadastral; null = e-mail não é nominal.
     emailNominalDe: dono?.nome ?? null,
-  })
+  }
+  // Guarda para a org não perder a análise ao recarregar (0057). Falha ao
+  // guardar não impede a resposta: a consulta em si deu certo.
+  await salvarConsulta(admin, org, cnpj, consulta).catch((e) => console.error('[prospeccao/socios] não salvou a consulta:', e))
+  return NextResponse.json(consulta)
 }
