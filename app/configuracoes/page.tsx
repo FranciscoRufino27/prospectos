@@ -2,10 +2,11 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Settings, Users, Palette, Target } from 'lucide-react';
+import { Settings, Users, Palette, Target, Plug } from 'lucide-react';
 import DistribuicaoComercialPanel from '@/components/configuracoes/DistribuicaoComercialPanel';
 import PersonalizacaoPanel from '@/components/configuracoes/PersonalizacaoPanel';
 import ObjetivosOperacaoPanel from '@/components/configuracoes/ObjetivosOperacaoPanel';
+import IntegracoesPanel from '@/components/configuracoes/IntegracoesPanel';
 import { AbasModulo, PaginaModulo } from '@/components/tema/Modulo';
 
 // Configurações por workspace: objetivos, distribuição comercial e personalização.
@@ -18,8 +19,8 @@ export default function ConfiguracoesPage() {
   );
 }
 
-type Aba = 'objetivos' | 'distribuicao' | 'personalizacao';
-const ABAS: Aba[] = ['objetivos', 'distribuicao', 'personalizacao'];
+type Aba = 'objetivos' | 'distribuicao' | 'personalizacao' | 'integracoes';
+const ABAS: Aba[] = ['objetivos', 'distribuicao', 'personalizacao', 'integracoes'];
 // Abas removidas: o link antigo do processo comercial (/processo-comercial
 // redireciona para ?tab=processo) cai na Distribuição, única seção que ficou.
 const ABAS_LEGADAS: Record<string, Aba> = { processo: 'distribuicao' };
@@ -85,6 +86,7 @@ function Inner() {
     { id: 'objetivos', label: 'Objetivos da operação', Icon: Target },
     { id: 'distribuicao', label: 'Distribuição', Icon: Users },
     { id: 'personalizacao', label: 'Personalização', Icon: Palette },
+    { id: 'integracoes', label: 'Integrações', Icon: Plug },
   ] as const;
 
   return (
@@ -96,6 +98,7 @@ function Inner() {
         {aba === 'objetivos' && <ObjetivosOperacaoPanel />}
         {aba === 'distribuicao' && <DistribuicaoComercialPanel />}
         {aba === 'personalizacao' && <PersonalizacaoPanel />}
+        {aba === 'integracoes' && <IntegracoesPanel />}
       </div>
     </PaginaModulo>
   );
