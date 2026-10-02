@@ -15,7 +15,7 @@
 // junto com as fases). Se a superfície crescer muito, aí sim avaliamos um zod.
 
 // Suba este número ao mudar o formato do blob, e adicione o passo em `migrar()`.
-export const WORKSPACE_CONFIG_SCHEMA_VERSION = 8
+export const WORKSPACE_CONFIG_SCHEMA_VERSION = 9
 
 // Objetivos que o produto já consegue medir de ponta a ponta. Novos objetivos
 // só entram nesta allowlist quando houver dado operacional real para dashboard,
@@ -129,6 +129,36 @@ export interface ComercialConfig {
   // acima) ou 'ambos'. Ausente = DESLIGADO — nenhuma org passa a receber
   // mensagem sem escolher.
   avisoResposta?: ModoAvisoResposta
+  // Grupos do WhatsApp salvos com nome (Configurações > Distribuição), para a
+  // tela escolher pelo nome em vez do id. Não decide envio: o grupo usado
+  // continua sendo `grupoWhatsappId` / o grupo da campanha.
+  gruposWhatsapp?: GrupoWhatsappSalvo[]
+}
+
+export interface GrupoWhatsappSalvo {
+  id: string // id da Z-API, ex.: 120363019502650977-group
+  nome: string
+}
+
+export const LIMITE_GRUPOS_WHATSAPP = 30
+export const FORMATO_ID_GRUPO_WHATSAPP = /^\d{10,30}-group$/
+
+// Lista de grupos salvos: id no formato da Z-API, nome obrigatório (até 80
+// caracteres), sem id repetido (vale o primeiro), no máximo LIMITE_GRUPOS_WHATSAPP.
+export function parseGruposWhatsapp(bruto: unknown): GrupoWhatsappSalvo[] {
+  if (!Array.isArray(bruto)) return []
+  const vistos = new Set<string>()
+  const out: GrupoWhatsappSalvo[] = []
+  for (const g of bruto) {
+    if (!ehObjeto(g)) continue
+    const id = typeof g.id === 'string' ? g.id.trim() : ''
+    const nome = typeof g.nome === 'string' ? g.nome.replace(/\s+/g, ' ').trim().slice(0, 80) : ''
+    if (!FORMATO_ID_GRUPO_WHATSAPP.test(id) || !nome || vistos.has(id)) continue
+    vistos.add(id)
+    out.push({ id, nome })
+    if (out.length >= LIMITE_GRUPOS_WHATSAPP) break
+  }
+  return out
 }
 
 export const MODOS_AVISO_RESPOSTA = ['responsavel', 'grupo', 'ambos'] as const
@@ -354,6 +384,8 @@ function migrar(bruto: Record<string, unknown>): Record<string, unknown> {
   if (v < 7) cfg = { ...cfg, _schema_version: 7 }
   // v7 -> v8: adiciona prospeccao.porteOutroDecisor. Ausência = sem corte por porte.
   if (v < 8) cfg = { ...cfg, _schema_version: 8 }
+  // v8 -> v9: adiciona comercial.gruposWhatsapp (grupos salvos com nome). Ausência = nenhum.
+  if (v < 9) cfg = { ...cfg, _schema_version: 9 }
   return cfg
 }
 
@@ -405,6 +437,8 @@ export function parseWorkspaceConfig(bruto: unknown): WorkspaceConfig {
     if (typeof c.avisoResposta === 'string' && (MODOS_AVISO_RESPOSTA as readonly string[]).includes(c.avisoResposta)) {
       comercial.avisoResposta = c.avisoResposta as ModoAvisoResposta
     }
+    const grupos = parseGruposWhatsapp(c.gruposWhatsapp)
+    if (grupos.length) comercial.gruposWhatsapp = grupos
     if (Object.keys(comercial).length > 0) out.comercial = comercial
   }
   if (Array.isArray(obj.camposUI)) {
@@ -507,6 +541,8 @@ export interface WorkspaceConfigEditavel {
   comercialRodizioHandoff?: boolean | null
   // Aviso de resposta do cliente. null (ou valor inválido) DESLIGA.
   comercialAvisoResposta?: ModoAvisoResposta | null
+  // Grupos do WhatsApp salvos com nome. Substitui a lista inteira; lista vazia/null LIMPA.
+  comercialGruposWhatsapp?: GrupoWhatsappSalvo[] | null
   camposUI?: CampoUI[]
   operacao?: OperacaoConfig
   // Perfil de busca da prospecção. Substitui o perfil inteiro; null LIMPA.
@@ -550,6 +586,11 @@ export function mesclarWorkspaceConfig(atual: WorkspaceConfig, patch: WorkspaceC
     const { avisoResposta: _anterior, ...resto } = next.comercial ?? atual.comercial ?? {}
     const modo = patch.comercialAvisoResposta
     next.comercial = modo && (MODOS_AVISO_RESPOSTA as readonly string[]).includes(modo) ? { ...resto, avisoResposta: modo } : resto
+  }
+  if (patch.comercialGruposWhatsapp !== undefined) {
+    const { gruposWhatsapp: _anterior, ...resto } = next.comercial ?? atual.comercial ?? {}
+    const grupos = parseGruposWhatsapp(patch.comercialGruposWhatsapp)
+    next.comercial = grupos.length ? { ...resto, gruposWhatsapp: grupos } : resto
   }
   if (Array.isArray(patch.camposUI)) next.camposUI = patch.camposUI
   if (patch.operacao) next.operacao = patch.operacao

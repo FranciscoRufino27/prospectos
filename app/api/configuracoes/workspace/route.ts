@@ -58,6 +58,10 @@ export async function PUT(req: Request) {
     comercialAvisoResposta: typeof b.comercialAvisoResposta === 'string' || b.comercialAvisoResposta === null
       ? b.comercialAvisoResposta
       : undefined,
+    // Grupos do WhatsApp salvos com nome: lista substitui (validada no parse); null limpa.
+    comercialGruposWhatsapp: Array.isArray(b.comercialGruposWhatsapp) || b.comercialGruposWhatsapp === null
+      ? b.comercialGruposWhatsapp
+      : undefined,
     camposUI: Array.isArray(b.camposUI) ? b.camposUI : undefined,
     operacao: b.operacao && typeof b.operacao === 'object' ? b.operacao : undefined,
     // Perfil de busca da prospecção: objeto substitui (validado no parse); null limpa.

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Users, Check, Loader2, MessageCircle, Save, BellRing } from 'lucide-react';
+import type { GrupoWhatsappSalvo } from '@/lib/config/workspaceConfig';
+import GruposWhatsappSalvos from './GruposWhatsappSalvos';
 
 // Distribuição comercial (handoff): quem participa do round-robin, o grupo do
 // WhatsApp que recebe o aviso e para onde vai o aviso de "cliente respondeu".
@@ -30,6 +32,8 @@ export default function DistribuicaoComercialPanel() {
   const [salvandoGrupo, setSalvandoGrupo] = useState(false);
   const [grupoOk, setGrupoOk] = useState(false);
   const [erroGrupo, setErroGrupo] = useState<string | null>(null);
+  // Grupos do WhatsApp salvos com nome: o grupo de avisos é escolhido por eles.
+  const [gruposSalvos, setGruposSalvos] = useState<GrupoWhatsappSalvo[]>([]);
   // Janela do check-in (minutos). Vazio = padrão do produto (7 dias).
   const [janela, setJanela] = useState('');
   const [janelaSalva, setJanelaSalva] = useState('');
@@ -57,6 +61,7 @@ export default function DistribuicaoComercialPanel() {
     setRodizio(cfg?.config?.comercial?.rodizioHandoff === true);
     const g = typeof cfg?.config?.comercial?.grupoWhatsappId === 'string' ? cfg.config.comercial.grupoWhatsappId : '';
     setGrupo(g); setGrupoSalvo(g);
+    setGruposSalvos(Array.isArray(cfg?.config?.comercial?.gruposWhatsapp) ? cfg.config.comercial.gruposWhatsapp : []);
     const jm = typeof cfg?.config?.comercial?.handoffRevisaoMinutos === 'number' ? String(cfg.config.comercial.handoffRevisaoMinutos) : '';
     setJanela(jm); setJanelaSalva(jm);
     const cr = typeof cfg?.config?.comercial?.campanhaRetornoId === 'string' ? cfg.config.comercial.campanhaRetornoId : '';
@@ -243,24 +248,41 @@ export default function DistribuicaoComercialPanel() {
         </p>
       )}
 
+      <GruposWhatsappSalvos grupos={gruposSalvos} podeEditar={podeEditar} onAlterado={setGruposSalvos} />
+
       <div className="pt-4 border-t border-[var(--border)] space-y-2">
         <div className="text-sm font-semibold text-slate-200 inline-flex items-center gap-2">
           <MessageCircle size={14} className="text-green-400" /> Grupo de avisos comercial
         </div>
         <p className="text-xs text-slate-500">
           Grupo do WhatsApp (Z-API) que recebe o aviso quando um lead interessado é entregue a um comercial.
-          Formato: <code className="text-slate-400">120363019502650977-group</code>. Sem grupo, o aviso fica pendente
-          — o handoff não é afetado.
+          {gruposSalvos.length > 0
+            ? ' Escolha entre os grupos salvos acima.'
+            : <> Formato: <code className="text-slate-400">120363019502650977-group</code> — ou salve o grupo com nome acima para escolher pelo nome.</>}
+          {' '}Sem grupo, o aviso fica pendente — o handoff não é afetado.
         </p>
         <div className="flex gap-2">
-          <input
-            className="flex-1 bg-[var(--bg-base)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-            value={grupo}
-            onChange={(e) => setGrupo(e.target.value)}
-            disabled={!podeEditar || salvandoGrupo}
-            placeholder="identificador do grupo"
-            spellCheck={false}
-          />
+          {gruposSalvos.length > 0 ? (
+            <select
+              className="flex-1 bg-[var(--bg-base)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              value={grupo}
+              onChange={(e) => setGrupo(e.target.value)}
+              disabled={!podeEditar || salvandoGrupo}
+            >
+              <option value="">Nenhum grupo</option>
+              {grupo && !gruposSalvos.some((g) => g.id === grupo) && <option value={grupo}>{grupo} (sem nome salvo)</option>}
+              {gruposSalvos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
+            </select>
+          ) : (
+            <input
+              className="flex-1 bg-[var(--bg-base)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              value={grupo}
+              onChange={(e) => setGrupo(e.target.value)}
+              disabled={!podeEditar || salvandoGrupo}
+              placeholder="identificador do grupo"
+              spellCheck={false}
+            />
+          )}
           {podeEditar && (
             <button onClick={salvarGrupo} disabled={salvandoGrupo || (grupo.trim() === grupoSalvo && janela.trim() === janelaSalva && campanhaRetorno === campanhaRetornoSalva)}
               className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500 disabled:opacity-40 inline-flex items-center gap-1 shrink-0">

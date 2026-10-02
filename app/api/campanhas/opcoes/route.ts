@@ -5,7 +5,7 @@ import { listarTemplates } from '@/lib/templates/repository'
 import { engineConfig } from '@/lib/engine/config'
 import { perfisComWhatsappAvisos } from '@/lib/campanhas/retornoWhatsappServidor'
 import { lerConfigZapi } from '@/lib/whatsapp/zapi'
-import { lerGrupoComercialDaOrg } from '@/lib/comercial/handoff/composicao'
+import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
 
 export const runtime = 'nodejs'
 
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     const remetentePromise = tipo === 'prospeccao'
       ? statusRemetenteProspeccao(admin, org).then((s) => (s.conectado ? { conta: s.contaKey as string, email: s.email as string } : null))
       : buscarRemetenteCampanha(admin, org)
-    const [templates, { data: leads, error: leadsError }, remetente, perfisWhatsapp, grupoConta] = await Promise.all([
+    const [templates, { data: leads, error: leadsError }, remetente, perfisWhatsapp, comercial] = await Promise.all([
       // Mesma biblioteca da tela de Templates: só e-mail ativo da organização e
       // sem as cópias `campanha_*` geradas por outras campanhas.
       listarTemplates(admin, org, { canal: 'email', ativo: 'ativos' }),
@@ -39,7 +39,9 @@ export async function GET(req: Request) {
         .limit(2000),
       remetentePromise,
       perfisComWhatsappAvisos(admin, org),
-      lerGrupoComercialDaOrg(admin, org),
+      // Grupo da conta e grupos salvos com nome (Configurações > Distribuição).
+      admin.from('organizacoes').select('configuracoes').eq('id', org).maybeSingle()
+        .then(({ data, error }) => { if (error) throw error; return parseWorkspaceConfig(data?.configuracoes).comercial }),
     ])
     if (leadsError) throw leadsError
     const nichosPorChave = new Map<string, string>()
@@ -71,7 +73,9 @@ export async function GET(req: Request) {
         provedorConfigurado: lerConfigZapi() !== null,
         perfisComNumero: perfisWhatsapp,
         // Grupo cadastrado em Configurações > Distribuição (padrão do aviso no grupo).
-        grupoConta,
+        grupoConta: comercial?.grupoWhatsappId ?? null,
+        // Grupos salvos com nome, para escolher o grupo da campanha pelo nome.
+        grupos: comercial?.gruposWhatsapp ?? [],
       },
     })
   } catch (e) {

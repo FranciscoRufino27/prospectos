@@ -83,6 +83,8 @@ interface WhatsappRetornoOpcoes {
   perfisComNumero: string[] | null
   // Grupo cadastrado em Configurações > Distribuição (null = nenhum).
   grupoConta: string | null
+  // Grupos salvos com nome (Configurações > Distribuição); vazio = escolher pelo id.
+  grupos?: Array<{ id: string; nome: string }>
 }
 
 interface PreviaPublico {
@@ -303,6 +305,8 @@ export default function CampanhaWizardPage({
   const querGrupo = aviso.whatsapp.includes('grupo')
   const querResponsavelWhatsapp = aviso.whatsapp.includes('responsavel')
   const grupoEfetivo = aviso.grupoWhatsappId?.trim() || whatsappRetorno?.grupoConta || null
+  const gruposSalvos = whatsappRetorno?.grupos ?? []
+  const nomeDoGrupo = (id: string) => gruposSalvos.find((g) => g.id === id)?.nome ?? null
   const responsavelTemWhatsapp = whatsappRetorno?.perfisComNumero && publico.responsavel_id
     ? whatsappRetorno.perfisComNumero.includes(publico.responsavel_id)
     : null
@@ -1023,16 +1027,36 @@ export default function CampanhaWizardPage({
                       {querGrupo && (
                         <div className="mt-3">
                           <label className={label}>Grupo do WhatsApp</label>
-                          <input
-                            className={input}
-                            value={aviso.grupoWhatsappId ?? ''}
-                            onChange={(e) => atualizarAviso({ grupoWhatsappId: e.target.value })}
-                            placeholder={whatsappRetorno?.grupoConta ?? '120363019502650977-group'}
-                          />
+                          {gruposSalvos.length > 0 ? (
+                            <select
+                              className={input}
+                              value={aviso.grupoWhatsappId ?? ''}
+                              onChange={(e) => atualizarAviso({ grupoWhatsappId: e.target.value })}
+                            >
+                              <option value="">
+                                {whatsappRetorno?.grupoConta
+                                  ? `Grupo da conta (${nomeDoGrupo(whatsappRetorno.grupoConta) ?? whatsappRetorno.grupoConta})`
+                                  : 'Escolha o grupo…'}
+                              </option>
+                              {aviso.grupoWhatsappId?.trim() && !nomeDoGrupo(aviso.grupoWhatsappId.trim()) && (
+                                <option value={aviso.grupoWhatsappId}>{aviso.grupoWhatsappId} (sem nome salvo)</option>
+                              )}
+                              {gruposSalvos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                            </select>
+                          ) : (
+                            <input
+                              className={input}
+                              value={aviso.grupoWhatsappId ?? ''}
+                              onChange={(e) => atualizarAviso({ grupoWhatsappId: e.target.value })}
+                              placeholder={whatsappRetorno?.grupoConta ?? '120363019502650977-group'}
+                            />
+                          )}
                           <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
-                            {whatsappRetorno?.grupoConta
-                              ? <>Vazio = grupo da conta (<code className="text-slate-400">{whatsappRetorno.grupoConta}</code>, de Configurações &gt; Distribuição). Preencha só para usar outro grupo nesta campanha.</>
-                              : 'A conta não tem grupo cadastrado: informe aqui o id do grupo (formato 120363019502650977-group) ou cadastre em Configurações > Processo comercial > Distribuição.'}
+                            {gruposSalvos.length > 0
+                              ? 'Grupos salvos em Configurações > Processo comercial > Distribuição.'
+                              : whatsappRetorno?.grupoConta
+                                ? <>Vazio = grupo da conta (<code className="text-slate-400">{whatsappRetorno.grupoConta}</code>, de Configurações &gt; Distribuição). Preencha só para usar outro grupo nesta campanha.</>
+                                : 'A conta não tem grupo cadastrado: informe aqui o id do grupo (formato 120363019502650977-group) ou salve os grupos com nome em Configurações > Processo comercial > Distribuição.'}
                           </p>
                         </div>
                       )}

@@ -61,7 +61,7 @@ export interface DepsZapi {
 // Uma chamada autenticada à Z-API. Header Client-Token nunca é logado.
 async function chamarZapi(
   cfg: ConfigZapi,
-  caminho: 'status' | 'send-text' | 'send-document/pdf',
+  caminho: 'status' | 'send-text' | 'send-document/pdf' | 'groups?page=1&pageSize=100',
   init: { method: 'GET' } | { method: 'POST'; body: unknown },
   doFetch: typeof fetch,
 ): Promise<{ resposta: Response } | { falha: string }> {
@@ -119,6 +119,44 @@ export async function getStatus(deps: DepsZapi = {}): Promise<ResultadoStatusZap
     smartphoneConnected: o.smartphoneConnected === true,
     ...(typeof o.error === 'string' && o.error ? { erro: o.error } : {}),
   }
+}
+
+export type ResultadoGruposZapi =
+  | { ok: true; grupos: Array<{ id: string; nome: string }> }
+  | { ok: false; codigo: CodigoErroZapi; mensagem: string; status?: number }
+
+/**
+ * Grupos do WhatsApp da instância (GET /groups): só id ("<dígitos>-group") e
+ * nome — o resto do chat (mensagens, não lidas) nunca é repassado. Até 100,
+ * em ordem alfabética. Só leitura.
+ */
+export async function listarGruposZapi(deps: DepsZapi = {}): Promise<ResultadoGruposZapi> {
+  const cfg = lerConfigZapi(deps.env ?? process.env)
+  if (!cfg) {
+    return { ok: false, codigo: 'config_ausente', mensagem: 'Z-API não configurada: defina ZAPI_INSTANCE_ID, ZAPI_TOKEN e ZAPI_CLIENT_TOKEN.' }
+  }
+  const r = await chamarZapi(cfg, 'groups?page=1&pageSize=100', { method: 'GET' }, deps.fetch ?? fetch)
+  if ('falha' in r) return { ok: false, codigo: 'falha_rede', mensagem: `Falha de rede ao listar grupos da Z-API: ${r.falha}` }
+
+  const corpo: unknown = await r.resposta.json().catch(() => null)
+  if (!r.resposta.ok) {
+    return { ok: false, codigo: 'erro_provider', status: r.resposta.status, mensagem: resumoErroProvider(corpo, r.resposta.status) }
+  }
+  if (!Array.isArray(corpo)) {
+    return { ok: false, codigo: 'resposta_invalida', status: r.resposta.status, mensagem: 'Z-API respondeu /groups sem uma lista.' }
+  }
+  const vistos = new Set<string>()
+  const grupos: Array<{ id: string; nome: string }> = []
+  for (const item of corpo) {
+    const o = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
+    const id = typeof o.phone === 'string' ? o.phone.trim() : ''
+    const nome = typeof o.name === 'string' ? o.name.replace(/\s+/g, ' ').trim() : ''
+    if (o.isGroup === false || !/^\d{10,30}-group$/.test(id) || vistos.has(id)) continue
+    vistos.add(id)
+    grupos.push({ id, nome: nome || id })
+  }
+  grupos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  return { ok: true, grupos }
 }
 
 function extrairIds(corpo: unknown): IdsZapi {
