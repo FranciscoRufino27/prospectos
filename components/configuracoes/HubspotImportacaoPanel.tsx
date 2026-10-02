@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, Building2, Check, ChevronLeft, ChevronRight, Info, RefreshCw, Search } from 'lucide-react'
 import { NICHOS } from '@/lib/prospeccao/nichos'
 import { ACAO_SUGERIDA, JANELA_ATIVIDADE_DIAS, ROTULO_SITUACAO, SITUACOES, type Situacao } from '@/lib/integracoes/hubspot/situacao'
+import HubspotLotesImportacao from './HubspotLotesImportacao'
 
 // Central de Importação HubSpot: mostra SÓ as empresas disponíveis para
 // importar — aptas (não cliente, com CNPJ ou domínio e contato com e-mail
 // corporativo) e clientes (com e-mail, para envio de novidades) — de
 // comerciais mapeados. A lista vem do índice local (botão "Atualizar
-// índice"); filtros, paginação e contagens são server-side. Nada é importado
-// aqui: "Preparar seleção" grava o lote para a importação.
+// índice"); filtros, paginação e contagens são server-side. "Preparar
+// seleção" grava o lote; os leads só são criados ao importar o lote
+// (HubspotLotesImportacao).
 
 type Status = 'importada' | 'em_preparo' | 'nao_importada'
 
@@ -193,6 +195,7 @@ export default function HubspotImportacaoPanel() {
   const [enriquecidos, setEnriquecidos] = useState<ResultadoEnriquecimento[] | null>(null)
   const [selecionandoFiltro, setSelecionandoFiltro] = useState(false)
   const [avisoSelecao, setAvisoSelecao] = useState<string | null>(null)
+  const [versaoLotes, setVersaoLotes] = useState(0)
   const seqLista = useRef(0)
   const seqResumo = useRef(0)
 
@@ -378,6 +381,7 @@ export default function HubspotImportacaoPanel() {
       setResultado(`Lote preparado com ${d.incluidas} empresa(s), nicho esperado “${nomeNicho}”.${extras ? ` ${extras}.` : ''} Nada foi importado ainda.`)
       setSelecionadas(new Map())
       setAvisoSelecao(null)
+      setVersaoLotes((v) => v + 1)
       setConfirmando(false)
       setNicho('')
       carregarLista()
@@ -397,7 +401,7 @@ export default function HubspotImportacaoPanel() {
           </h3>
           <p className="mt-1 text-sm text-slate-400">
             Só aparecem empresas disponíveis para importar: aptas (CNPJ ou site + contato com e-mail da empresa) e clientes com
-            e-mail, de comerciais mapeados. Nada é importado aqui e nenhum lead é criado.
+            e-mail, de comerciais mapeados. Selecione e prepare um lote; os leads só são criados ao importar o lote, mais abaixo.
           </p>
         </div>
         <button
@@ -693,12 +697,14 @@ export default function HubspotImportacaoPanel() {
 
       {avisoSelecao && <p className="text-xs text-slate-300 text-right">{avisoSelecao}</p>}
 
+      <HubspotLotesImportacao versao={versaoLotes} onImportado={() => setVersaoIndice((v) => v + 1)} />
+
       {confirmando && (
         <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-4 space-y-3">
           <p className="text-sm text-slate-200">Preparar {selecionadas.size} empresa(s) para a próxima etapa</p>
           <p className="text-xs text-slate-400">
             Escolha o nicho esperado desta operação. Ele não filtra nada: é comparado com o nicho sugerido pelo enriquecimento (CNAE na Receita).
-            Nada é importado e nenhum lead é criado. Clientes entram marcados para envio de novidades (nunca prospecção fria);
+            Preparar ainda não cria leads: isso acontece ao importar o lote. Clientes entram marcados para envio de novidades (nunca prospecção fria);
             empresas já importadas ficam de fora.
           </p>
           <div className="flex flex-wrap items-end gap-3">

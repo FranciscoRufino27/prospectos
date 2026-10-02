@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server'
 import { exigirPermissao } from '@/lib/rbac/servidor'
 import { prepararLote } from '@/lib/integracoes/hubspot/preparacao'
+import { listarLotes } from '@/lib/integracoes/hubspot/importacao'
 
-// Prepara um lote de importação (nicho esperado + empresas selecionadas).
-// NÃO importa: não cria empresas, contatos nem leads.
+// POST prepara um lote de importação (nicho esperado + empresas selecionadas)
+// e NÃO importa. GET lista os lotes da organização. A importação de um lote
+// fica em ./[id]/importar.
 export const runtime = 'nodejs'
+
+export async function GET() {
+  const acc = await exigirPermissao('workspace.configure')
+  if ('erro' in acc) return acc.erro
+  try {
+    return NextResponse.json({ lotes: await listarLotes(acc.acesso.org, { admin: acc.acesso.admin }) })
+  } catch (e) {
+    console.error('[hubspot/importacoes] listar lotes:', e)
+    return NextResponse.json({ erro: 'erro_banco' }, { status: 500 })
+  }
+}
 
 const STATUS_POR_MOTIVO: Record<string, number> = {
   nicho_invalido: 400,
