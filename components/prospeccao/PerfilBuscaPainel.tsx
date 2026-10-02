@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertCircle, Check, ChevronDown, Info, Lock, Mail, Phone, Plus, RotateCcw, Save, Search,
+  AlertCircle, Check, ChevronDown, Globe2, Info, Lock, Mail, Phone, Plus, RotateCcw, Save, Search,
   SlidersHorizontal, UserRound, X,
 } from 'lucide-react';
 import SeletorLocalizacao from './SeletorLocalizacao';
+import BuscaEmpresaEspecifica, { type PedidoEmpresa } from './BuscaEmpresaEspecifica';
 import SeletorNichos from './SeletorNichos';
 import SeletorOpcoesPerfil, { type OpcaoPerfil } from './SeletorOpcoesPerfil';
 import {
@@ -22,11 +23,15 @@ import {
   type PorteCorteDecisor,
   type ProspeccaoConfig,
 } from '@/lib/config/workspaceConfig';
-import { NICHOS, nichoDaAtividade } from '@/lib/prospeccao/nichos';
+import { gruposDoPerfil, NICHOS, nichoDaAtividade } from '@/lib/prospeccao/nichos';
+import { SETORES_DO_NICHO } from '@/lib/prospeccao/nichosInternacional';
 import { formatarCnae, ROTULO_PORTE } from '@/lib/prospeccao/rotulos';
 import s from './Prospeccao.module.css';
 
 const LIMITE_CNAES = PROSPECCAO_LIMITES.cnaes;
+
+/** Onde buscar depois de salvar o perfil. */
+export type DestinoBusca = 'brasil' | 'internacional';
 
 const OPCOES_FUNCIONARIOS: OpcaoPerfil[] = FAIXAS_FUNCIONARIOS.map((valor) => ({ valor, rotulo: valor }));
 const ROTULOS_CARGOS: Record<CargoAlvoProspeccao, string> = {
@@ -42,22 +47,38 @@ const ATIVIDADES = NICHOS.flatMap((nicho) => nicho.atividades.map((atividade) =>
 
 export default function PerfilBuscaPainel({
   catalogoCnaes,
+  modo = 'brasil',
   quantidadeTexto,
   soComEmail,
+  decisorObrigatorio = true,
+  onDecisorObrigatorioChange,
+  telefoneObrigatorio = false,
+  onTelefoneObrigatorioChange,
   filtrosDisponiveis,
   onQuantidadeChange,
   onSoComEmailChange,
   onFechar,
   onSalvo,
+  onBuscarEmpresa,
 }: {
   catalogoCnaes: string[] | null;
+  /** Aba ativa: o botão dela fica em destaque no rodapé. */
+  modo?: DestinoBusca;
   quantidadeTexto: string;
   soComEmail: boolean;
+  /** Ligado: só empresas com decisor e e-mail dele. Desligado: também as sem. */
+  decisorObrigatorio?: boolean;
+  onDecisorObrigatorioChange?: (ativo: boolean) => void;
+  /** Só no Brasil: a Receita traz telefone; a Crustdata não. */
+  telefoneObrigatorio?: boolean;
+  onTelefoneObrigatorioChange?: (ativo: boolean) => void;
   filtrosDisponiveis: boolean;
   onQuantidadeChange: (valor: string) => void;
   onSoComEmailChange: (ativo: boolean) => void;
   onFechar: () => void;
-  onSalvo: (perfil: ProspeccaoConfig | null) => void;
+  onSalvo: (perfil: ProspeccaoConfig | null, destino: DestinoBusca) => void;
+  /** "Buscar empresa específica": independe dos filtros do perfil. */
+  onBuscarEmpresa?: (pedido: PedidoEmpresa) => void;
 }) {
   const [perfil, setPerfil] = useState<ProspeccaoConfig>({});
   const [podeEditar, setPodeEditar] = useState(false);
@@ -66,6 +87,8 @@ export default function PerfilBuscaPainel({
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [avancadosAbertos, setAvancadosAbertos] = useState(false);
+  // Aba de localização: abre na mesma origem da tela (Brasil/Internacional).
+  const [abaGeo, setAbaGeo] = useState<DestinoBusca>(modo);
   const [atividadeBusca, setAtividadeBusca] = useState('');
   const [cnaeDigitado, setCnaeDigitado] = useState('');
 
@@ -96,6 +119,11 @@ export default function PerfilBuscaPainel({
   const faixasFuncionarios = perfil.faixasFuncionarios ?? [];
   const cargosAlvo = perfil.cargosAlvo ?? [];
   const areasAlvo = perfil.areasAlvo ?? [];
+  const paises = perfil.paises ?? [];
+  // Nichos do perfil sem tradução para setor do LinkedIn (ex.: CNAE solto).
+  const gruposPerfil = gruposDoPerfil(cnaes);
+  const nichosSemSetor = gruposPerfil.filter((g) => !SETORES_DO_NICHO[g.id]).map((g) => g.nome);
+  const nichosComSetor = gruposPerfil.length - nichosSemSetor.length;
   const outras = cnaes.filter((codigo) => !nichoDaAtividade(codigo));
   const foraDoCatalogo = catalogoCnaes ? cnaes.filter((codigo) => !catalogoCnaes.includes(codigo)) : [];
   const quantidadeInvalida = quantidadeTexto.trim() !== '' && quantidadeValida(Number(quantidadeTexto)) === null;
@@ -138,7 +166,7 @@ export default function PerfilBuscaPainel({
     onSoComEmailChange(false);
   }
 
-  async function salvar() {
+  async function salvar(destino: DestinoBusca) {
     if (!podeEditar || salvando) return;
     setSalvando(true);
     setErro(null);
@@ -146,7 +174,8 @@ export default function PerfilBuscaPainel({
       // O porte jurídico legado sai ao salvar: a interface nova usa somente
       // faixas de funcionários como intenção de qualificação.
       const { portes: _portesLegados, ...perfilAtual } = perfil;
-      const perfilSalvo = cnaes.length ? perfilAtual : null;
+      // Só países (sem nicho) ainda é perfil: a busca internacional usa.
+      const perfilSalvo = cnaes.length || paises.length ? perfilAtual : null;
       const res = await fetch('/api/configuracoes/workspace', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -155,7 +184,7 @@ export default function PerfilBuscaPainel({
       const corpo = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(corpo?.erro || 'Falha ao salvar o perfil');
       setPerfil(perfilSalvo ?? {});
-      onSalvo(perfilSalvo);
+      onSalvo(perfilSalvo, destino);
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao salvar');
     } finally {
@@ -184,18 +213,25 @@ export default function PerfilBuscaPainel({
             <p className={s.readOnlyNotice}><Lock size={13} /> O perfil salvo é somente leitura para sua permissão atual.</p>
           )}
 
+          {onBuscarEmpresa && <BuscaEmpresaEspecifica key={abaGeo} modo={abaGeo} onBuscar={onBuscarEmpresa} />}
+
           <SeletorLocalizacao
+            aba={abaGeo}
+            onAba={setAbaGeo}
             ufs={ufs}
             municipios={municipios}
+            paises={paises}
+            nichosSemSetor={nichosSemSetor}
             desabilitado={!podeEditar}
             onChangeUfs={(novas) => setPerfil((atual) => ({ ...atual, ufs: novas }))}
             onChangeMunicipios={(novos) => setPerfil((atual) => ({ ...atual, municipios: novos }))}
+            onChangePaises={(novos) => setPerfil((atual) => ({ ...atual, paises: novos }))}
           />
 
           <section className={s.profileSection}>
             <label className={s.profileLabel} htmlFor="quantidade-desejada">Quantidade desejada</label>
             <div className={s.quantityField}>
-              <input id="quantidade-desejada" type="number" inputMode="numeric" min={1} max={PESQUISAS_LIMITES.quantidadeMax} value={quantidadeTexto} disabled={!filtrosDisponiveis} onChange={(evento) => onQuantidadeChange(evento.target.value)} placeholder="100" className="focus-ring" />
+              <input id="quantidade-desejada" type="number" inputMode="numeric" min={1} max={PESQUISAS_LIMITES.quantidadeMax} value={quantidadeTexto} disabled={!filtrosDisponiveis} onChange={(evento) => onQuantidadeChange(evento.target.value)} className="focus-ring" />
               <span>leads válidos</span>
             </div>
             <p className={s.fieldHelp}><Info size={12} /> Nesta etapa, o campo limita resultados; a meta por validade será conectada ao motor.</p>
@@ -208,12 +244,22 @@ export default function PerfilBuscaPainel({
               <button type="button" role="switch" aria-checked={soComEmail} disabled={!filtrosDisponiveis} onClick={() => onSoComEmailChange(!soComEmail)} className={`${s.criteriaRow} focus-ring`}>
                 <Mail size={15} /><span className="flex-1 text-left">E-mail válido obrigatório</span><span className={`${s.switchTrack} ${soComEmail ? s.switchTrackAtivo : ''}`} aria-hidden="true"><span /></span>
               </button>
-              <button type="button" role="switch" aria-checked="false" disabled className={s.criteriaRow} title="Disponível após enriquecimento de decisores">
-                <UserRound size={15} /><span className="flex-1 text-left">Decisor obrigatório</span><span className={s.switchTrack} aria-hidden="true"><span /></span>
+              <button type="button" role="switch" aria-checked={decisorObrigatorio} disabled={!filtrosDisponiveis || !onDecisorObrigatorioChange}
+                onClick={() => onDecisorObrigatorioChange?.(!decisorObrigatorio)} className={`${s.criteriaRow} focus-ring`}
+                title={decisorObrigatorio ? 'Só entram empresas com decisor e o e-mail dele' : 'Entram também empresas sem decisor ou sem o e-mail dele'}>
+                <UserRound size={15} /><span className="flex-1 text-left">Decisor obrigatório</span><span className={`${s.switchTrack} ${decisorObrigatorio ? s.switchTrackAtivo : ''}`} aria-hidden="true"><span /></span>
               </button>
-              <button type="button" role="switch" aria-checked="false" disabled className={s.criteriaRow} title="Disponível quando a fonte trouxer telefone">
-                <Phone size={15} /><span className="flex-1 text-left">Telefone obrigatório</span><span className={s.switchTrack} aria-hidden="true"><span /></span>
-              </button>
+              {abaGeo === 'internacional' ? (
+                <button type="button" role="switch" aria-checked="false" disabled className={s.criteriaRow} title="A fonte internacional (Crustdata) não traz telefone na busca de empresas">
+                  <Phone size={15} /><span className="flex-1 text-left">Telefone obrigatório <small className="text-slate-500">· só no Brasil</small></span><span className={s.switchTrack} aria-hidden="true"><span /></span>
+                </button>
+              ) : (
+                <button type="button" role="switch" aria-checked={telefoneObrigatorio} disabled={!filtrosDisponiveis || !onTelefoneObrigatorioChange}
+                  onClick={() => onTelefoneObrigatorioChange?.(!telefoneObrigatorio)} className={`${s.criteriaRow} focus-ring`}
+                  title="Só empresas com telefone na Receita (fixo ou celular)">
+                  <Phone size={15} /><span className="flex-1 text-left">Telefone obrigatório</span><span className={`${s.switchTrack} ${telefoneObrigatorio ? s.switchTrackAtivo : ''}`} aria-hidden="true"><span /></span>
+                </button>
+              )}
             </div>
           </section>
 
@@ -221,6 +267,7 @@ export default function PerfilBuscaPainel({
             <span className={s.profileLabel}>Nichos de interesse <Info size={12} aria-hidden="true" /></span>
             <SeletorNichos cnaes={cnaes} desabilitado={!podeEditar} onChange={definirCnaes} onAviso={setAviso} />
           </section>
+
 
           <section className={s.profileSection}>
             <span className={s.profileLabel}>Tamanho da empresa <Info size={12} aria-hidden="true" /></span>
@@ -338,7 +385,7 @@ export default function PerfilBuscaPainel({
           <p className={s.profilePendingNote}><Info size={12} /> Cargos-alvo e porte de corte já avaliam o decisor no &quot;analisar&quot;. Funcionários e áreas ficam salvos e serão aplicados quando a fonte de enriquecimento for conectada.</p>
           {foraDoCatalogo.length > 0 && <p className={s.infoNotice}>{foraDoCatalogo.length} atividade{foraDoCatalogo.length === 1 ? '' : 's'} ainda não {foraDoCatalogo.length === 1 ? 'está' : 'estão'} no catálogo atual.</p>}
           {aviso && <p className={s.warningNotice}><AlertCircle size={14} /> {aviso}</p>}
-          {cnaes.length === 0 && <p className={s.warningNotice}><AlertCircle size={14} /> Selecione ao menos um nicho ou CNAE para habilitar a busca.</p>}
+          {cnaes.length === 0 && paises.length === 0 && <p className={s.warningNotice}><AlertCircle size={14} /> Selecione ao menos um nicho ou um país para habilitar a busca.</p>}
           {erro && <p className={s.errorNotice}><AlertCircle size={14} /> {erro}</p>}
         </div>
       )}
@@ -346,7 +393,16 @@ export default function PerfilBuscaPainel({
       {podeEditar && (
         <footer className={s.profileFooter}>
           <button type="button" onClick={limpar} disabled={salvando} className={`${s.clearButton} focus-ring`}><RotateCcw size={15} /> Limpar filtros</button>
-          <button type="button" onClick={salvar} disabled={salvando || carregando} className={`${s.primaryButton} flex-1 justify-center disabled:opacity-60 focus-ring`}><Save size={15} /> {salvando ? 'Salvando…' : 'Salvar e buscar'}</button>
+          <button type="button" onClick={() => salvar('brasil')} disabled={salvando || carregando || cnaes.length === 0}
+            title={cnaes.length === 0 ? 'Escolha ao menos um nicho para buscar no Brasil' : 'Salva o perfil e busca no catálogo da Receita'}
+            className={`${abaGeo === 'brasil' ? s.primaryButton : s.outlineButton} flex-1 justify-center disabled:opacity-50 focus-ring`}>
+            <Save size={15} /> {salvando ? 'Salvando…' : 'Salvar e buscar no Brasil'}
+          </button>
+          <button type="button" onClick={() => salvar('internacional')} disabled={salvando || carregando || (paises.length === 0 && nichosComSetor === 0)}
+            title={paises.length === 0 && nichosComSetor === 0 ? 'Escolha um nicho ou um país (aba Internacional, no topo)' : 'Salva o perfil e busca fora do Brasil, com os mesmos nichos'}
+            className={`${abaGeo === 'internacional' ? s.primaryButton : s.outlineButton} flex-1 justify-center disabled:opacity-50 focus-ring`}>
+            <Globe2 size={15} /> {salvando ? 'Salvando…' : 'Salvar e buscar internacional'}
+          </button>
         </footer>
       )}
     </aside>

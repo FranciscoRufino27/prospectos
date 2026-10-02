@@ -2,11 +2,12 @@
 //   modo=previa    → prospeccao_importar com p_simular=true (nada é gravado)
 //   modo=confirmar → grava empresa + lead + contato por CNPJ
 // O lead nasce owner='n8n' / novos_leads (fora do motor), igual à importação
-// por CSV. Nada é enviado. Responsável = usuário autenticado.
+// por CSV. Nada é enviado. Responsável = usuário autenticado. O e-mail do lead
+// é o do decisor (Anymail, salvo pela org); sem ele, a empresa não entra.
 import { NextResponse } from 'next/server'
 import { resolverAcesso } from '@/lib/rbac/servidor'
 import { resolverResponsavelPorAuthId } from '@/lib/leads/responsavelServer'
-import { importarProspeccao, validarItens } from '@/lib/prospeccao/importacaoServidor'
+import { importarProspeccao, resumir, separarPorEmailDoDecisor, validarItens } from '@/lib/prospeccao/importacaoServidor'
 
 export const runtime = 'nodejs'
 
@@ -35,8 +36,13 @@ export async function POST(req: Request) {
       }
       responsavel = { id: vinculo.usuario.id, nome: vinculo.usuario.nome }
     }
-    const r = await importarProspeccao(admin, { org, responsavel, segmento, itens: validacao.itens, simular })
-    return NextResponse.json({ ...r, simulado: simular })
+    // E-mail do lead = e-mail verificado do decisor, resolvido no servidor.
+    const { comEmail, semEmail } = await separarPorEmailDoDecisor(admin, org, validacao.itens)
+    const r = comEmail.length
+      ? await importarProspeccao(admin, { org, responsavel, segmento, itens: comEmail, simular })
+      : { resultados: [] }
+    const resultados = [...r.resultados, ...semEmail]
+    return NextResponse.json({ resultados, resumo: resumir(resultados), simulado: simular })
   } catch (err) {
     console.error('[prospeccao/importar] erro:', err)
     return NextResponse.json({ erro: 'Não foi possível importar agora.' }, { status: 500 })

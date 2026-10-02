@@ -14,8 +14,10 @@
 // Sem dependência externa: validação enxuta à mão (o schema é pequeno e cresce
 // junto com as fases). Se a superfície crescer muito, aí sim avaliamos um zod.
 
+import { PAISES_INTERNACIONAL, type CodigoPais } from '@/lib/prospeccao/crustdata'
+
 // Suba este número ao mudar o formato do blob, e adicione o passo em `migrar()`.
-export const WORKSPACE_CONFIG_SCHEMA_VERSION = 8
+export const WORKSPACE_CONFIG_SCHEMA_VERSION = 9
 
 // Objetivos que o produto já consegue medir de ponta a ponta. Novos objetivos
 // só entram nesta allowlist quando houver dado operacional real para dashboard,
@@ -164,6 +166,7 @@ export const UFS_BRASIL = [
 ] as const
 
 export const PROSPECCAO_LIMITES = { cnaes: 20, municipios: 100 } as const
+const CODIGOS_PAISES = new Set<string>(PAISES_INTERNACIONAL.map((p) => p.codigo))
 
 export const FAIXAS_FUNCIONARIOS = ['1-10', '11-50', '51-200', '201-500', '501+'] as const
 export type FaixaFuncionarios = (typeof FAIXAS_FUNCIONARIOS)[number]
@@ -195,6 +198,9 @@ export interface ProspeccaoConfig {
   // Casar também pelo CNAE secundário. Desligado por padrão: traz empresas de
   // outro ramo que só listam a atividade como acessória.
   incluirCnaesSecundarios?: boolean
+  // Países-alvo da busca internacional (ISO-3, Crustdata). Os nichos são os
+  // mesmos do Brasil (`cnaes`), traduzidos para setores em nichosInternacional.
+  paises?: CodigoPais[]
 }
 
 function listaUnica(v: unknown, valido: (s: string) => boolean, max: number): string[] {
@@ -224,6 +230,8 @@ export function parseProspeccaoConfig(bruto: unknown): ProspeccaoConfig | undefi
   }
   if (typeof bruto.excluirMei === 'boolean') p.excluirMei = bruto.excluirMei
   if (typeof bruto.incluirCnaesSecundarios === 'boolean') p.incluirCnaesSecundarios = bruto.incluirCnaesSecundarios
+  const paises = listaUnica(bruto.paises, (s) => CODIGOS_PAISES.has(s), PAISES_INTERNACIONAL.length)
+  if (paises.length) p.paises = paises as CodigoPais[]
   return Object.keys(p).length ? p : undefined
 }
 
@@ -354,6 +362,8 @@ function migrar(bruto: Record<string, unknown>): Record<string, unknown> {
   if (v < 7) cfg = { ...cfg, _schema_version: 7 }
   // v7 -> v8: adiciona prospeccao.porteOutroDecisor. Ausência = sem corte por porte.
   if (v < 8) cfg = { ...cfg, _schema_version: 8 }
+  // v8 -> v9: adiciona prospeccao.paises (busca internacional). Ausência = nenhum país-alvo.
+  if (v < 9) cfg = { ...cfg, _schema_version: 9 }
   return cfg
 }
 

@@ -19,7 +19,7 @@ const ROTULO_STATUS: Record<StatusImportacao, string> = {
   importado: 'Importados',
   ja_na_base: 'Já estão na base (CNPJ)',
   email_ja_existe: 'E-mail já existe na base',
-  sem_email: 'Sem e-mail válido',
+  sem_email: 'Sem e-mail do decisor',
   fora_do_catalogo: 'Fora do catálogo',
   duplicado_no_lote: 'Repetidos na seleção',
 }

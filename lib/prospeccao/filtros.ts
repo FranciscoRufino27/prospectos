@@ -144,3 +144,32 @@ export function paramsRpc(org: string, f: FiltrosBusca) {
     p_texto: f.texto,
   }
 }
+
+/** Resultados de uma busca de empresa específica (nome ou CNPJ). */
+export const LIMITE_BUSCA_ESPECIFICA = 5
+
+/**
+ * Busca de UMA empresa, independente do perfil: todas as atividades do
+ * catálogo (principal ou secundária), qualquer porte ou e-mail. Restringem só
+ * o texto (nome ou CNPJ) e o local escolhido na busca (estado e, opcional,
+ * municípios). null = texto curto demais para buscar.
+ */
+export function filtrosEspecificos(
+  textoBruto: unknown,
+  cnaesCatalogo: readonly string[],
+  local: { ufs?: string[]; municipios?: string[] } = {},
+): FiltrosBusca | null {
+  const base = normalizarFiltros({ texto: textoBruto, cnaes: [], ufs: local.ufs ?? [], municipios: local.municipios ?? [] }, undefined)
+  const texto = base.texto
+  // `texto` já vem com % e _ escapados para o ILIKE: conta só os caracteres reais.
+  if (texto.replace(/\\/g, '').length < 2) return null
+  return {
+    ...base,
+    cnaes: [...new Set(cnaesCatalogo.filter((c) => /^\d{7}$/.test(c)))],
+    incluirCnaesSecundarios: true,
+    portes: [],
+    excluirMei: false,
+    soComEmail: false,
+    texto,
+  }
+}

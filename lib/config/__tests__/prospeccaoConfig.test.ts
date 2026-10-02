@@ -10,7 +10,7 @@ describe('workspaceConfig.prospeccao (perfil de busca)', () => {
   it('blob v4 sem perfil migra para a versão atual sem inventar perfil', () => {
     const r = parseWorkspaceConfig({ _schema_version: 4, roi: { custoMensal: 10 } })
     expect(r._schema_version).toBe(WORKSPACE_CONFIG_SCHEMA_VERSION)
-    expect(WORKSPACE_CONFIG_SCHEMA_VERSION).toBe(8)
+    expect(WORKSPACE_CONFIG_SCHEMA_VERSION).toBe(9)
     expect(r.prospeccao).toBeUndefined()
     expect(r.roi).toEqual({ custoMensal: 10 })
   })

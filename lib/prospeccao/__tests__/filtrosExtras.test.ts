@@ -52,3 +52,20 @@ describe('buscarProspeccao escolhe a RPC pelos filtros extras', () => {
     expect(rpc).toHaveBeenCalledWith('prospeccao_contar_v2', expect.objectContaining({ p_org: 'org-a', p_capital_min: 50_000 }))
   })
 })
+
+describe('filtrosEspecificos (busca de uma empresa, independente do perfil)', () => {
+  it('abre tudo menos o texto: todas as atividades do catálogo, inclusive secundária', async () => {
+    const { filtrosEspecificos } = await import('@/lib/prospeccao/filtros')
+    const f = filtrosEspecificos('  Pousada São João ', ['5510801', '5590601', 'x'])!
+    expect(f).toMatchObject({
+      cnaes: ['5510801', '5590601'], incluirCnaesSecundarios: true, ufs: [], municipios: [], portes: [],
+      excluirMei: false, soComEmail: false, texto: 'Pousada Sao Joao', anosMinimos: null, capitalMinimo: null, telefone: '',
+    })
+  })
+  it('texto curto demais não busca; CNPJ passa', async () => {
+    const { filtrosEspecificos } = await import('@/lib/prospeccao/filtros')
+    expect(filtrosEspecificos('a', ['5510801'])).toBeNull()
+    expect(filtrosEspecificos('%', ['5510801'])).toBeNull()
+    expect(filtrosEspecificos('05.406.438/0001-98', ['5510801'])?.texto).toBe('05.406.438/0001-98')
+  })
+})
