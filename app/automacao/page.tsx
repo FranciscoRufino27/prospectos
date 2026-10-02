@@ -43,9 +43,9 @@ function Inner() {
   return (
     <PaginaModulo
       grupo="Execução"
-      titulo="Automação"
+      titulo="Campanhas"
       subtitulo="Campanhas, workflows, modelos reutilizáveis e execuções — um só lugar."
-      abas={<AbasModulo rotulo="Seções da Automação" ativa={aba} onChange={setAba} abas={TABS} />}
+      abas={<AbasModulo rotulo="Seções de Campanhas" ativa={aba} onChange={setAba} abas={TABS} />}
     >
       <div className="animate-in">
         {aba === 'campanhas' && <CampanhasPanel />}
