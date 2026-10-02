@@ -230,7 +230,7 @@ interface ConsultaIndice extends PromiseLike<{ data: unknown[] | null; count: nu
   order(coluna: string, opcoes?: { ascending?: boolean; nullsFirst?: boolean }): ConsultaIndice
   range(de: number, ate: number): ConsultaIndice
 }
-const consultaIndice = (admin: SupabaseClient, colunas: string, opcoes: { count: 'exact'; head?: boolean }) =>
+const consultaIndice = (admin: SupabaseClient, colunas: string, opcoes?: { count: 'exact'; head?: boolean }) =>
   admin.from('hubspot_empresas_indice').select(colunas, opcoes) as unknown as ConsultaIndice
 
 // Aplica o universo (disponível + comercial mapeado) e os filtros. `null` =
@@ -283,6 +283,34 @@ export async function consultarIndice(
   return {
     total: count ?? 0,
     linhas: linhas.map((r) => ({ hubspot_company_id: String(r.hubspot_company_id), situacao: r.situacao as Situacao })),
+  }
+}
+
+// Todas as empresas do filtro (id e nome), na mesma ordem da lista. Lê em
+// páginas de 1.000 — o máximo de linhas por resposta do Supabase.
+const PAGINA_LEITURA = 1000
+
+export async function linhasDoFiltro(
+  admin: SupabaseClient,
+  org: string,
+  f: Omit<FiltrosIndice, 'pagina' | 'tamanho'>,
+  ownersMapeados: readonly string[],
+  importadas: readonly string[],
+): Promise<Array<{ id: string; nome: string }>> {
+  const linhas: Array<{ id: string; nome: string }> = []
+  for (let de = 0; ; de += PAGINA_LEITURA) {
+    const q = aplicarFiltros(consultaIndice(admin, 'hubspot_company_id, nome'), org, f, ownersMapeados, importadas)
+    if (!q) return []
+    const { data } = await q
+      .order('nome', { ascending: true, nullsFirst: false })
+      .order('hubspot_company_id', { ascending: true })
+      .range(de, de + PAGINA_LEITURA - 1)
+    const lote = (data ?? []) as Array<{ hubspot_company_id: unknown; nome: unknown }>
+    for (const r of lote) {
+      const id = String(r.hubspot_company_id)
+      linhas.push({ id, nome: typeof r.nome === 'string' && r.nome ? r.nome : `(sem nome) #${id}` })
+    }
+    if (lote.length < PAGINA_LEITURA) return linhas
   }
 }
 

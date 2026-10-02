@@ -10,7 +10,8 @@ import { listarUsuariosOrganizacao, mapaResponsaveis } from './comerciais'
 import { comCache, lerAssociacoes, lerObjetosPorIds, type ObjetoHubspot } from './leituraLote'
 import { escolherContatoPrincipal, type ContatoLido } from './contatoPrincipal'
 import { ehEmailCorporativo } from './enriquecimento/cadastro'
-import { consultarIndice, resumirIndice, type FiltrosIndice, type ResumoIndice } from './indice'
+import { consultarIndice, linhasDoFiltro, resumirIndice, type FiltrosIndice, type ResumoIndice } from './indice'
+import { LIMITE_EMPRESAS_LOTE } from './preparacao'
 import { ACAO_SUGERIDA, SITUACOES, classificarSituacao, type Situacao } from './situacao'
 
 // Central de Importação HubSpot. A LISTA vem do índice local
@@ -248,6 +249,41 @@ export async function resumirSituacoes(
   const admin = deps.admin ?? createSupabaseAdminClient()
   const [responsaveis, importadas] = await Promise.all([mapaResponsaveis(admin, org), idsImportados(admin, org)])
   return { ok: true, resumo: await resumirIndice(admin, org, filtros, [...responsaveis.keys()], importadas) }
+}
+
+// Empresas que já entraram em algum lote preparado ("Em lote preparado").
+// Paginado: o Supabase devolve no máximo 1.000 linhas por resposta.
+async function idsEmLote(admin: SupabaseClient, org: string): Promise<Set<string>> {
+  const ids = new Set<string>()
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await admin
+      .from('hubspot_importacao_itens')
+      .select('hubspot_company_id')
+      .eq('organizacao_id', org)
+      .order('hubspot_company_id', { ascending: true })
+      .range(de, de + 999)
+    if (error) throw new Error(`Falha ao ler os lotes preparados: ${error.message}`)
+    for (const r of data ?? []) ids.add(String(r.hubspot_company_id))
+    if ((data ?? []).length < 1000) return ids
+  }
+}
+
+// "Selecionar todas do filtro": as empresas do filtro que ainda não foram
+// importadas nem entraram em lote, na ordem da lista, até o limite de um lote.
+// Assim, depois de preparar um lote, o próximo clique traz as seguintes.
+// `total` = quantas o filtro tem nessa condição (pode passar do limite).
+export async function selecionaveisDoFiltro(
+  org: string,
+  filtros: FiltrosEmpresas,
+  deps: Deps = {},
+): Promise<{ ok: true; total: number; itens: Array<{ id: string; nome: string }> }> {
+  if (filtros.importada === 'sim') return { ok: true, total: 0, itens: [] }
+  const admin = deps.admin ?? createSupabaseAdminClient()
+  const [responsaveis, importadas, emLote] = await Promise.all([mapaResponsaveis(admin, org), idsImportados(admin, org), idsEmLote(admin, org)])
+  const fora = new Set([...importadas, ...emLote])
+  const linhas = await linhasDoFiltro(admin, org, { ...filtros, importada: 'todas' }, [...responsaveis.keys()], importadas)
+  const livres = linhas.filter((l) => !fora.has(l.id))
+  return { ok: true, total: livres.length, itens: livres.slice(0, LIMITE_EMPRESAS_LOTE) }
 }
 
 export async function listarEmpresasParaImportacao(

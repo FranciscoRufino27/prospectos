@@ -5,6 +5,7 @@ import {
   montarLinha,
   negocioEmDestaque,
   listarEmpresasParaImportacao,
+  selecionaveisDoFiltro,
   type FiltrosEmpresas,
   type ContextoLinha,
   type NegocioLido,
@@ -152,6 +153,44 @@ describe('listarEmpresasParaImportacao — índice + detalhes em lote', () => {
     const r = await listarEmpresasParaImportacao(ORG, BASE, { admin: admin([]).client, fetch: h.fn, agora: AGORA })
     expect(r).toMatchObject({ ok: true, total: 0, itens: [] })
     expect(h.chamadas).toEqual([])
+  })
+
+  it('selecionar todas do filtro: pula importadas e em lote, na ordem do índice, sem chamar o HubSpot', async () => {
+    const indice = ['1', '2', '3', '4', '5'].map((id) => ({ hubspot_company_id: id, nome: `Empresa ${id}` }))
+    const { client, chains } = supabaseFake((t: string) => {
+      if (t === 'hubspot_owners_mapeamento') return { data: [{ hubspot_owner_id: '229861376', usuario_id: 'u-bruno', ativo: true }] }
+      if (t === 'empresas') return { data: [{ hubspot_company_id: '2' }] }
+      if (t === 'hubspot_importacao_itens') return { data: [{ hubspot_company_id: '3' }] }
+      if (t === 'hubspot_empresas_indice') return { data: indice }
+      return { data: [] }
+    })
+    const h = hubspot()
+    const r = await selecionaveisDoFiltro(ORG, { ...BASE, situacao: 'reativar', importada: 'nao' }, { admin: client, fetch: h.fn })
+    expect(r).toEqual({ ok: true, total: 3, itens: [{ id: '1', nome: 'Empresa 1' }, { id: '4', nome: 'Empresa 4' }, { id: '5', nome: 'Empresa 5' }] })
+    expect(h.chamadas).toEqual([])
+    const consulta = chains.find((c) => c.table === 'hubspot_empresas_indice')
+    expect(consulta?.temEq('situacao', 'reativar')).toBe(true)
+    expect(chains.find((c) => c.table === 'hubspot_importacao_itens')?.temEq('organizacao_id', ORG)).toBe(true)
+    expect(tocouSoOrg(chains, ORG)).toBe(true)
+  })
+
+  it('selecionar todas do filtro: no máximo um lote (200), com o total real do filtro', async () => {
+    const indice = Array.from({ length: 250 }, (_, i) => ({ hubspot_company_id: String(i + 1), nome: `E${i + 1}` }))
+    const { client } = supabaseFake((t: string) => {
+      if (t === 'hubspot_owners_mapeamento') return { data: [{ hubspot_owner_id: '229861376', usuario_id: 'u-bruno', ativo: true }] }
+      if (t === 'hubspot_empresas_indice') return { data: indice }
+      return { data: [] }
+    })
+    const r = await selecionaveisDoFiltro(ORG, BASE, { admin: client })
+    expect(r.total).toBe(250)
+    expect(r.itens).toHaveLength(200)
+    expect(r.itens[199].id).toBe('200')
+  })
+
+  it('selecionar todas com o filtro "já importadas" → nada, sem consultar o banco', async () => {
+    const { client, chains } = supabaseFake()
+    expect(await selecionaveisDoFiltro(ORG, { ...BASE, importada: 'sim' }, { admin: client })).toEqual({ ok: true, total: 0, itens: [] })
+    expect(chains).toHaveLength(0)
   })
 
   it('empresa apagada no HubSpot desde a sincronização some da página e é contada', async () => {

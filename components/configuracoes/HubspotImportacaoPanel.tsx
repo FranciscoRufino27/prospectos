@@ -133,6 +133,7 @@ const ERROS: Record<string, string> = {
   nenhuma_elegivel: 'Nenhuma empresa selecionada está disponível (já importadas, fora do índice ou sem comercial mapeado). Atualize o índice e tente de novo.',
   erro_hubspot: 'O HubSpot não respondeu à leitura das empresas selecionadas.',
   erro_banco: 'Não foi possível salvar o resultado do enriquecimento.',
+  erro_selecao: 'Não foi possível selecionar as empresas do filtro. Tente de novo.',
 }
 const msgErro = (codigo: string) => ERROS[codigo] ?? `Não foi possível concluir (${codigo}).`
 
@@ -190,6 +191,8 @@ export default function HubspotImportacaoPanel() {
   const [mostrarRegra, setMostrarRegra] = useState(false)
   const [enriquecendo, setEnriquecendo] = useState(false)
   const [enriquecidos, setEnriquecidos] = useState<ResultadoEnriquecimento[] | null>(null)
+  const [selecionandoFiltro, setSelecionandoFiltro] = useState(false)
+  const [avisoSelecao, setAvisoSelecao] = useState<string | null>(null)
   const seqLista = useRef(0)
   const seqResumo = useRef(0)
 
@@ -271,7 +274,7 @@ export default function HubspotImportacaoPanel() {
     }
   }
 
-  const mudar = (set: (v: string) => void) => (v: string) => { set(v); setPagina(1) }
+  const mudar = (set: (v: string) => void) => (v: string) => { set(v); setPagina(1); setAvisoSelecao(null) }
 
   const totalPaginas = dados ? Math.max(1, Math.ceil(dados.total / TAMANHO)) : 1
   const selecionavel = (l: Linha) => l.status !== 'importada'
@@ -295,6 +298,41 @@ export default function HubspotImportacaoPanel() {
       else for (const l of selecionaveis) { if (novo.size >= LIMITE_SELECAO) break; novo.set(l.id, l.nome) }
       return novo
     })
+  }
+
+  // Todas as empresas do filtro atual que ainda não foram importadas nem estão
+  // em lote, na ordem da lista, até completar o limite do lote.
+  async function selecionarTodasDoFiltro() {
+    setSelecionandoFiltro(true)
+    setAvisoSelecao(null)
+    try {
+      const qs = qsBase()
+      qs.set('situacao', situacao)
+      qs.set('selecao', 'todas')
+      const r = await fetch(`/api/integracoes/hubspot/empresas?${qs}`)
+      const d = await r.json()
+      if (!r.ok) throw new Error(msgErro(d?.erro ?? `HTTP ${r.status}`))
+      const itens = d.itens as { id: string; nome: string }[]
+      const total = d.total as number
+      if (total === 0) {
+        setAvisoSelecao('Nenhuma empresa deste filtro para selecionar: todas já foram importadas ou já estão em lote preparado.')
+        return
+      }
+      const novo = new Map(selecionadas)
+      for (const e of itens) {
+        if (novo.size >= LIMITE_SELECAO) break
+        novo.set(e.id, e.nome)
+      }
+      const doFiltro = itens.filter((e) => novo.has(e.id)).length
+      setSelecionadas(novo)
+      setAvisoSelecao(doFiltro >= total
+        ? `${total.toLocaleString('pt-BR')} empresa(s) do filtro selecionada(s).`
+        : `${doFiltro.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')} empresas do filtro selecionadas (limite de ${LIMITE_SELECAO} por lote). Prepare este lote e clique de novo para selecionar as seguintes.`)
+    } catch (e) {
+      setAvisoSelecao(e instanceof Error ? e.message : 'Falha ao selecionar as empresas do filtro.')
+    } finally {
+      setSelecionandoFiltro(false)
+    }
   }
 
   async function enriquecer() {
@@ -339,6 +377,7 @@ export default function HubspotImportacaoPanel() {
       ].filter(Boolean).join(' · ')
       setResultado(`Lote preparado com ${d.incluidas} empresa(s), nicho esperado “${nomeNicho}”.${extras ? ` ${extras}.` : ''} Nada foi importado ainda.`)
       setSelecionadas(new Map())
+      setAvisoSelecao(null)
       setConfirmando(false)
       setNicho('')
       carregarLista()
@@ -620,11 +659,19 @@ export default function HubspotImportacaoPanel() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={selecionarTodasDoFiltro}
+            disabled={selecionandoFiltro || carregando || indiceVazio || importada === 'sim' || selecionadas.size >= LIMITE_SELECAO}
+            title={`Seleciona as empresas deste filtro que ainda não foram importadas nem estão em lote (até ${LIMITE_SELECAO} por lote)`}
+            className="text-xs text-indigo-300 hover:text-indigo-200 underline underline-offset-2 disabled:opacity-50 disabled:no-underline focus-ring rounded"
+          >
+            {selecionandoFiltro ? 'Selecionando…' : 'Selecionar todas do filtro'}
+          </button>
           <span className="text-xs text-slate-400">
             {selecionadas.size} selecionada(s){selecionadas.size >= LIMITE_SELECAO ? ` (máximo ${LIMITE_SELECAO})` : ''}
           </span>
           {selecionadas.size > 0 && (
-            <button onClick={() => setSelecionadas(new Map())} className="text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2">Limpar</button>
+            <button onClick={() => { setSelecionadas(new Map()); setAvisoSelecao(null) }} className="text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2">Limpar</button>
           )}
           <button
             onClick={enriquecer}
@@ -643,6 +690,8 @@ export default function HubspotImportacaoPanel() {
           </button>
         </div>
       </div>
+
+      {avisoSelecao && <p className="text-xs text-slate-300 text-right">{avisoSelecao}</p>}
 
       {confirmando && (
         <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-4 space-y-3">
