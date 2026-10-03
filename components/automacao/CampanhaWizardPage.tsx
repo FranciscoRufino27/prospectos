@@ -317,7 +317,7 @@ export default function CampanhaWizardPage({
   const alertasAviso: string[] = []
   if (!aviso.email && !querWhatsapp) bloqueiosAviso.push('Marque ao menos um canal (e-mail ou WhatsApp).')
   if (querGrupo && whatsappRetorno && !grupoEfetivo) {
-    bloqueiosAviso.push('Nenhum grupo: informe o grupo abaixo ou cadastre em Configurações > Processo comercial > Distribuição.')
+    bloqueiosAviso.push('Nenhum grupo: informe o grupo abaixo ou cadastre em Configurações > Distribuição.')
   }
   if (aviso.grupoWhatsappId?.trim() && !FORMATO_GRUPO_WHATSAPP.test(aviso.grupoWhatsappId.trim())) {
     bloqueiosAviso.push('O grupo precisa estar no formato 120363019502650977-group.')
@@ -1053,10 +1053,10 @@ export default function CampanhaWizardPage({
                           )}
                           <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
                             {gruposSalvos.length > 0
-                              ? 'Grupos salvos em Configurações > Processo comercial > Distribuição.'
+                              ? 'Grupos salvos em Configurações > Distribuição.'
                               : whatsappRetorno?.grupoConta
                                 ? <>Vazio = grupo da conta (<code className="text-slate-400">{whatsappRetorno.grupoConta}</code>, de Configurações &gt; Distribuição). Preencha só para usar outro grupo nesta campanha.</>
-                                : 'A conta não tem grupo cadastrado: informe aqui o id do grupo (formato 120363019502650977-group) ou salve os grupos com nome em Configurações > Processo comercial > Distribuição.'}
+                                : 'A conta não tem grupo cadastrado: informe aqui o id do grupo (formato 120363019502650977-group) ou salve os grupos com nome em Configurações > Distribuição.'}
                           </p>
                         </div>
                       )}

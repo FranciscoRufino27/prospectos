@@ -70,7 +70,7 @@ export async function processarNotificacaoGrupo(
 
   const grupoId = await deps.lerGrupoId(organizacaoId)
   if (!grupoId) {
-    await deps.repo.marcarConfiguracaoAusente(organizacaoId, id, 'Grupo de avisos comercial não configurado (Configurações > Processo comercial > Distribuição).')
+    await deps.repo.marcarConfiguracaoAusente(organizacaoId, id, 'Grupo de avisos comercial não configurado (Configurações > Distribuição).')
     return { tipo: 'configuracao_ausente', notificacao: { ...n, status: 'configuracao_ausente' } }
   }
 

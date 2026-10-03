@@ -1,4 +1,4 @@
-// Configurações > Processo comercial > Distribuição: quem participa do
+// Configurações > Distribuição: quem participa do
 // round-robin do handoff comercial. GET p/ qualquer sessão da org (a tela
 // mostra em somente-leitura); PUT exige workspace.configure. Regras de negócio
 // ficam em lib/comercial/handoff — aqui só auth, parse e status HTTP.

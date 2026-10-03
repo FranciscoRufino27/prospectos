@@ -99,7 +99,7 @@ export interface AvisoRetorno {
   // Destinos no WhatsApp; vazio = sem WhatsApp.
   whatsapp: DestinoWhatsappRetorno[];
   // Grupo desta campanha (id Z-API "…-group"); ausente = grupo cadastrado em
-  // Configurações > Processo comercial > Distribuição.
+  // Configurações > Distribuição.
   grupoWhatsappId?: string;
 }
 

@@ -136,7 +136,7 @@ async function resolverDestino(deps: DepsAvisoResposta, a: AvisoResposta): Promi
   }
   if (a.destinoTipo === 'grupo') {
     const grupo = a.dados.grupoId || await deps.lerGrupoId(a.organizacaoId)
-    return grupo ? { destino: grupo } : { motivo: 'Grupo comercial não configurado (Configurações > Processo comercial > Distribuição).' }
+    return grupo ? { destino: grupo } : { motivo: 'Grupo comercial não configurado (Configurações > Distribuição).' }
   }
   const numero = a.dados.responsavelPerfilId
     ? await deps.lerWhatsappPerfil(a.organizacaoId, a.dados.responsavelPerfilId)

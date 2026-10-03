@@ -80,7 +80,7 @@ export async function exigirAvisoRetornoPronto(
   const querGrupo = aviso.whatsapp.includes('grupo')
   const grupo = querGrupo ? aviso.grupoWhatsappId || await lerGrupoComercialDaOrg(admin, org) : null
   if (querGrupo && !grupo) {
-    throw new Error('O aviso no grupo do WhatsApp está marcado, mas não há grupo: informe o grupo na campanha ou cadastre em Configurações > Processo comercial > Distribuição.')
+    throw new Error('O aviso no grupo do WhatsApp está marcado, mas não há grupo: informe o grupo na campanha ou cadastre em Configurações > Distribuição.')
   }
   if (aviso.email) return
 
