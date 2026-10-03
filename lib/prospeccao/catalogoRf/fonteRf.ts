@@ -61,16 +61,107 @@ function criarStripZipHeader(): Transform {
 
 const INTERVALO_PROGRESSO_MS = 30_000
 
+export interface OpcoesRetomada {
+  /** Reconexões seguidas sem progresso antes de desistir (padrão 8). */
+  tentativas?: number
+  /** Espera antes da reconexão n (1, 2, …), em ms. */
+  esperaMs?: (tentativa: number) => number
+  fetch?: typeof fetch
+  aoReconectar?: (msg: string) => void
+  /** Tamanho total informado na primeira resposta (content-length). */
+  aoTotal?: (bytes: number) => void
+}
+
+const esperaPadrao = (tentativa: number) => Math.min(30_000, 2_000 * 2 ** (tentativa - 1))
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Bytes de um arquivo com retomada. O share da RF derruba transferências
+ * longas ("terminated" depois de minutos, em arquivos de GB); em vez de
+ * abortar a carga, reabre com `Range: bytes=<recebido>-` e continua. A
+ * sequência entregue é contínua, então o inflate segue sem perceber. Se o
+ * servidor ignorar o Range (200 em vez de 206), os bytes já entregues são
+ * descartados. Corpo que termina antes do content-length também é retomado.
+ * Erro HTTP 4xx (exceto 429) é definitivo.
+ */
+export async function* bytesComRetomada(
+  url: string,
+  headers: Record<string, string>,
+  opcoes: OpcoesRetomada = {},
+): AsyncGenerator<Buffer> {
+  const doFetch = opcoes.fetch ?? fetch
+  const maxTentativas = opcoes.tentativas ?? 8
+  const espera = opcoes.esperaMs ?? esperaPadrao
+  let entregue = 0
+  let total: number | null = null
+  let falhas = 0
+  let progressoNaUltimaFalha = 0
+
+  const falhar = async (motivo: unknown): Promise<void> => {
+    // Conta só falhas seguidas SEM progresso: uma queda depois de centenas de
+    // MB recebidos não consome o limite de quem trava no mesmo ponto.
+    if (entregue > progressoNaUltimaFalha) falhas = 0
+    progressoNaUltimaFalha = entregue
+    falhas++
+    if (falhas > maxTentativas) throw motivo instanceof Error ? motivo : new Error(String(motivo))
+    const texto = motivo instanceof Error ? motivo.message : String(motivo)
+    opcoes.aoReconectar?.(`conexão caiu em ${(entregue / 1048576).toFixed(0)} MB (${texto}); retomando, tentativa ${falhas}/${maxTentativas}`)
+    await esperar(espera(falhas))
+  }
+
+  for (;;) {
+    let res: Response
+    try {
+      res = await doFetch(url, { headers: entregue > 0 ? { ...headers, Range: `bytes=${entregue}-` } : headers })
+    } catch (e) {
+      await falhar(e)
+      continue
+    }
+    if (!res.ok || !res.body) {
+      const erro = new Error(`HTTP ${res.status}`)
+      if (res.status >= 500 || res.status === 429) { await falhar(erro); continue }
+      throw erro
+    }
+    if (total === null && res.status === 200) {
+      const n = Number(res.headers.get('content-length') || 0)
+      if (n > 0) { total = n; opcoes.aoTotal?.(n) }
+    }
+    let pular = entregue > 0 && res.status !== 206 ? entregue : 0
+    try {
+      for await (const pedaco of res.body as unknown as AsyncIterable<Uint8Array>) {
+        let buf = Buffer.from(pedaco)
+        if (pular > 0) {
+          const corta = Math.min(pular, buf.length)
+          pular -= corta
+          buf = buf.subarray(corta)
+          if (buf.length === 0) continue
+        }
+        entregue += buf.length
+        yield buf
+      }
+    } catch (e) {
+      await falhar(e)
+      continue
+    }
+    if (total !== null && entregue < total) {
+      await falhar(new Error(`corpo terminou em ${entregue} de ${total} bytes`))
+      continue
+    }
+    return
+  }
+}
+
 export function criarFonteRf(mesRf: string, opcoes: { aoProgredir?: (msg: string) => void } = {}): FonteRf {
   return {
     async *linhas(arquivo: string) {
       const url = `${RF_BASE}/${mesRf}/${arquivo}`
-      const res = await fetch(url, { headers: { Authorization: autorizacao() } })
-      if (!res.ok || !res.body) throw new Error(`Download da RF falhou (${arquivo}): HTTP ${res.status}`)
-
       // Os arquivos têm centenas de MB: sem progresso dentro do arquivo não dá
       // para distinguir download lento de processo travado.
-      const total = Number(res.headers.get('content-length') || 0)
+      let total = 0
+      const origem = bytesComRetomada(url, { Authorization: autorizacao() }, {
+        aoTotal: (n) => { total = n },
+        aoReconectar: (msg) => opcoes.aoProgredir?.(`${arquivo}: ${msg}`),
+      })
       let bytes = 0
       const contador = new Transform({
         transform(chunk: Buffer, _enc, cb) {
@@ -86,8 +177,10 @@ export function criarFonteRf(mesRf: string, opcoes: { aoProgredir?: (msg: string
           }, INTERVALO_PROGRESSO_MS)
         : null
 
-      const fonte = Readable.fromWeb(res.body as import('stream/web').ReadableStream)
-      fonte.on('error', (e) => contador.destroy(e))
+      // Erro definitivo (HTTP 4xx ou quedas seguidas além do limite) destrói o
+      // fluxo e chega ao consumidor: carga parcial nunca termina "normalmente".
+      const fonte = Readable.from(origem, { objectMode: false })
+      fonte.on('error', (e) => contador.destroy(new Error(`Download da RF falhou (${arquivo}): ${e.message}`)))
       try {
         yield* linhasDeZip(fonte.pipe(contador))
       } finally {
