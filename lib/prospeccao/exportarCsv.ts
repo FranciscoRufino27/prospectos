@@ -7,12 +7,11 @@ import type { ResultadoCatalogo } from './buscaServidor'
 import type { ConsultaSocios, Decisor } from './decisores'
 import { formatarTelefone, normalizarPerfilLinkedIn } from './contato'
 import { formatarCnae, nomeLegivel, nomeSemSufixo, rotuloPorte } from './rotulos'
-import { ROTULO_QUALIDADE } from './qualidadeEmail'
 import { formatarCnpj } from '@/lib/empresas/cnpj'
 
 const COLUNAS = [
   'CNPJ', 'Empresa', 'Razão social', 'Cidade', 'UF', 'Porte', 'Atividade principal', 'CNAE',
-  'Abertura', 'Capital social', 'Telefone', 'Tipo de telefone', 'E-mail', 'Qualidade do e-mail',
+  'Abertura', 'Capital social', 'Telefone', 'Tipo de telefone', 'E-mail do decisor',
   'Site provável', 'Decisor', 'Cargo do decisor', 'LinkedIn do decisor', 'Situação do decisor',
 ] as const
 
@@ -41,6 +40,8 @@ export function linhaCsv(
   empresa: ResultadoCatalogo,
   decisor: Decisor | null | undefined,
   consulta: ConsultaSocios | undefined,
+  /** E-mail verificado do decisor (Anymail); o cadastral da Receita não sai. */
+  emailDecisor: string | null = null,
 ): string[] {
   const telefone = formatarTelefone(empresa.telefone)
   return [
@@ -57,8 +58,7 @@ export function linhaCsv(
     empresa.capital_social === null ? '' : empresa.capital_social.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     telefone?.exibicao ?? empresa.telefone ?? '',
     telefone ? (telefone.tipo === 'celular' ? 'Celular' : 'Fixo') : '',
-    empresa.email ?? '',
-    empresa.email ? ROTULO_QUALIDADE[empresa.qualidade_email] : '',
+    emailDecisor ?? '',
     empresa.dominio?.dominio ?? '',
     decisor?.nome ?? '',
     decisor?.nome ? decisor.cargo ?? '' : '',

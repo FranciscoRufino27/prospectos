@@ -4,11 +4,10 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import {
   Ban, Bookmark, Building2, Check, ChevronDown, ChevronRight, Database, Download, FileSpreadsheet, Filter, Globe2, LayoutGrid, Mail,
-  Loader2, Radar, RotateCcw, Search, SlidersHorizontal, Target, Trash2, UserSearch,
+  Loader2, Radar, RotateCcw, Search, SlidersHorizontal, Square, Target, Trash2, UserSearch,
 } from 'lucide-react';
-import { filtrosDoPerfil, LIMITE_PAGINA, OPCOES_ANOS_MINIMOS, OPCOES_CAPITAL_MINIMO, type FiltroTelefone, type FiltrosBusca } from '@/lib/prospeccao/filtros';
+import { cnpjDoTexto, filtrosDoPerfil, LIMITE_BUSCA_ESPECIFICA, OPCOES_ANOS_MINIMOS, OPCOES_CAPITAL_MINIMO, type FiltroTelefone, type FiltrosBusca } from '@/lib/prospeccao/filtros';
 import type { ResultadoCatalogo, StatusCatalogo } from '@/lib/prospeccao/buscaServidor';
-import { ROTULO_QUALIDADE, type QualidadeEmail } from '@/lib/prospeccao/qualidadeEmail';
 import { formatarCnae, iniciais, nomeLegivel, nomeSemSufixo, rotuloPorte, ROTULO_PORTE } from '@/lib/prospeccao/rotulos';
 import { gruposDoPerfil, nichoDaAtividade, nomeAtividade } from '@/lib/prospeccao/nichos';
 import { nomeSugerido } from '@/lib/prospeccao/pesquisas';
@@ -21,39 +20,27 @@ import DetalheEmpresa, { consultarSociosApi, type ConsultaSocios, type Decisor, 
 import { emLote, normalizarPerfilLinkedIn } from '@/lib/prospeccao/contato';
 import { linhaCsv, montarCsv, nomeArquivoCsv } from '@/lib/prospeccao/exportarCsv';
 import { emailDoDecisor, type Enriquecimento } from '@/lib/prospeccao/enriquecimento';
+import { buscarComDecisor, entraNaLista, ROTULO_PULO, type MotivoPulo, type ResumoBuscaComDecisor } from '@/lib/prospeccao/buscaComDecisor';
+import { META_MAXIMA_DECISOR, TETO_TENTATIVAS_DECISOR, type ResultadoDecisorAutomatico } from '@/lib/prospeccao/decisorAutomatico';
 import DecisorCelula from '@/components/prospeccao/DecisorCelula';
 import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoModal';
 import CaixaSelecao from '@/components/prospeccao/CaixaSelecao';
-import PerfilBuscaPainel from '@/components/prospeccao/PerfilBuscaPainel';
+import PerfilBuscaPainel, { type DestinoBusca } from '@/components/prospeccao/PerfilBuscaPainel';
 import { ProvedorSeloReceita } from '@/components/prospeccao/SeloReceita';
 import PesquisasSalvas, { SalvarPesquisa } from '@/components/prospeccao/PesquisasSalvas';
 import { iconeDoNicho } from '@/components/prospeccao/iconesNicho';
+import { NOME_UF } from '@/lib/prospeccao/estados';
+import { CabecalhoBloco, Indicador } from '@/components/prospeccao/Indicador';
 import BuscaInternacional, { type PedidoBusca } from '@/components/prospeccao/BuscaInternacional';
+import type { PedidoEmpresa } from '@/components/prospeccao/BuscaEmpresaEspecifica';
+import type { CodigoPais } from '@/lib/prospeccao/crustdata';
+import { nichosInternacionaisDoPerfil } from '@/lib/prospeccao/nichosInternacional';
 import ForaDoCatalogo, { EmpresaNaoEncontrada } from '@/components/prospeccao/ForaDoCatalogo';
 import s from '@/components/prospeccao/Prospeccao.module.css';
 
-// Prospecção: buscar no catálogo da Receita → analisar → selecionar →
+// Prospecção: buscar no catálogo da Receita já com o decisor e o e-mail dele → selecionar →
 // importar → iniciar prospecção (wizard de campanha). A busca parte do perfil
 // da organização (Configurações › Perfil de busca). Visual alinhado ao Dashboard.
-
-// Qualidade do e-mail como texto colorido discreto (sem caixa), para não
-// competir com o próprio e-mail na linha.
-const COR_QUALIDADE: Record<QualidadeEmail, string> = {
-  corporativo: 'text-emerald-400',
-  generico: 'text-sky-400',
-  pessoal: 'text-amber-400',
-  contabilidade: 'text-red-400',
-  digitacao: 'text-red-400',
-  sem_email: 'text-slate-500',
-};
-const PONTO_QUALIDADE: Record<QualidadeEmail, string> = {
-  corporativo: 'bg-emerald-400',
-  generico: 'bg-sky-400',
-  pessoal: 'bg-amber-400',
-  contabilidade: 'bg-red-400',
-  digitacao: 'bg-red-400',
-  sem_email: 'bg-slate-600',
-};
 
 // Paleta discreta para o avatar, estável por CNPJ.
 const CORES_AVATAR = [
@@ -92,9 +79,10 @@ interface RespostaApi {
   perfil: FiltrosBusca;
   temPerfil: boolean;
   ehAdmin: boolean;
+  paisesInternacional: CodigoPais[];
 }
 
-const ROTULO_STATUS_EMAIL = { todos: 'Todos', com_email: 'Com e-mail', sem_email: 'Sem e-mail' } as const;
+const ROTULO_STATUS_EMAIL = { todos: 'Todos', com_email: 'Com e-mail do decisor', sem_email: 'Sem e-mail do decisor' } as const;
 type StatusEmailResultado = keyof typeof ROTULO_STATUS_EMAIL;
 
 // Situação do decisor de cada empresa, para o filtro de resultado que vira
@@ -119,6 +107,9 @@ function situacaoConfere(situacao: SituacaoDecisor, decisor: Decisor | null | un
     case 'com_linkedin': return !!normalizarPerfilLinkedIn(decisor?.linkedin);
   }
 }
+
+// Resoluções simultâneas: poucas, para não estourar o limite da OpenCNPJ/Anymail.
+const CONCORRENCIA_DECISOR = 3;
 
 /** 10000 → "R$ 10 mil"; 1000000 → "R$ 1 milhão". */
 function rotuloCapital(valor: number): string {
@@ -176,42 +167,6 @@ function Alternar({ ativo, onChange, children }: { ativo: boolean; onChange: (v:
   );
 }
 
-const TOM_KPI = { cyan: s.kpiCyan, violet: s.kpiViolet, emerald: s.kpiEmerald, amber: s.kpiAmber };
-
-// Indicador no padrão do Dashboard. `proporcao` (0–1) desenha a barra; sem ela,
-// o card fica só com o número — nada de barra decorativa sem dado por trás.
-function Indicador({ icone: Icone, rotulo, valor, detalhe, tom, proporcao }: {
-  icone: typeof Building2; rotulo: string; valor: string; detalhe: string;
-  tom: keyof typeof TOM_KPI; proporcao?: number | null;
-}) {
-  return (
-    <article className={`${s.kpiCard} ${TOM_KPI[tom]}`}>
-      <div className={s.kpiTop}>
-        <span className={s.kpiIcon}><Icone size={19} strokeWidth={1.8} aria-hidden="true" /></span>
-        <div className={s.kpiIdentity}>
-          <span className={s.kpiLabel}>{rotulo}</span>
-          <strong>{valor}</strong>
-        </div>
-      </div>
-      {proporcao != null && (
-        <div className={s.kpiMeter} aria-hidden="true">
-          <span style={{ width: `${Math.round(Math.min(1, Math.max(0, proporcao)) * 100)}%` }} />
-        </div>
-      )}
-      <span className={s.kpiSubtitle}>{detalhe}</span>
-    </article>
-  );
-}
-
-function CabecalhoBloco({ icone: Icone, titulo, subtitulo }: { icone: typeof Building2; titulo: string; subtitulo: string }) {
-  return (
-    <div className={s.sectionHeading}>
-      <span className={s.sectionIcon}><Icone size={17} aria-hidden="true" /></span>
-      <div><h2>{titulo}</h2><p>{subtitulo}</p></div>
-    </div>
-  );
-}
-
 function LinhasEsqueleto() {
   return (
     <>
@@ -241,8 +196,23 @@ export default function ProspeccaoPage() {
   const [temPerfil, setTemPerfil] = useState<boolean | null>(null);
   const [catalogo, setCatalogo] = useState<StatusCatalogo | null>(null);
   const [ehAdmin, setEhAdmin] = useState(false);
+  // Países-alvo do perfil para a aba Internacional.
+  const [paisesPerfil, setPaisesPerfil] = useState<CodigoPais[]>([]);
   const [itens, setItens] = useState<ResultadoCatalogo[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
+  // Busca com decisor: a lista só recebe empresas completas (decisor + e-mail
+  // válido dele). `buscando` = em andamento; `resumoBusca` = última concluída.
+  const [buscando, setBuscando] = useState(false);
+  const [progresso, setProgresso] = useState<{ completos: number; tentativas: number } | null>(null);
+  const [resumoBusca, setResumoBusca] = useState<(ResumoBuscaComDecisor & { meta: number }) | null>(null);
+  const [pulados, setPulados] = useState<{ item: ResultadoCatalogo; motivo: MotivoPulo; erro?: string }[]>([]);
+  const [candidatosVistos, setCandidatosVistos] = useState(0);
+  // Meta da busca feita (ou em andamento); null = nenhuma busca ainda.
+  const [metaDaBusca, setMetaDaBusca] = useState<number | null>(null);
+  // Critério mínimo "Decisor obrigatório": ligado = só empresas com decisor e
+  // e-mail dele; desligado = também as sem decisor (com o motivo).
+  const [decisorObrigatorio, setDecisorObrigatorio] = useState(true);
+  // Por que cada empresa da lista ficou sem decisor/e-mail (só com o critério desligado).
+  const [motivosSemDecisor, setMotivosSemDecisor] = useState<Record<string, MotivoPulo>>({});
   const [total, setTotal] = useState<number | null>(null);
   const [totalComEmail, setTotalComEmail] = useState<number | null>(null);
   // Quantas empresas o usuário descartou manualmente nesta sessão de busca
@@ -290,71 +260,198 @@ export default function ProspeccaoPage() {
   const [modo, setModo] = useState<'brasil' | 'internacional'>('brasil');
   // Atalho "Procurar fora do catálogo": abre a aba internacional já buscando.
   const [pedidoInternacional, setPedidoInternacional] = useState<PedidoBusca | null>(null);
-  // Nome/CNPJ digitado: vai para filtros.texto com debounce.
-  const [nomeBusca, setNomeBusca] = useState('');
+  // Texto da última busca específica no Brasil; null = a lista veio do perfil.
+  const [buscaEspecifica, setBuscaEspecifica] = useState<string | null>(null);
+  // Empresa específica fora da Receita: busca na Crustdata (Brasil), mostrada
+  // aqui mesmo na aba Brasil no lugar da lista vazia do catálogo.
+  const [crustdataBrasil, setCrustdataBrasil] = useState<PedidoBusca | null>(null);
   // Só a resposta da busca mais recente pode escrever no estado.
   const buscaAtual = useRef(0);
 
-  const buscar = useCallback(async (f: FiltrosBusca | null, apos: string | null, limite?: number) => {
-    const id = ++buscaAtual.current;
+  // Contagem e filtros efetivos do catálogo (grátis): cards e painel. Não
+  // mexe na lista — ela só muda quando o usuário clica em Buscar.
+  const contagemAtual = useRef(0);
+  const carregarContagem = useCallback(async (f: FiltrosBusca | null) => {
+    const id = ++contagemAtual.current;
     setCarregando(true);
-    setErro(null);
     try {
       const res = await fetch('/api/prospeccao/busca', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filtros: f ?? undefined, cursor: apos, limite }),
+        body: JSON.stringify({ filtros: f ?? undefined, limite: 1 }),
       });
       const corpo = (await res.json().catch(() => ({}))) as Partial<RespostaApi> & { erro?: string };
-      if (id !== buscaAtual.current) return;
+      if (id !== contagemAtual.current) return;
       if (!res.ok) throw new Error(corpo.erro || 'Falha na busca');
       setCatalogo(corpo.catalogo ?? null);
       setEhAdmin(corpo.ehAdmin === true);
       setTemPerfil(!!corpo.temPerfil);
       setPerfil(corpo.perfil ?? null);
+      setPaisesPerfil(corpo.paisesInternacional ?? []);
       if (!f) setFiltros(corpo.filtros ?? null);
-      setItens((atual) => (apos ? [...atual, ...(corpo.itens ?? [])] : corpo.itens ?? []));
-      // O que a org já salvou (0057) entra no estado; edição local, que pode
-      // ainda estar a caminho do servidor, prevalece.
-      const salvos = (corpo.itens ?? []).filter((i) => i.analise);
-      if (salvos.length) {
-        setDecisores((m) => {
-          const n = { ...m };
-          for (const i of salvos) if (!(i.cnpj in n) && i.analise?.decisor) n[i.cnpj] = i.analise.decisor;
-          decisoresRef.current = n;
-          return n;
-        });
-        setConsultas((m) => {
-          const n = { ...m };
-          for (const i of salvos) if (!n[i.cnpj] && i.analise?.consulta) n[i.cnpj] = i.analise.consulta;
-          return n;
-        });
-        setEnriquecimentos((m) => {
-          const n = { ...m };
-          for (const i of salvos) if (!n[i.cnpj] && i.analise?.enriquecimento) n[i.cnpj] = i.analise.enriquecimento;
-          return n;
-        });
-      }
-      setCursor(corpo.proximoCursor ?? null);
-      if (!apos) {
-        setTotal(corpo.total ?? null);
-        setTotalComEmail(corpo.totalComEmail ?? null);
-        setDescartadosSessao(0);
-        setFiltroResultadoTexto('');
-        setFiltroResultadoEmail('todos');
-        setFiltroResultadoNicho('');
-        setFiltroResultadoPorte('');
-        setFiltroResultadoUf('');
-      }
+      setTotal(corpo.total ?? null);
+      setTotalComEmail(corpo.totalComEmail ?? null);
     } catch (e) {
-      if (id === buscaAtual.current) setErro(e instanceof Error ? e.message : 'Erro na busca');
+      if (id === contagemAtual.current) setErro(e instanceof Error ? e.message : 'Erro na busca');
     } finally {
-      if (id === buscaAtual.current) setCarregando(false);
+      if (id === contagemAtual.current) setCarregando(false);
     }
   }, []);
 
   // 1ª carga: sem filtros → o servidor aplica o perfil e devolve os filtros efetivos.
-  useEffect(() => { buscar(null, null); }, [buscar]);
+  useEffect(() => { carregarContagem(null); }, [carregarContagem]);
+
+  // Meta da busca com decisor: a quantidade pedida, nunca acima do teto dos testes.
+  const meta = Math.min(quantidade ?? META_MAXIMA_DECISOR, META_MAXIMA_DECISOR);
+
+  // Percorre o catálogo (melhores notas primeiro) e resolve o decisor empresa a
+  // empresa até ter `meta` completas. Cada resolução pode gastar crédito
+  // (Anymail/Crustdata); o servidor reaproveita o que a org já consultou.
+  // `especifica`: texto de uma empresa específica — ignora o perfil (o servidor
+  // procura em todo o catálogo), traz poucos resultados e mostra mesmo sem decisor.
+  async function buscarEmpresasComDecisor(f: FiltrosBusca | null = filtros, pedidoEmpresa: Extract<PedidoEmpresa, { modo: 'brasil' }> | null = null) {
+    const especifica = pedidoEmpresa?.texto ?? null;
+    if (buscando || (!f && !especifica)) return;
+    const id = ++buscaAtual.current;
+    const ativo = () => id === buscaAtual.current;
+    // Domínio próprio vem do e-mail da Receita: com decisor obrigatório, sem
+    // e-mail não há como achar o do decisor. Desligado, vale o critério de e-mail.
+    const filtrosBusca = especifica ? { texto: especifica } : { ...f!, soComEmail: decisorObrigatorio ? true : f!.soComEmail };
+    const metaBusca = especifica ? LIMITE_BUSCA_ESPECIFICA : meta;
+    setMetaDaBusca(metaBusca);
+    let cursorAtual: string | null = null;
+    let vistos = 0;
+    setCrustdataBrasil(null);
+    // "Decisor obrigatório" desligado (ou empresa específica): sem decisor/e-mail também entra.
+    const aceitaIncompletas = !!especifica || !decisorObrigatorio;
+    setBuscaEspecifica(especifica);
+    // Consulta de sócios das incompletas, guardada até o desfecho chegar.
+    const consultasIncompletas = new Map<string, ConsultaSocios>();
+    setBuscando(true);
+    setErro(null);
+    setAberto(null);
+    setItens([]);
+    setPulados([]);
+    setMotivosSemDecisor({});
+    setSelecionados(new Map());
+    setConfirmandoDescarte(false);
+    setCandidatosVistos(0);
+    setResumoBusca(null);
+    setProgresso({ completos: 0, tentativas: 0 });
+    setDescartadosSessao(0);
+    setFiltroResultadoTexto('');
+    setFiltroResultadoEmail('todos');
+    setFiltroResultadoNicho('');
+    setFiltroResultadoPorte('');
+    setFiltroResultadoUf('');
+    try {
+      const resumo = await buscarComDecisor<ResultadoCatalogo, Extract<ResultadoDecisorAutomatico, { status: 'completo' }>>({
+        meta: metaBusca,
+        teto: especifica ? LIMITE_BUSCA_ESPECIFICA : TETO_TENTATIVAS_DECISOR,
+        concorrencia: CONCORRENCIA_DECISOR,
+        aceitaIncompletas,
+        cancelado: () => !ativo(),
+        proximaPagina: async () => {
+          const res = await fetch('/api/prospeccao/busca', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filtros: filtrosBusca,
+              cursor: cursorAtual,
+              ...(pedidoEmpresa ? { especifica: true, limite: LIMITE_BUSCA_ESPECIFICA, uf: pedidoEmpresa.uf, cidade: pedidoEmpresa.cidade, site: pedidoEmpresa.site } : {}),
+            }),
+          });
+          const corpo = (await res.json().catch(() => ({}))) as Partial<RespostaApi> & { erro?: string };
+          if (!res.ok) throw new Error(corpo.erro || 'Falha na busca');
+          cursorAtual = corpo.proximoCursor ?? null;
+          vistos += corpo.itens?.length ?? 0;
+          if (ativo()) setCandidatosVistos(vistos);
+          return { itens: corpo.itens ?? [], fim: !cursorAtual };
+        },
+        resolver: async (item) => {
+          const res = await fetch('/api/prospeccao/decisor-automatico', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cnpj: item.cnpj }),
+          });
+          const corpo = (await res.json().catch(() => ({}))) as ResultadoDecisorAutomatico & { erro?: string };
+          // Sem crédito, sem chave ou limite: parar já, senão as próximas falham igual.
+          if (!res.ok) return { tipo: 'falha', erro: corpo.erro || 'Falha ao buscar o decisor.', fatal: [402, 429, 503].includes(res.status) };
+          if (corpo.status === 'completo') return { tipo: 'completo', dados: corpo };
+          if (corpo.status === 'incompleto' && corpo.consulta) consultasIncompletas.set(item.cnpj, corpo.consulta);
+          return { tipo: 'pulado', motivo: corpo.status === 'incompleto' ? corpo.motivo : 'erro' };
+        },
+        aoDesfecho: (item, d) => {
+          if (!ativo()) return;
+          if (d.tipo === 'pulado') {
+            if (!entraNaLista(d, aceitaIncompletas)) {
+              // Empresa específica já na base: aparece (com o selo), sem consultar nada.
+              if (especifica && d.motivo === 'ja_na_base') setItens((l) => [...l, item]);
+              else setPulados((l) => [...l, { item, motivo: d.motivo, erro: d.erro }]);
+              return;
+            }
+            // Entra sem decisor completo: mostra o sócio sugerido (se houver)
+            // e o motivo; sem e-mail do decisor, não importa.
+            setItens((l) => [...l, item]);
+            setMotivosSemDecisor((m) => ({ ...m, [item.cnpj]: d.motivo }));
+            const consulta = consultasIncompletas.get(item.cnpj);
+            if (consulta) registrarConsulta(item.cnpj, consulta);
+            return;
+          }
+          const { decisor, consulta, enriquecimento } = d.dados;
+          setItens((l) => [...l, item]);
+          // Edição do usuário ainda a caminho do servidor prevalece.
+          if (!timersSalvar.current.has(item.cnpj)) {
+            decisoresRef.current = { ...decisoresRef.current, [item.cnpj]: decisor };
+            setDecisores(decisoresRef.current);
+          }
+          setConsultas((m) => ({ ...m, [item.cnpj]: consulta }));
+          setEnriquecimentos((m) => ({ ...m, [item.cnpj]: enriquecimento }));
+        },
+        aoProgresso: (p) => { if (ativo()) setProgresso(p); },
+      });
+      if (!ativo()) return;
+      setResumoBusca({ ...resumo, meta: metaBusca });
+      if (resumo.erro) setErro(resumo.erro);
+      // Empresa específica que não está na Receita (o catálogo só tem as
+      // atividades carregadas): segue na Crustdata, no Brasil, com decisor.
+      // CNPJ fica na tela: a OpenCNPJ mostra os dados oficiais dele.
+      if (especifica && !resumo.erro && vistos === 0 && !cnpjDoTexto(especifica)) {
+        setCrustdataBrasil({
+          nome: especifica, pais: 'BRA', id: Date.now(), origem: 'receita',
+          estado: pedidoEmpresa?.uf ? NOME_UF[pedidoEmpresa.uf as keyof typeof NOME_UF] : '',
+          cidade: pedidoEmpresa?.cidade ?? '',
+          site: pedidoEmpresa?.site ?? null,
+        });
+      }
+    } catch (e) {
+      if (ativo()) setErro(e instanceof Error ? e.message : 'Erro na busca');
+    } finally {
+      if (ativo()) { setBuscando(false); setProgresso(null); }
+    }
+  }
+
+  // "Buscar empresa específica" do Perfil de busca: Brasil no catálogo (com
+  // desvio para a Crustdata); internacional direto na Crustdata.
+  function buscarEmpresaEspecifica(pedido: PedidoEmpresa) {
+    setPerfilAberto(false);
+    if (pedido.modo === 'internacional') {
+      setPedidoInternacional({ nome: pedido.texto, pais: pedido.pais, estado: pedido.estado, cidade: pedido.cidade, site: pedido.site, id: Date.now() });
+      setModo('internacional');
+      return;
+    }
+    setPedidoInternacional(null);
+    setModo('brasil');
+    buscarEmpresasComDecisor(null, pedido);
+  }
+
+  // Interrompe a busca em andamento: o que já completou fica na lista.
+  function pararBusca() {
+    buscaAtual.current++;
+    setBuscando(false);
+    setResumoBusca({ completos: itens.length, tentativas: progresso?.tentativas ?? 0, parada: 'cancelado', erro: null, meta });
+    setProgresso(null);
+  }
 
   useEffect(() => {
     fetch('/api/prospeccao/pesquisas')
@@ -377,41 +474,51 @@ export default function ProspeccaoPage() {
     return () => clearTimeout(t);
   }, [quantidadeTexto, quantidade]);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const valor = nomeBusca.trim();
-      if (!filtros || valor === filtros.texto || (valor.length === 1 && !/\d/.test(valor))) return;
-      atualizar({ texto: valor });
-    }, 500);
-    return () => clearTimeout(t);
-  }, [nomeBusca, filtros]);
 
+  // Filtro mudou: só atualiza a contagem (grátis). A busca com decisor, que
+  // gasta crédito, roda apenas no clique de Buscar.
   const primeiraExecucao = useRef(true);
   useEffect(() => {
     if (!filtros) return;
     if (primeiraExecucao.current) { primeiraExecucao.current = false; return; }
-    setAberto(null);
-    buscar(filtros, null, quantidade ? Math.min(quantidade, LIMITE_PAGINA) : undefined);
-  }, [filtros, quantidade, buscar]);
+    carregarContagem(filtros);
+  }, [filtros, carregarContagem]);
 
   // Perfil salvo no painel: recomeça pelo novo perfil sem perder os ajustes
   // da busca atual que ainda não fazem parte da configuração persistida.
-  function aoSalvarPerfil(novoPerfil: ProspeccaoConfig | null) {
+  // `destino`: botão clicado no painel — busca no catálogo da Receita (com
+  // decisor) ou na aba internacional, com os nichos e países do perfil.
+  function aoSalvarPerfil(novoPerfil: ProspeccaoConfig | null, destino: DestinoBusca) {
     setPerfilAberto(false);
     setNicho('');
+    setPaisesPerfil(novoPerfil?.paises ?? []);
     primeiraExecucao.current = true;
     if (!novoPerfil) {
-      buscar(null, null, quantidade ? Math.min(quantidade, LIMITE_PAGINA) : undefined);
+      carregarContagem(null);
       return;
     }
+    // Filtros que só existem na tela (nome/CNPJ, tempo, capital, telefone)
+    // continuam valendo na busca disparada pelo painel.
     const novosFiltros = {
       ...filtrosDoPerfil(novoPerfil),
       soComEmail: filtros?.soComEmail ?? false,
+      texto: filtros?.texto ?? '',
+      anosMinimos: filtros?.anosMinimos ?? null,
+      capitalMinimo: filtros?.capitalMinimo ?? null,
+      telefone: filtros?.telefone ?? '',
     };
-    setTemPerfil(true);
+    setTemPerfil(!!novoPerfil.cnaes?.length);
     setPerfil(novosFiltros);
     setFiltros(novosFiltros);
-    buscar(novosFiltros, null, quantidade ? Math.min(quantidade, LIMITE_PAGINA) : undefined);
+    carregarContagem(novosFiltros);
+    if (destino === 'internacional') {
+      setPedidoInternacional({ nome: '', pais: '', id: Date.now(), doPerfil: true });
+      setModo('internacional');
+    } else {
+      setPedidoInternacional(null);
+      setModo('brasil');
+      if (novosFiltros.cnaes.length) buscarEmpresasComDecisor(novosFiltros);
+    }
   }
 
   // Atalho "Procurar fora do catálogo": aba internacional já buscando no Brasil.
@@ -437,7 +544,6 @@ export default function ProspeccaoPage() {
     const grupo = grupos.find((g) => g.cnaes.length === cnaes.length && g.cnaes.every((c) => cnaes.includes(c)));
     setNicho(grupo?.id ?? '');
     definirQuantidade(p.quantidade);
-    setNomeBusca('');
     setFiltros({
       cnaes,
       ufs: f.ufs ?? [],
@@ -571,7 +677,7 @@ export default function ProspeccaoPage() {
 
   // Baixa os selecionados em CSV, com o que já está na tela (sem ir ao servidor).
   function exportarSelecionados() {
-    const linhas = [...selecionados.values()].map((i) => linhaCsv(i, decisores[i.cnpj], consultas[i.cnpj]));
+    const linhas = [...selecionados.values()].map((i) => linhaCsv(i, decisores[i.cnpj], consultas[i.cnpj], emailDoDecisor(enriquecimentos[i.cnpj], decisores[i.cnpj]?.nome)));
     const url = URL.createObjectURL(new Blob([montarCsv(linhas)], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
@@ -598,8 +704,9 @@ export default function ProspeccaoPage() {
   const itensFiltrados = useMemo(() => {
     const termo = filtroResultadoTexto.trim().toLocaleLowerCase('pt-BR');
     return itens.filter((i) => {
-      if (filtroResultadoEmail === 'com_email' && !i.email) return false;
-      if (filtroResultadoEmail === 'sem_email' && i.email) return false;
+      const temEmailDecisor = !!emailDoDecisor(enriquecimentos[i.cnpj], decisores[i.cnpj]?.nome);
+      if (filtroResultadoEmail === 'com_email' && !temEmailDecisor) return false;
+      if (filtroResultadoEmail === 'sem_email' && temEmailDecisor) return false;
       if (filtroResultadoNicho && nichoDaAtividade(i.cnae_principal)?.id !== filtroResultadoNicho) return false;
       if (filtroResultadoPorte && i.porte !== filtroResultadoPorte) return false;
       if (filtroResultadoUf && i.uf !== filtroResultadoUf) return false;
@@ -611,7 +718,7 @@ export default function ProspeccaoPage() {
       const nicho = (nomeAtividade(i.cnae_principal) ?? '').toLocaleLowerCase('pt-BR');
       return nome.includes(termo) || cidade.includes(termo) || nicho.includes(termo) || i.cnpj.includes(termo.replace(/\D/g, ''));
     });
-  }, [itens, filtroResultadoTexto, filtroResultadoEmail, filtroResultadoNicho, filtroResultadoPorte, filtroResultadoUf, ocultarJaNaBase, filtroResultadoDecisor, decisores, consultas]);
+  }, [itens, filtroResultadoTexto, filtroResultadoEmail, filtroResultadoNicho, filtroResultadoPorte, filtroResultadoUf, ocultarJaNaBase, filtroResultadoDecisor, decisores, consultas, enriquecimentos]);
 
   const haFiltroResultadoAtivo = !!filtroResultadoTexto || filtroResultadoEmail !== 'todos' || !!filtroResultadoNicho || !!filtroResultadoPorte || !!filtroResultadoUf || ocultarJaNaBase || filtroResultadoDecisor !== 'todos';
 
@@ -662,8 +769,8 @@ export default function ProspeccaoPage() {
   const itensImportacao = [...selecionados.values()].map((i) => ({
     cnpj: i.cnpj,
     nome: i.nome_fantasia ?? i.razao_social ?? i.cnpj,
-    // E-mail válido achado para o decisor atual (Anymail) substitui o da Receita.
-    email: emailDoDecisor(enriquecimentos[i.cnpj], decisores[i.cnpj]?.nome) ?? i.email,
+    // Só o e-mail verificado do decisor atual; o servidor confere de novo.
+    email: emailDoDecisor(enriquecimentos[i.cnpj], decisores[i.cnpj]?.nome),
     contato_nome: decisores[i.cnpj]?.nome?.trim() || null,
     contato_cargo: decisores[i.cnpj]?.cargo?.trim() || null,
     contato_linkedin: normalizarPerfilLinkedIn(decisores[i.cnpj]?.linkedin),
@@ -697,8 +804,18 @@ export default function ProspeccaoPage() {
     ? (filtros.portes.length === 0 ? '' : filtros.portes.length === 1 ? filtros.portes[0] : '__varios__')
     : '';
   const carregados = itens.length;
-  // Há mais para carregar: o servidor tem próxima página E a quantidade não foi atingida.
-  const temMais = !!cursor && (quantidade === null || carregados < quantidade);
+  // Indicadores da busca atual (cards do topo). Avaliadas = toda empresa que
+  // recebeu um veredito; descartadas = fora da lista + descartes manuais.
+  const avaliadasNaBusca = itens.length + pulados.length;
+  const comDecisorNaBusca = itens.filter((i) => !!emailDoDecisor(enriquecimentos[i.cnpj], decisores[i.cnpj]?.nome)).length;
+  const descartadasNaBusca = pulados.length + descartadosSessao;
+
+  // Empresas puladas, por motivo, para o resumo da busca.
+  const puladosPorMotivo = useMemo(() => {
+    const contagem = new Map<MotivoPulo, number>();
+    for (const p of pulados) contagem.set(p.motivo, (contagem.get(p.motivo) ?? 0) + 1);
+    return [...contagem.entries()];
+  }, [pulados]);
 
   function focarPerfil() {
     setPerfilAberto(true);
@@ -743,7 +860,7 @@ export default function ProspeccaoPage() {
                 <Database size={15} aria-hidden="true" /> Brasil · Receita Federal
               </button>
               <button type="button" onClick={() => { setPedidoInternacional(null); setModo('internacional'); }} aria-pressed={modo === 'internacional'} className={`${modo === 'internacional' ? s.nichoAtivo : ''} focus-ring`}>
-                <Globe2 size={15} aria-hidden="true" /> Internacional · nome e país
+                <Globe2 size={15} aria-hidden="true" /> Internacional · nicho e país
               </button>
             </div>
           </div>
@@ -785,7 +902,14 @@ export default function ProspeccaoPage() {
 
         <div className={s.content}>
           {modo === 'internacional' ? (
-            <BuscaInternacional pedido={pedidoInternacional} />
+            <BuscaInternacional
+              pedido={pedidoInternacional}
+              nichos={nichosInternacionaisDoPerfil(perfil?.cnaes ?? [])}
+              paisesPerfil={paisesPerfil}
+              meta={meta}
+              decisorObrigatorio={decisorObrigatorio}
+              onAbrirPerfil={focarPerfil}
+            />
           ) : semPerfil ? (
             <section className={`${s.panel} ${s.emptyHero}`}>
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-300 shadow-[0_0_24px_rgba(14,165,233,0.25)]">
@@ -821,7 +945,7 @@ export default function ProspeccaoPage() {
                     {ajustesAtivos > 0 && (
                       <button
                         type="button"
-                        onClick={() => { setNicho(''); definirQuantidade(null); setPesquisaAtiva(null); setNomeBusca(''); setFiltros({ ...perfil }); }}
+                        onClick={() => { setNicho(''); definirQuantidade(null); setPesquisaAtiva(null); setFiltros({ ...perfil }); }}
                         className={`${s.linkAction} focus-ring rounded`}
                       >
                         <RotateCcw size={12} /> Voltar ao perfil
@@ -842,20 +966,6 @@ export default function ProspeccaoPage() {
 
                   {/* Estado e município ficam só no perfil de busca. */}
                   <div className={`${s.filterGrid} ${s.filterGridBusca}`}>
-                    <Campo rotulo="Nome ou CNPJ">
-                      <div className="relative">
-                        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input
-                          value={nomeBusca}
-                          onChange={(e) => setNomeBusca(e.target.value)}
-                          maxLength={80}
-                          placeholder="Razão social, fantasia ou CNPJ"
-                          aria-label="Buscar por nome ou CNPJ"
-                          className={`${s.field} pl-9 pr-3 focus-ring`}
-                        />
-                      </div>
-                    </Campo>
-
                     <Campo rotulo="Atividade">
                       <Selecao
                         rotuloAcessivel="Atividade"
@@ -925,59 +1035,55 @@ export default function ProspeccaoPage() {
 
               {/* Resumo — Meta = quantidade desejada; avaliadas/com e-mail/descartadas
                   vêm da contagem real do servidor, sem depender do que já carregou. */}
-              <section className={s.kpiGrid}>
-                <Indicador
-                  tom="cyan"
-                  icone={Target}
-                  rotulo="Meta"
-                  valor={quantidade ? `${quantidade.toLocaleString('pt-BR')}` : '—'}
-                  detalhe={
-                    !quantidade
-                      ? 'defina a quantidade no painel'
-                      : filtros?.soComEmail
-                        ? 'leads com e-mail válido'
-                        : 'empresas — ligue "e-mail obrigatório" para valer como leads válidos'
-                  }
-                />
-                <Indicador
-                  tom="violet"
-                  icone={Building2}
-                  rotulo="Empresas avaliadas"
-                  valor={total === null ? '—' : total.toLocaleString('pt-BR')}
-                  detalhe={carregando && carregados === 0 ? 'Buscando…' : 'no catálogo, com os filtros atuais'}
-                />
-                <Indicador
-                  tom="emerald"
-                  icone={Mail}
-                  rotulo="Com e-mail válido"
-                  valor={totalComEmail === null ? '—' : totalComEmail.toLocaleString('pt-BR')}
-                  proporcao={total && totalComEmail !== null ? totalComEmail / Math.max(1, total) : null}
-                  detalhe={
-                    total && totalComEmail !== null
-                      ? `${Math.round((totalComEmail / Math.max(1, total)) * 100)}% do avaliado`
-                      : 'aguardando contagem'
-                  }
-                />
-                <Indicador
-                  tom="amber"
-                  icone={Ban}
-                  rotulo="Descartadas"
-                  valor={
-                    total === null || totalComEmail === null
-                      ? descartadosSessao.toLocaleString('pt-BR')
-                      : (Math.max(0, total - totalComEmail) + descartadosSessao).toLocaleString('pt-BR')
-                  }
-                  detalhe="sem e-mail ou descartadas manualmente nesta busca"
-                />
-              </section>
+              {/* Indicadores DA BUSCA feita (não do catálogo inteiro): vazios até
+                  buscar, ao vivo durante a busca e zerados numa busca nova. Com a
+                  empresa vinda da Crustdata, os indicadores são os dela, abaixo. */}
+              {!crustdataBrasil && (
+                <section className={s.kpiGrid}>
+                  <Indicador
+                    tom="cyan"
+                    icone={Target}
+                    rotulo="Meta"
+                    valor={metaDaBusca === null ? '—' : metaDaBusca.toLocaleString('pt-BR')}
+                    detalhe={metaDaBusca === null
+                      ? 'aparece ao buscar'
+                      : buscaEspecifica ? 'resultados da busca pelo nome' : decisorObrigatorio ? 'empresas com decisor e e-mail dele' : 'empresas (decisor não obrigatório)'}
+                  />
+                  <Indicador
+                    tom="violet"
+                    icone={Building2}
+                    rotulo="Empresas avaliadas"
+                    valor={metaDaBusca === null ? '—' : avaliadasNaBusca.toLocaleString('pt-BR')}
+                    detalhe={metaDaBusca === null ? 'aparece ao buscar' : buscando ? 'avaliando…' : 'nesta busca'}
+                  />
+                  <Indicador
+                    tom="emerald"
+                    icone={Mail}
+                    rotulo="Com decisor e e-mail"
+                    valor={metaDaBusca === null ? '—' : comDecisorNaBusca.toLocaleString('pt-BR')}
+                    proporcao={metaDaBusca === null ? null : comDecisorNaBusca / Math.max(1, metaDaBusca)}
+                    detalhe={metaDaBusca === null ? 'aparece ao buscar' : `${comDecisorNaBusca} de ${metaDaBusca} da meta`}
+                  />
+                  <Indicador
+                    tom="amber"
+                    icone={Ban}
+                    rotulo="Descartadas"
+                    valor={metaDaBusca === null ? '—' : descartadasNaBusca.toLocaleString('pt-BR')}
+                    detalhe={metaDaBusca === null ? 'aparece ao buscar' : 'fora da lista ou descartadas manualmente nesta busca'}
+                  />
+                </section>
+              )}
 
               {erro && (
                 <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{erro}</p>
               )}
 
-              {filtros?.texto && !carregando && (
+              {crustdataBrasil ? (
+                <BuscaInternacional embutido pedido={crustdataBrasil} meta={meta} decisorObrigatorio={decisorObrigatorio} />
+              ) : (<>
+              {buscaEspecifica && resumoBusca && !buscando && (
                 <ForaDoCatalogo
-                  texto={filtros.texto}
+                  texto={buscaEspecifica}
                   semResultado={carregados === 0}
                   onBuscarFora={buscarForaDoCatalogo}
                 />
@@ -989,9 +1095,22 @@ export default function ProspeccaoPage() {
                   <CabecalhoBloco
                     icone={Radar}
                     titulo="Resultados"
-                    subtitulo={grupoAtivo ? `Empresas de ${grupoAtivo.nome} no catálogo da Receita.` : 'Empresas do catálogo da Receita para o seu perfil.'}
+                    subtitulo={buscaEspecifica
+                      ? `Resultados para “${buscaEspecifica}” em todo o catálogo da Receita (ignora o perfil).`
+                      : `Empresas${grupoAtivo ? ` de ${grupoAtivo.nome}` : ''} do catálogo da Receita, já com o decisor e o e-mail dele.`}
                   />
                   <div className="flex items-center gap-4">
+                    {buscando ? (
+                      <>
+                        <span className="flex items-center gap-2 text-xs text-slate-300" role="status">
+                          <Loader2 size={14} className="animate-spin" />
+                          {progresso?.completos ?? 0} de {meta} encontradas · {progresso?.tentativas ?? 0} analisada{progresso?.tentativas === 1 ? '' : 's'}
+                        </span>
+                        <button type="button" onClick={pararBusca} className={`${s.outlineButton} focus-ring`}>
+                          <Square size={13} /> Parar
+                        </button>
+                      </>
+                    ) : null}
                     <span className="text-xs text-slate-400">
                       <span className="font-semibold tabular-nums text-slate-200">{selecionados.size}</span> selecionada{selecionados.size === 1 ? '' : 's'}
                     </span>
@@ -1075,19 +1194,34 @@ export default function ProspeccaoPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {carregando && carregados === 0 ? (
+                    {buscando && carregados === 0 ? (
                       <LinhasEsqueleto />
-                    ) : carregados === 0 && filtros?.texto ? (
+                    ) : !resumoBusca && carregados === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-24 text-center">
+                          <UserSearch size={30} className="mx-auto text-slate-600" />
+                          <p className="mt-4 text-sm font-medium text-slate-300">Pronto para buscar</p>
+                          <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+                            A busca é disparada no Perfil de busca, em “Salvar e buscar no Brasil”: a lista traz até {meta} empresa{meta === 1 ? '' : 's'}{decisorObrigatorio ? ' já com o decisor e o e-mail dele' : ''}.
+                          </p>
+                          <button type="button" onClick={focarPerfil} className={`${s.outlineButton} mx-auto mt-5 focus-ring`}>
+                            <SlidersHorizontal size={15} /> Abrir Perfil de busca
+                          </button>
+                        </td>
+                      </tr>
+                    ) : carregados === 0 && buscaEspecifica && candidatosVistos === 0 ? (
                       <tr>
                         <td colSpan={8}>
                           <EmpresaNaoEncontrada
-                            texto={filtros.texto}
+                            texto={buscaEspecifica}
                             // `total` ignora o filtro de e-mail: se há empresas e nenhuma
                             // apareceu, o "só com e-mail" é que as escondeu.
-                            escondidasPorEmail={filtros.soComEmail && total ? total : 0}
+                            // A busca com decisor exige e-mail na Receita: empresa sem
+                            // e-mail não teria como dar o e-mail do decisor.
+                            escondidasPorEmail={0}
                             onMostrarSemEmail={() => atualizar({ soComEmail: false })}
                             onBuscarFora={buscarForaDoCatalogo}
-                            onLimpar={() => setNomeBusca('')}
+                            onLimpar={() => { setBuscaEspecifica(null); setResumoBusca(null); }}
                           />
                         </td>
                       </tr>
@@ -1095,8 +1229,12 @@ export default function ProspeccaoPage() {
                       <tr>
                         <td colSpan={8} className="py-24 text-center">
                           <Building2 size={30} className="mx-auto text-slate-600" />
-                          <p className="mt-4 text-sm font-medium text-slate-300">Nenhuma empresa com esses filtros</p>
-                          <p className="mt-1 text-sm text-slate-500">Tente ampliar os estados, o porte ou o nicho.</p>
+                          <p className="mt-4 text-sm font-medium text-slate-300">
+                            {candidatosVistos === 0 ? 'Nenhuma empresa com esses filtros' : 'Nenhuma empresa com decisor e e-mail encontrado'}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {candidatosVistos === 0 ? 'Tente ampliar os estados, o porte ou o nicho.' : 'Veja abaixo por que as empresas analisadas ficaram de fora.'}
+                          </p>
                         </td>
                       </tr>
                     ) : itensFiltrados.length === 0 ? (
@@ -1112,6 +1250,7 @@ export default function ProspeccaoPage() {
                         const expandido = aberto === i.cnpj;
                         const selecionado = selecionados.has(i.cnpj);
                         const decisor = decisores[i.cnpj];
+                        const emailDecisor = emailDoDecisor(enriquecimentos[i.cnpj], decisor?.nome);
                         const nome = nomeSemSufixo(nomeLegivel(i.nome_fantasia ?? i.razao_social)) || formatarCnpj(i.cnpj);
                         const atividade = nomeAtividade(i.cnae_principal);
                         return (
@@ -1156,19 +1295,23 @@ export default function ProspeccaoPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-2.5">
-                                {i.email ? (
+                                {emailDecisor ? (
                                   <>
                                     <div className="flex items-center gap-2 min-w-0">
                                       <Mail size={13} className="shrink-0 text-slate-500" />
-                                      <span className="min-w-0 truncate text-slate-200" title={i.email}>{i.email}</span>
+                                      <span className="min-w-0 truncate text-slate-200" title={emailDecisor}>{emailDecisor}</span>
                                     </div>
-                                    <div className={`mt-1 flex items-center gap-1.5 pl-5 text-xs ${COR_QUALIDADE[i.qualidade_email]}`}>
-                                      <span className={`h-1.5 w-1.5 rounded-full ${PONTO_QUALIDADE[i.qualidade_email]}`} />
-                                      {ROTULO_QUALIDADE[i.qualidade_email]}
+                                    <div className="mt-1 flex items-center gap-1.5 pl-5 text-xs text-emerald-400">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                      do decisor · verificado
                                     </div>
                                   </>
                                 ) : (
-                                  <span className="text-sm text-slate-500">Sem e-mail</span>
+                                  // Só vale o e-mail do decisor: o cadastral da Receita fica no detalhe.
+                                  <span className="text-sm text-slate-500" title={motivosSemDecisor[i.cnpj] ? ROTULO_PULO[motivosSemDecisor[i.cnpj]] : undefined}>
+                                    Sem e-mail do decisor
+                                    {motivosSemDecisor[i.cnpj] && <span className="mt-0.5 block text-xs text-slate-600">{ROTULO_PULO[motivosSemDecisor[i.cnpj]]}</span>}
+                                  </span>
                                 )}
                               </td>
                               <td className="px-4 py-2.5">
@@ -1199,19 +1342,36 @@ export default function ProspeccaoPage() {
                     )}
                   </tbody>
                 </table>
-                {temMais && (
-                  <div className={s.loadMore}>
-                    <button
-                      type="button"
-                      onClick={() => buscar(filtros, cursor, quantidade ? quantidade - carregados : undefined)}
-                      disabled={carregando}
-                      className={`${s.outlineButton} focus-ring`}
-                    >
-                      {carregando ? 'Carregando…' : 'Carregar mais empresas'}
-                    </button>
+                {resumoBusca && !buscando && (
+                  <div className="border-t border-[var(--border-subtle)] px-5 py-4 text-sm text-slate-400">
+                    <p>
+                      {decisorObrigatorio && !buscaEspecifica
+                        ? <><span className="font-semibold text-slate-200">{carregados} de {resumoBusca.meta}</span> com decisor e e-mail</>
+                        : <><span className="font-semibold text-slate-200">{carregados} de {resumoBusca.meta}</span> empresas · {carregados - Object.keys(motivosSemDecisor).length} com decisor e e-mail</>}
+                      {' · '}{resumoBusca.tentativas} empresa{resumoBusca.tentativas === 1 ? '' : 's'} analisada{resumoBusca.tentativas === 1 ? '' : 's'}
+                      {resumoBusca.parada === 'teto' && ` · parou no limite de ${TETO_TENTATIVAS_DECISOR} análises por busca`}
+                      {resumoBusca.parada === 'fim' && carregados < resumoBusca.meta && ' · o catálogo acabou para estes filtros'}
+                      {resumoBusca.parada === 'cancelado' && ' · busca interrompida'}
+                    </p>
+                    {pulados.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-slate-300">
+                          {pulados.length} empresa{pulados.length === 1 ? '' : 's'} fora da lista: {puladosPorMotivo.map(([m, n]) => `${n} ${ROTULO_PULO[m]}`).join(' · ')}
+                        </summary>
+                        <ul className="mt-2 space-y-1 text-xs">
+                          {pulados.map((p) => (
+                            <li key={p.item.cnpj}>
+                              <span className="text-slate-300">{nomeSemSufixo(nomeLegivel(p.item.nome_fantasia ?? p.item.razao_social)) || formatarCnpj(p.item.cnpj)}</span>
+                              <span className="text-slate-500"> · {ROTULO_PULO[p.motivo]}{p.erro ? ` (${p.erro})` : ''}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
                   </div>
                 )}
               </section>
+              </>)}
 
               {/* Espaço para a barra flutuante não cobrir o fim da lista. */}
               {selecionados.size > 0 && <div className="h-16" />}
@@ -1224,13 +1384,19 @@ export default function ProspeccaoPage() {
       {perfilAberto && (
       <PerfilBuscaPainel
         catalogoCnaes={catalogo?.cnaes ?? null}
+        modo={modo}
         quantidadeTexto={quantidadeTexto}
         soComEmail={filtros?.soComEmail ?? false}
+        decisorObrigatorio={decisorObrigatorio}
+        onDecisorObrigatorioChange={setDecisorObrigatorio}
+        telefoneObrigatorio={!!filtros?.telefone}
+        onTelefoneObrigatorioChange={(ativo) => atualizar({ telefone: ativo ? (filtros?.telefone || 'com') : '' })}
         filtrosDisponiveis={!!filtros}
         onQuantidadeChange={setQuantidadeTexto}
         onSoComEmailChange={(ativo) => atualizar({ soComEmail: ativo })}
         onFechar={() => setPerfilAberto(false)}
         onSalvo={aoSalvarPerfil}
+        onBuscarEmpresa={buscarEmpresaEspecifica}
       />
       )}
 

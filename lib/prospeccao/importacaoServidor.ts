@@ -4,6 +4,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizarPerfilLinkedIn } from './contato'
+import { carregarAnalises } from './decisoresServidor'
+import { emailDoDecisor } from './enriquecimento'
 
 export const MAX_ITENS_IMPORTACAO = 200
 
@@ -70,6 +72,28 @@ export function resumir(resultados: ResultadoItem[]): ResumoImportacao {
   }
   for (const r of resultados) resumo[r.status] = (resumo[r.status] ?? 0) + 1
   return resumo
+}
+
+/**
+ * O e-mail do lead é SEMPRE o do decisor, verificado pela Anymail e salvo pela
+ * própria org (0060) — nunca o e-mail cadastral da Receita nem o que o cliente
+ * mandou. Sem e-mail do decisor, a empresa nem chega à RPC: lá o e-mail vazio
+ * cairia no cadastral do catálogo.
+ */
+export async function separarPorEmailDoDecisor(
+  admin: SupabaseClient,
+  org: string,
+  itens: ItemImportacao[],
+): Promise<{ comEmail: ItemImportacao[]; semEmail: ResultadoItem[] }> {
+  const analises = await carregarAnalises(admin, org, itens.map((i) => i.cnpj))
+  const comEmail: ItemImportacao[] = []
+  const semEmail: ResultadoItem[] = []
+  for (const item of itens) {
+    const email = emailDoDecisor(analises[item.cnpj]?.enriquecimento, item.contato_nome)
+    if (email) comEmail.push({ ...item, email })
+    else semEmail.push({ cnpj: item.cnpj, status: 'sem_email', lead_id: null })
+  }
+  return { comEmail, semEmail }
 }
 
 export async function importarProspeccao(

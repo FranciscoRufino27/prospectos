@@ -1,8 +1,12 @@
-// Busca internacional de empresas por nome e país via Crustdata Company Search
+// Busca internacional de empresas por nome, país e nicho via Crustdata Company Search
 // (POST /company/search, API 2025-11-01). Paga: 0,03 crédito por empresa
 // devolvida, só com campos básicos — nenhum campo "premium" (headcount,
 // taxonomy, funding…) é pedido, porque cada um soma crédito por resultado.
 // Nada é gravado: o resultado vai direto para a tela.
+// Filtrar por setor (`basic_info.industries`) não é campo premium; o valor do
+// setor nem pode ser pedido de volta (a API recusa em `fields`).
+
+import { SETORES_VALIDOS } from './nichosInternacional'
 
 export const CRUSTDATA_URL = 'https://api.crustdata.com/company/search'
 export const CRUSTDATA_VERSAO = '2025-11-01'
@@ -55,8 +59,18 @@ export type CodigoPais = (typeof PAISES_INTERNACIONAL)[number]['codigo']
 
 export interface BuscaInternacional {
   nome: string
-  pais: CodigoPais | ''
+  /** Vazio = qualquer país. */
+  paises: CodigoPais[]
+  /** Setores do LinkedIn dos nichos escolhidos; vazio = qualquer setor. */
+  setores: string[]
   cursor: string | null
+  /** Empresas por página (1–25); a busca com decisor pede menos para gastar menos. */
+  limite?: number
+  /** Estado/região e cidade da sede (busca de empresa específica). */
+  estado?: string
+  cidade?: string
+  /** Site da empresa específica: identifica sem ambiguidade (filtro exato). */
+  site?: string
 }
 
 export interface EmpresaInternacional {
@@ -81,18 +95,35 @@ export interface RespostaInternacional {
 
 const CODIGOS = new Set<string>(PAISES_INTERNACIONAL.map((p) => p.codigo))
 
-/** Revalida o pedido da tela. null = nem nome nem país (busca sem critério). */
+const listaValida = (v: unknown, valido: (s: string) => boolean): string[] =>
+  Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && valido(x)))] : []
+
+/** Revalida o pedido da tela. null = sem nome, país nem nicho (busca sem critério). */
 export function normalizarBuscaInternacional(bruto: unknown): BuscaInternacional | null {
   if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return null
   const b = bruto as Record<string, unknown>
   const nome = typeof b.nome === 'string' ? b.nome.replace(/\s+/g, ' ').trim().slice(0, NOME_MAX) : ''
-  const pais = typeof b.pais === 'string' && CODIGOS.has(b.pais) ? (b.pais as CodigoPais) : ''
+  // `pais` (um só) continua aceito: é o que o atalho "fora do catálogo" manda.
+  const paises = listaValida(Array.isArray(b.paises) ? b.paises : typeof b.pais === 'string' ? [b.pais] : [], (x) => CODIGOS.has(x)) as CodigoPais[]
+  // Só setores da tradução dos nichos: a rota não vira filtro livre da Crustdata.
+  const setores = listaValida(b.setores, (x) => SETORES_VALIDOS.has(x))
   // O cursor é opaco (token da Crustdata); só confere tamanho e alfabeto.
   const cursor = typeof b.cursor === 'string' && b.cursor.length <= CURSOR_MAX && /^[A-Za-z0-9_\-+/=:.]+$/.test(b.cursor)
     ? b.cursor
     : null
-  if (nome.length < 2 && !pais) return null
-  return { nome: nome.length >= 2 ? nome : '', pais, cursor }
+  const site = siteValido(b.site)
+  if (nome.length < 2 && paises.length === 0 && setores.length === 0 && !site) return null
+  const local = (v: unknown) => (typeof v === 'string' ? v.replace(/[^\p{L}\p{N}\s.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 60) : '')
+  const estado = local(b.estado)
+  const cidade = local(b.cidade)
+  const limite = typeof b.limite === 'number' && Number.isInteger(b.limite) && b.limite >= 1 && b.limite < LIMITE_INTERNACIONAL ? b.limite : undefined
+  return {
+    nome: nome.length >= 2 ? nome : '', paises, setores, cursor,
+    ...(limite ? { limite } : {}),
+    ...(estado.length >= 2 ? { estado } : {}),
+    ...(cidade.length >= 2 ? { cidade } : {}),
+    ...(site ? { site } : {}),
+  }
 }
 
 export const CAMPOS_CRUSTDATA = [
@@ -112,16 +143,34 @@ export const CAMPOS_CRUSTDATA = [
 /**
  * Corpo do POST. Com nome, usa a busca ranqueada (`lexical`): a empresa com o
  * nome mais parecido vem primeiro. O filtro `(.)` em basic_info.name devolvia
- * as parecidas sem ordem ("Inovacode" sumia entre 340 resultados). Só país é
- * filtro puro.
+ * as parecidas sem ordem ("Inovacode" sumia entre 340 resultados). País e
+ * setor (nicho) são filtros puros, combinados com E.
  */
 export function corpoCrustdata(b: BuscaInternacional): Record<string, unknown> {
-  const filtroPais = b.pais ? { filters: { field: 'locations.country', type: '=', value: b.pais } } : {}
+  // Com o site, ele sozinho identifica a empresa: nome e local não entram.
+  if (b.site) {
+    return {
+      filters: { field: 'basic_info.primary_domain', type: '=', value: b.site },
+      fields: CAMPOS_CRUSTDATA,
+      limit: b.limite ?? LIMITE_INTERNACIONAL,
+    }
+  }
+  const condicoes = [
+    ...(b.paises.length ? [{ field: 'locations.country', type: 'in', value: b.paises }] : []),
+    ...(b.setores.length ? [{ field: 'basic_info.industries', type: 'in', value: b.setores }] : []),
+    // Estado e cidade normalizados pela Crustdata ("São Paulo" pode vir como
+    // "State of São Paulo"): `(.)` casa todas as palavras e tolera grafia.
+    ...(b.estado ? [{ field: 'locations.state', type: '(.)', value: b.estado }] : []),
+    ...(b.cidade ? [{ field: 'locations.city', type: '(.)', value: b.cidade }] : []),
+  ]
+  const filtros = condicoes.length === 0 ? {}
+    : condicoes.length === 1 ? { filters: condicoes[0] }
+    : { filters: { op: 'and', conditions: condicoes } }
   return {
     ...(b.nome ? { search: { query: b.nome, mode: 'lexical' } } : {}),
-    ...filtroPais,
+    ...filtros,
     fields: CAMPOS_CRUSTDATA,
-    limit: LIMITE_INTERNACIONAL,
+    limit: b.limite ?? LIMITE_INTERNACIONAL,
     ...(b.cursor ? { cursor: b.cursor } : {}),
   }
 }
@@ -161,6 +210,49 @@ export function mapearEmpresa(bruto: unknown): EmpresaInternacional | null {
     funcionarios: texto(info.employee_count_range),
     tipo: texto(info.company_type),
   }
+}
+
+/** "https://www.Barkleyus.com/contato" → "barkleyus.com"; null se não for um site. */
+export function siteValido(v: unknown): string | null {
+  if (typeof v !== 'string') return null
+  const d = v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#].*$/, '')
+  return d.length <= 253 && /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d) ? d : null
+}
+
+/** Nome da empresa contém o nome buscado? (sem acento/pontuação). */
+export function nomeCasa(nomeEmpresa: string, nomeBuscado: string): boolean {
+  const alvo = letras(nomeBuscado)
+  return !!alvo && letras(nomeEmpresa).includes(alvo)
+}
+
+/** Empresas pedidas à Crustdata numa busca específica, antes de ordenar (25 × 0,03). */
+export const CANDIDATAS_BUSCA_ESPECIFICA = 25
+
+/** "51-200" → 51; "10001+" → 10001; sem faixa = 0. */
+export function minimoFuncionarios(faixa: string | null): number {
+  const n = faixa ? Number.parseInt(faixa.replace(/[^\d-+]/g, ''), 10) : NaN
+  return Number.isFinite(n) ? n : 0
+}
+
+const letras = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/**
+ * Busca de UMA empresa pelo nome: a Crustdata devolve muitos homônimos
+ * ("Barkley Trading", "Barkley Apartments"…) sem pôr a empresa de verdade
+ * primeiro. Ordena por: nome igual ao digitado → começa com ele → contém;
+ * empate pelo porte (mais funcionários primeiro); sem domínio vai para o fim
+ * (sem domínio não há como achar o e-mail).
+ */
+export function ordenarBuscaEspecifica(itens: EmpresaInternacional[], nomeBuscado: string): EmpresaInternacional[] {
+  const alvo = letras(nomeBuscado)
+  const nota = (e: EmpresaInternacional) => {
+    const n = letras(e.nome)
+    return n === alvo ? 3 : n.startsWith(alvo) ? 2 : n.includes(alvo) ? 1 : 0
+  }
+  return [...itens].sort((a, b) =>
+    Number(!!b.dominio) - Number(!!a.dominio)
+    || nota(b) - nota(a)
+    || minimoFuncionarios(b.funcionarios) - minimoFuncionarios(a.funcionarios))
 }
 
 export type FalhaCrustdata = 'sem_chave' | 'sem_credito' | 'limite' | 'indisponivel'

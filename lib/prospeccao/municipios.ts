@@ -39,3 +39,13 @@ export function podarMunicipios(codigos: string[], ufs: string[], conhecidos: Re
     return !m || ufs.includes(m.uf)
   })
 }
+
+/**
+ * Cidade digitada (já normalizada) → municípios do catálogo que valem para a
+ * busca. Nome exato vence ("SANTOS" não traz "SANTOS DUMONT"); sem exato,
+ * valem os que contêm o texto.
+ */
+export function municipiosDaCidade(lista: readonly Municipio[], cidadeNormalizada: string): string[] {
+  const exatos = lista.filter((m) => m.nome === cidadeNormalizada)
+  return (exatos.length ? exatos : lista).map((m) => m.codigo)
+}

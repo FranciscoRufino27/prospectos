@@ -29,14 +29,14 @@ describe('celulaCsv', () => {
 })
 
 describe('linhaCsv', () => {
-  it('traz os dados legíveis da empresa e do decisor', () => {
+  it('traz os dados legíveis da empresa e do decisor, com o e-mail do decisor', () => {
     const linha = linhaCsv(EMPRESA, { nome: 'Carlos Filgueiras', cargo: 'Sócio-Administrador', linkedin: 'br.linkedin.com/in/carlos/?x=1' }, {
       socios: [], sugerido: null, status: 'socio_serve', motivo: null, emailNominalDe: null,
-    })
+    }, 'carlos@emiliano.com.br')
     expect(linha).toEqual([
       '04.433.548/0001-86', 'Hotel Emiliano', 'Emiliano Empreendimentos LTDA', 'São Paulo', 'SP', 'Médio/grande',
-      'Hotéis', '5510-8/01', '10/05/2001', '687.135,00', '(11) 99876-5432', 'Celular', 'juridico@emiliano.com.br',
-      'Corporativo', 'emiliano.com.br', 'Carlos Filgueiras', 'Sócio-Administrador', 'https://www.linkedin.com/in/carlos',
+      'Hotéis', '5510-8/01', '10/05/2001', '687.135,00', '(11) 99876-5432', 'Celular', 'carlos@emiliano.com.br',
+      'emiliano.com.br', 'Carlos Filgueiras', 'Sócio-Administrador', 'https://www.linkedin.com/in/carlos',
       'Sócio serve',
     ])
   })
@@ -49,7 +49,13 @@ describe('linhaCsv', () => {
   it('sem análise: campos do decisor vazios e situação "Não analisado"', () => {
     const linha = linhaCsv({ ...EMPRESA, telefone: null, email: null, mei: true, porte: 'micro' }, null, undefined)
     expect(linha[5]).toBe('Microempresa (MEI)')
-    expect(linha.slice(10, 19)).toEqual(['', '', '', '', 'emiliano.com.br', '', '', '', 'Não analisado'])
+    expect(linha.slice(10, 18)).toEqual(['', '', '', 'emiliano.com.br', '', '', '', 'Não analisado'])
+  })
+
+  it('nunca exporta o e-mail cadastral da Receita no lugar do e-mail do decisor', () => {
+    const linha = linhaCsv(EMPRESA, { nome: 'Carlos Filgueiras', cargo: 'Sócio' }, undefined)
+    expect(linha).not.toContain('juridico@emiliano.com.br')
+    expect(linha[12]).toBe('')
   })
 })
 

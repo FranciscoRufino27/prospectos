@@ -41,13 +41,20 @@ function resposta(status: number, corpo: unknown) {
 }
 
 describe('normalizarBuscaInternacional', () => {
-  it('exige nome com 2+ letras ou um país da lista', () => {
+  it('exige nome com 2+ letras, um país da lista ou um nicho', () => {
     expect(normalizarBuscaInternacional({})).toBeNull()
     expect(normalizarBuscaInternacional({ nome: 'H' })).toBeNull()
     expect(normalizarBuscaInternacional({ pais: 'XXX' })).toBeNull()
     expect(normalizarBuscaInternacional(null)).toBeNull()
-    expect(normalizarBuscaInternacional({ nome: '  Hilton   Hotels ', pais: 'PRT' })).toEqual({ nome: 'Hilton Hotels', pais: 'PRT', cursor: null })
-    expect(normalizarBuscaInternacional({ nome: 'H', pais: 'USA' })).toEqual({ nome: '', pais: 'USA', cursor: null })
+    expect(normalizarBuscaInternacional({ nome: '  Hilton   Hotels ', pais: 'PRT' })).toEqual({ nome: 'Hilton Hotels', paises: ['PRT'], setores: [], cursor: null })
+    expect(normalizarBuscaInternacional({ nome: 'H', pais: 'USA' })).toEqual({ nome: '', paises: ['USA'], setores: [], cursor: null })
+    expect(normalizarBuscaInternacional({ setores: ['Restaurants'] })).toEqual({ nome: '', paises: [], setores: ['Restaurants'], cursor: null })
+  })
+
+  it('vários países; só setores dos nichos (o resto é descartado)', () => {
+    const r = normalizarBuscaInternacional({ paises: ['PRT', 'ESP', 'XXX', 'PRT'], setores: ['Hospitality', 'Software Development', 7] })
+    expect(r).toEqual({ nome: '', paises: ['PRT', 'ESP'], setores: ['Hospitality'], cursor: null })
+    expect(normalizarBuscaInternacional({ setores: ['Software Development'] })).toBeNull()
   })
 
   it('aceita só cursor com cara de token', () => {
@@ -60,9 +67,9 @@ describe('normalizarBuscaInternacional', () => {
 
 describe('corpoCrustdata', () => {
   it('nome vai na busca ranqueada e país no filtro; só campos básicos (sem custo premium)', () => {
-    expect(corpoCrustdata({ nome: 'Hilton', pais: 'PRT', cursor: 'abc' })).toEqual({
+    expect(corpoCrustdata({ nome: 'Hilton', paises: ['PRT'], setores: [], cursor: 'abc' })).toEqual({
       search: { query: 'Hilton', mode: 'lexical' },
-      filters: { field: 'locations.country', type: '=', value: 'PRT' },
+      filters: { field: 'locations.country', type: 'in', value: ['PRT'] },
       fields: CAMPOS_CRUSTDATA,
       limit: LIMITE_INTERNACIONAL,
       cursor: 'abc',
@@ -71,13 +78,23 @@ describe('corpoCrustdata', () => {
   })
 
   it('só país é filtro puro; só nome não leva filtro', () => {
-    const soPais = corpoCrustdata({ nome: '', pais: 'USA', cursor: null })
-    expect(soPais.filters).toEqual({ field: 'locations.country', type: '=', value: 'USA' })
+    const soPais = corpoCrustdata({ nome: '', paises: ['USA'], setores: [], cursor: null })
+    expect(soPais.filters).toEqual({ field: 'locations.country', type: 'in', value: ['USA'] })
     expect(soPais).not.toHaveProperty('search')
-    const soNome = corpoCrustdata({ nome: 'Inovacode', pais: '', cursor: null })
+    const soNome = corpoCrustdata({ nome: 'Inovacode', paises: [], setores: [], cursor: null })
     expect(soNome.search).toEqual({ query: 'Inovacode', mode: 'lexical' })
     expect(soNome).not.toHaveProperty('filters')
     expect(soNome).not.toHaveProperty('cursor')
+  })
+
+  it('nicho + países: setor e país combinados com E', () => {
+    expect(corpoCrustdata({ nome: '', paises: ['PRT', 'ESP'], setores: ['Hotels and Motels', 'Hospitality'], cursor: null }).filters).toEqual({
+      op: 'and',
+      conditions: [
+        { field: 'locations.country', type: 'in', value: ['PRT', 'ESP'] },
+        { field: 'basic_info.industries', type: 'in', value: ['Hotels and Motels', 'Hospitality'] },
+      ],
+    })
   })
 })
 
@@ -108,7 +125,7 @@ describe('mapearEmpresa', () => {
 })
 
 describe('buscarEmpresasCrustdata', () => {
-  const busca = { nome: 'Hilton', pais: 'PRT' as const, cursor: null }
+  const busca = { nome: 'Hilton', paises: ['PRT' as const], setores: [], cursor: null }
 
   it('sem chave não chama a API', async () => {
     const fetcher = vi.fn()

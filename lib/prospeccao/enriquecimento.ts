@@ -25,6 +25,49 @@ export interface CandidatoDecisor {
   cargo: string
   linkedin: string | null
   local: string | null
+  /**
+   * Domínio do empregador atual, quando a pessoa foi achada pelo NOME da
+   * empresa (pode ser outro cadastro dela, ex.: cba.com.br em vez de
+   * cbaluminio.com.br). É nele que o e-mail é procurado.
+   */
+  dominio?: string | null
+}
+
+// Sufixo societário (BR e de fora) no fim do nome: "Companhia Brasileira de
+// Alumínio S.A." precisa casar com o empregador "CBA | Companhia Brasileira
+// de Alumínio" — o `(.)` da Crustdata exige TODAS as palavras.
+const SUFIXO_EMPRESA = /(?:[\s,.-]+(?:ltda|me|epp|eireli|s\/a|s\.?a\.?|sa|cia|inc|llc|l\.?l\.?c|ltd|limited|gmbh|ag|s\.?l\.?|sl|sas|s\.?a\.?s\.?|lda|b\.?v\.?|bv|n\.?v\.?|nv|plc|corp|corporation|co|company)\.?)+\.?\s*$/i
+
+/** Nome da empresa para buscar pessoas: sem sufixo societário nem pontuação solta. */
+export function nomeParaBuscaDePessoas(nome: string): string {
+  const limpo = nome.replace(SUFIXO_EMPRESA, '').replace(/[\s,.-]+$/, '').replace(/\s+/g, ' ').trim()
+  return limpo || nome.trim()
+}
+
+/** Onde procurar as pessoas: no domínio da empresa ou pelo nome do empregador atual. */
+export type AlvoPessoas = string | {
+  nomeEmpresa: string
+  /** Domínio do cadastro achado: empregador com o mesmo site é a empresa. */
+  dominioEmpresa?: string
+}
+
+/**
+ * O empregador atual (nome/site) é a empresa procurada pelo nome? Mesmo site,
+ * mesmo nome, ou nome longo contido ("CBA | Companhia Brasileira de Alumínio"
+ * contém "Companhia Brasileira de Alumínio"). Nome curto só por igualdade ou
+ * site: "Barkley" não pode pegar funcionário da "Barkley Trading".
+ */
+export function empregadorConfere(
+  empregador: { name?: unknown; company_website?: unknown },
+  alvo: { nomeEmpresa: string; dominioEmpresa?: string },
+): boolean {
+  const site = dominioDoSite(empregador.company_website)
+  if (site && alvo.dominioEmpresa && site === alvo.dominioEmpresa) return true
+  if (typeof empregador.name !== 'string') return false
+  const nome = soLetras(nomeParaBuscaDePessoas(empregador.name))
+  const alvoLetras = soLetras(alvo.nomeEmpresa)
+  if (!alvoLetras) return false
+  return nome === alvoLetras || (alvoLetras.length >= 12 && soLetras(empregador.name).includes(alvoLetras))
 }
 
 export type StatusEmailDecisor = 'valido' | 'arriscado' | 'nao_encontrado'
@@ -62,6 +105,8 @@ export function titulosDeDecisao(cargos: readonly CargoAlvoProspeccao[] | undefi
 }
 
 const CAMPOS_PESSOA = [
+  'experience.employment_details.current.name',
+  'experience.employment_details.current.company_website',
   'crustdata_person_id',
   'basic_profile.name',
   'basic_profile.current_title',
@@ -69,12 +114,17 @@ const CAMPOS_PESSOA = [
   'social_handles.professional_network_identifier.profile_url',
 ]
 
-export function corpoPessoasCrustdata(dominio: string, titulos: string[]): Record<string, unknown> {
+export function corpoPessoasCrustdata(alvo: AlvoPessoas, titulos: string[], limite = LIMITE_CANDIDATOS): Record<string, unknown> {
+  // Pelo nome, `(.)` exige todas as palavras ("Companhia Brasileira de
+  // Alumínio" casa "CBA | Companhia Brasileira de Alumínio").
+  const empresa = typeof alvo === 'string'
+    ? { field: 'experience.employment_details.current.company_website_domain', type: '=', value: alvo }
+    : { field: 'experience.employment_details.current.company_name', type: '(.)', value: alvo.nomeEmpresa }
   return {
     filters: {
       op: 'and',
       conditions: [
-        { field: 'experience.employment_details.current.company_website_domain', type: '=', value: dominio },
+        empresa,
         // Sigla/palavra curta ("CEO", "Head", "Dono") com `(.)` casava qualquer
         // palavra parecida ("Terapeuta"); `[.]` exige a palavra exata.
         {
@@ -84,7 +134,7 @@ export function corpoPessoasCrustdata(dominio: string, titulos: string[]): Recor
       ],
     },
     fields: CAMPOS_PESSOA,
-    limit: LIMITE_CANDIDATOS,
+    limit: Math.min(Math.max(1, limite), LIMITE_CANDIDATOS),
   }
 }
 
@@ -105,17 +155,40 @@ function linkedinValido(v: unknown): string | null {
  * Perfil da Crustdata → candidato. Descarta o perfil "da própria empresa"
  * (gente que cadastra a marca como pessoa: "Inovacode ." de CEO).
  */
-export function mapearPessoa(bruto: unknown, dominio: string): CandidatoDecisor | null {
+/** "http://www.cba.com.br/" → "cba.com.br"; null se não parecer domínio. */
+export function dominioDoSite(v: unknown): string | null {
+  if (typeof v !== 'string') return null
+  const d = v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#].*$/, '')
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d) ? d : null
+}
+
+export function mapearPessoa(bruto: unknown, alvo: AlvoPessoas): CandidatoDecisor | null {
   if (!bruto || typeof bruto !== 'object') return null
-  const p = bruto as { basic_profile?: Record<string, unknown>; social_handles?: { professional_network_identifier?: { profile_url?: unknown } } }
+  const p = bruto as {
+    basic_profile?: Record<string, unknown>
+    social_handles?: { professional_network_identifier?: { profile_url?: unknown } }
+    experience?: { employment_details?: { current?: { name?: unknown; company_website?: unknown }[] } }
+  }
   const nome = texto(p.basic_profile?.name, 120)
   const cargo = texto(p.basic_profile?.current_title, 120)
   if (!nome || !cargo) return null
-  if (soLetras(nome) === soLetras(dominio.split('.')[0])) return null
+  if (typeof alvo === 'string' && soLetras(nome) === soLetras(alvo.split('.')[0])) return null
+  // Pelo nome: o e-mail é procurado no site do empregador que casou com o nome.
+  let dominio: string | null | undefined
+  if (typeof alvo !== 'string') {
+    const atuais = Array.isArray(p.experience?.employment_details?.current) ? p.experience!.employment_details!.current! : []
+    // Só vale quem trabalha HOJE na empresa procurada (nome/site conferem).
+    const casou = atuais.find((e) => empregadorConfere(e, alvo))
+    dominio = dominioDoSite(casou?.company_website) ?? alvo.dominioEmpresa ?? null
+    if (!casou || !dominio) return null
+  }
   const local = p.basic_profile?.location && typeof p.basic_profile.location === 'object'
     ? texto((p.basic_profile.location as Record<string, unknown>).raw, 120)
     : null
-  return { nome, cargo, linkedin: linkedinValido(p.social_handles?.professional_network_identifier?.profile_url), local }
+  return {
+    nome, cargo, linkedin: linkedinValido(p.social_handles?.professional_network_identifier?.profile_url), local,
+    ...(dominio ? { dominio } : {}),
+  }
 }
 
 // Nível do cargo para ordenar os candidatos: quem decide mais vem primeiro.
@@ -137,17 +210,19 @@ export function nivelDoCargo(cargo: string): number {
 export type FalhaEnriquecimento = 'sem_chave' | 'sem_credito' | 'limite' | 'indisponivel'
 
 export async function buscarDecisoresCrustdata(
-  dominio: string,
+  alvo: AlvoPessoas,
   titulos: string[],
   chave: string | undefined,
   fetcher: typeof fetch = fetch,
+  /** Pessoas pedidas (cada uma devolvida custa 0,13). */
+  limite = LIMITE_CANDIDATOS,
 ): Promise<{ ok: true; candidatos: CandidatoDecisor[] } | { ok: false; motivo: FalhaEnriquecimento }> {
   if (!chave) return { ok: false, motivo: 'sem_chave' }
   try {
     const res = await fetcher(CRUSTDATA_PESSOAS_URL, {
       method: 'POST',
       headers: { authorization: `Bearer ${chave}`, 'content-type': 'application/json', 'x-api-version': CRUSTDATA_VERSAO },
-      body: JSON.stringify(corpoPessoasCrustdata(dominio, titulos)),
+      body: JSON.stringify(corpoPessoasCrustdata(alvo, titulos, limite)),
       signal: AbortSignal.timeout(TIMEOUT_CRUSTDATA_MS),
     })
     if (res.status === 401) return { ok: false, motivo: 'sem_chave' }
@@ -156,7 +231,7 @@ export async function buscarDecisoresCrustdata(
     if (!res.ok) return { ok: false, motivo: 'indisponivel' }
     const dados = (await res.json()) as { profiles?: unknown }
     const candidatos = (Array.isArray(dados.profiles) ? dados.profiles : [])
-      .map((p) => mapearPessoa(p, dominio))
+      .map((p) => mapearPessoa(p, alvo))
       .filter((c): c is CandidatoDecisor => c !== null)
       .sort((a, b) => nivelDoCargo(a.cargo) - nivelDoCargo(b.cargo))
     return { ok: true, candidatos }

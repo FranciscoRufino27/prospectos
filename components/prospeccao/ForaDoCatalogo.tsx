@@ -141,14 +141,7 @@ export default function ForaDoCatalogo({
       </section>
     );
   }
-  // Sem resultado, quem fala é a tela "Empresa não encontrada" na tabela.
-  if (semResultado) return null;
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-700/60 px-4 py-3 text-sm text-slate-300">
-      <span>Não achou “{texto}”? O catálogo só tem os ramos carregados.</span>
-      <button type="button" onClick={() => onBuscarFora(texto)} className={`${s.outlineButton} focus-ring`}>
-        <Globe2 size={15} /> Procurar fora do catálogo
-      </button>
-    </div>
-  );
+  // Busca por nome: sem resultado na Receita a tela já segue na Crustdata;
+  // com resultado, não há o que dizer aqui.
+  return null;
 }
