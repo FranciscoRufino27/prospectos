@@ -74,7 +74,15 @@ describe('OpenCNPJ', () => {
     })).toEqual({
       cnpj: PETROBRAS, razao_social: 'PETROLEO BRASILEIRO S A PETROBRAS', nome_fantasia: null, situacao_cadastral: 'Ativa',
       cnae_principal: '0600001', atividade_principal: 'Extração de petróleo e gás natural', email: 'x@petrobras.com.br', uf: 'RJ', municipio: 'RIO DE JANEIRO',
+      socios: [],
     })
+  })
+  it('traz o quadro societário (pessoa física) junto, para o cache servir à Prospecção', () => {
+    const d = mapearOpenCnpj(PETROBRAS, { QSA: [
+      { nome_socio: 'MARIA SOUZA LIMA', qualificacao_socio: 'Sócio-Administrador', identificador_socio: 'Pessoa Física', data_entrada_sociedade: '2010-05-01' },
+      { nome_socio: 'HOLDING X LTDA', qualificacao_socio: 'Sócio', identificador_socio: 'Pessoa Jurídica' },
+    ] })
+    expect(d.socios).toEqual([{ nome: 'Maria Souza Lima', qualificacao: 'Sócio-Administrador', desde: '2010-05-01' }])
   })
   it('404 = não encontrado; 5xx/rede = falha (nunca confundidos)', async () => {
     expect(await consultarOpenCnpj(PETROBRAS, vi.fn(async () => new Response('', { status: 404 })) as unknown as typeof fetch)).toEqual({ status: 'nao_encontrado' })

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolverAcesso } from '@/lib/rbac/servidor'
 import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
-import { consultarSocios } from '@/lib/prospeccao/socios'
+import { consultarSociosComCache } from '@/lib/prospeccao/inteligencia'
 import { avaliarDecisor } from '@/lib/prospeccao/adequacaoDecisor'
 import { donoDoEmail } from '@/lib/prospeccao/emailNominal'
 import type { ConsultaSocios } from '@/lib/prospeccao/decisores'
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   if (empresa.error || orgRow.error) return NextResponse.json({ erro: 'Não foi possível consultar agora.' }, { status: 500 })
   if (!empresa.data) return NextResponse.json({ erro: 'CNPJ fora do catálogo.' }, { status: 404 })
 
-  const r = await consultarSocios(cnpj)
+  const r = await consultarSociosComCache({ admin, organizacaoId: org }, cnpj)
   if (!r.ok) {
     return NextResponse.json(
       { erro: r.motivo === 'nao_encontrado' ? 'OpenCNPJ não encontrou este CNPJ.' : 'OpenCNPJ indisponível no momento.' },

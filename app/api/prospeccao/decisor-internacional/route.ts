@@ -8,6 +8,7 @@ import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
 import { buscarDecisoresCrustdata, buscarEmailAnymail } from '@/lib/prospeccao/enriquecimento'
 import { CANDIDATOS_EMAIL_INTERNACIONAL, resolverDecisorInternacional } from '@/lib/prospeccao/decisorAutomatico'
 import { dominioValido, lerDecisorInternacional, salvarDecisorInternacional } from '@/lib/prospeccao/decisoresInternacionaisServidor'
+import { buscarEmailComCache, buscarPessoasComCache } from '@/lib/prospeccao/inteligencia'
 
 export const runtime = 'nodejs'
 // Crustdata (20s) + até 2 consultas Anymail (50s cada) no pior caso.
@@ -32,10 +33,14 @@ export async function POST(req: Request) {
       return null
     })
 
+    // Toda consulta externa passa antes pelo cache de inteligência (global).
+    const intel = { admin, organizacaoId: org }
     const r = await resolverDecisorInternacional(dominio, perfil, salvo, {
       // Só pede quantas pessoas vai tentar na Anymail: cada uma devolvida custa.
-      buscarPessoas: (alvo, titulos) => buscarDecisoresCrustdata(alvo, titulos, process.env.CRUSTDATA_API_KEY, fetch, CANDIDATOS_EMAIL_INTERNACIONAL),
-      buscarEmail: (nome, d) => buscarEmailAnymail(nome, d, process.env.ANYMAILFINDER_API_KEY),
+      buscarPessoas: (alvo, titulos) => buscarPessoasComCache(intel, alvo, titulos, CANDIDATOS_EMAIL_INTERNACIONAL,
+        () => buscarDecisoresCrustdata(alvo, titulos, process.env.CRUSTDATA_API_KEY, fetch, CANDIDATOS_EMAIL_INTERNACIONAL)),
+      buscarEmail: (nome, d) => buscarEmailComCache(intel, nome, d,
+        () => buscarEmailAnymail(nome, d, process.env.ANYMAILFINDER_API_KEY)),
       salvar: (parte) => salvarDecisorInternacional(admin, org, dominio, parte),
     }, typeof corpo.nome === 'string' ? corpo.nome.replace(/\s+/g, ' ').trim().slice(0, 120) : null)
     if (r.status === 'falha') return NextResponse.json({ erro: r.erro }, { status: r.httpStatus })

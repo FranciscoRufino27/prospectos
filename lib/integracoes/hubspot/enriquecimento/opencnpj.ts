@@ -1,4 +1,5 @@
 import 'server-only'
+import { mapearSocios, type Socio } from '@/lib/prospeccao/socios'
 
 // OpenCNPJ (https://api.opencnpj.org/{cnpj}) — grátis, sem chave, CNPJ a CNPJ.
 // Sem cabeçalho de limite; o projeto já usa espaçamento de ~150 ms entre
@@ -14,6 +15,9 @@ export interface DadosCnpj {
   email: string | null
   uf: string | null
   municipio: string | null
+  // Quadro societário (sócios pessoa física). Ausente em entrada antiga do
+  // cache: quem precisa dos sócios trata como "não consultado" e consulta de novo.
+  socios?: Socio[]
 }
 
 export type ResultadoOpenCnpj =
@@ -32,6 +36,7 @@ type Bruto = {
   email?: string
   uf?: string
   municipio?: string
+  QSA?: unknown
 }
 
 const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
@@ -48,6 +53,7 @@ export function mapearOpenCnpj(cnpj: string, d: Bruto): DadosCnpj {
     email: texto(d.email)?.toLowerCase() ?? null,
     uf: texto(d.uf),
     municipio: texto(d.municipio),
+    socios: mapearSocios(d.QSA),
   }
 }
 

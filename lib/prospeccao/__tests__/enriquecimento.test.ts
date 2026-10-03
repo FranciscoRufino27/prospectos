@@ -239,25 +239,31 @@ describe('rotas de enriquecimento', () => {
     expect(f).not.toHaveBeenCalled()
   })
 
-  it('Anymail: salva sem apagar a Crustdata; válido não é pago de novo; não encontrado pode repetir', async () => {
+  it('Anymail: salva sem apagar a Crustdata; "não achou" fica guardado; válido não é pago de novo', async () => {
     globalThis.fetch = vi.fn(async () => resposta(200, { profiles: [PESSOA] })) as unknown as typeof fetch
     await decisor({ cnpj: CNPJ })
 
     globalThis.fetch = vi.fn(async () => resposta(200, { email: null, email_status: 'not_found' })) as unknown as typeof fetch
     expect((await (await email({ cnpj: CNPJ, nome: 'Ana Souza' })).json()).status).toBe('nao_encontrado')
 
-    const achou = vi.fn(async () => resposta(200, { email: 'ana@hotelmar.com.br', email_status: 'valid' }))
+    // Cache de inteligência: o "não achou" da mesma pessoa vale 60 dias, sem nova consulta.
+    const repete = vi.fn(async () => resposta(200, { email: 'ana@hotelmar.com.br', email_status: 'valid' }))
+    globalThis.fetch = repete as unknown as typeof fetch
+    expect((await (await email({ cnpj: CNPJ, nome: 'Ana Souza' })).json()).status).toBe('nao_encontrado')
+    expect(repete).not.toHaveBeenCalled()
+
+    const achou = vi.fn(async () => resposta(200, { email: 'bruno@hotelmar.com.br', email_status: 'valid' }))
     globalThis.fetch = achou as unknown as typeof fetch
-    expect((await (await email({ cnpj: CNPJ, nome: 'Ana Souza' })).json()).email).toBe('ana@hotelmar.com.br')
+    expect((await (await email({ cnpj: CNPJ, nome: 'Bruno Lima' })).json()).email).toBe('bruno@hotelmar.com.br')
     expect(achou).toHaveBeenCalledTimes(1)
 
     const salvo = linhaDa(ORG_A)?.enriquecimento as Enriquecimento
     expect(salvo.crustdata?.candidatos).toHaveLength(1)
-    expect(salvo.anymail?.email).toBe('ana@hotelmar.com.br')
+    expect(salvo.anymail?.email).toBe('bruno@hotelmar.com.br')
 
     const f = vi.fn()
     globalThis.fetch = f as unknown as typeof fetch
-    expect((await (await email({ cnpj: CNPJ, nome: 'ana souza' })).json()).reaproveitado).toBe(true)
+    expect((await (await email({ cnpj: CNPJ, nome: 'bruno lima' })).json()).reaproveitado).toBe(true)
     expect(f).not.toHaveBeenCalled()
   })
 

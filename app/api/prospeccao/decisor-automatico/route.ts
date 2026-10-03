@@ -5,8 +5,8 @@
 import { NextResponse } from 'next/server'
 import { resolverAcesso } from '@/lib/rbac/servidor'
 import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
-import { consultarSocios } from '@/lib/prospeccao/socios'
-import { buscarDecisoresCrustdata, buscarEmailAnymail } from '@/lib/prospeccao/enriquecimento'
+import { buscarDecisoresCrustdata, buscarEmailAnymail, LIMITE_CANDIDATOS } from '@/lib/prospeccao/enriquecimento'
+import { buscarEmailComCache, buscarPessoasComCache, consultarSociosComCache } from '@/lib/prospeccao/inteligencia'
 import { carregarAnalises, salvarConsulta, salvarDecisor, salvarEnriquecimento } from '@/lib/prospeccao/decisoresServidor'
 import { resolverDecisorAutomatico } from '@/lib/prospeccao/decisorAutomatico'
 import type { AnaliseSalva } from '@/lib/prospeccao/decisores'
@@ -41,10 +41,14 @@ export async function POST(req: Request) {
     })
     const salvo = analises[cnpj] ?? null
 
+    // Toda consulta externa passa antes pelo cache de inteligência (global).
+    const intel = { admin, organizacaoId: org }
     const r = await resolverDecisorAutomatico(empresa.data, perfil, salvo, {
-      consultarSocios: (c) => consultarSocios(c),
-      buscarEmail: (nome, dominio) => buscarEmailAnymail(nome, dominio, process.env.ANYMAILFINDER_API_KEY),
-      buscarPessoas: (dominio, titulos) => buscarDecisoresCrustdata(dominio, titulos, process.env.CRUSTDATA_API_KEY),
+      consultarSocios: (c) => consultarSociosComCache(intel, c),
+      buscarEmail: (nome, dominio) => buscarEmailComCache(intel, nome, dominio,
+        () => buscarEmailAnymail(nome, dominio, process.env.ANYMAILFINDER_API_KEY)),
+      buscarPessoas: (alvo, titulos) => buscarPessoasComCache(intel, alvo, titulos, LIMITE_CANDIDATOS,
+        () => buscarDecisoresCrustdata(alvo, titulos, process.env.CRUSTDATA_API_KEY)),
       salvarConsulta: (consulta) => salvarConsulta(admin, org, cnpj, consulta),
       salvarEnriquecimento: async (parte) => { await salvarEnriquecimento(admin, org, cnpj, parte) },
       salvarDecisor: (d) => salvarDecisor(admin, org, user.id, { cnpj, nome: d.nome, cargo: d.cargo || null, linkedin: d.linkedin ?? null }),

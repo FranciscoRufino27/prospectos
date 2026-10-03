@@ -273,9 +273,15 @@ describe('CNPJ fora do catálogo (OpenCNPJ)', () => {
     expect(ok.status).toBe(200)
     expect(await ok.json()).toMatchObject({ cnpj: '12345678000190', razao_social: 'INOVACODE LTDA', email: 'contato@inovacode.com.br', uf: 'SP' })
 
+    // Cache de inteligência: o mesmo CNPJ não é consultado de novo.
+    const repetida = vi.fn()
+    globalThis.fetch = repetida as unknown as typeof fetch
+    expect((await chamar('12345678000190')).status).toBe(200)
+    expect(repetida).not.toHaveBeenCalled()
+
     globalThis.fetch = vi.fn(async () => new Response('', { status: 404 })) as unknown as typeof fetch
-    expect((await chamar('12345678000190')).status).toBe(404)
+    expect((await chamar('11111111000191')).status).toBe(404)
     globalThis.fetch = vi.fn(async () => { throw new Error('timeout') }) as unknown as typeof fetch
-    expect((await chamar('12345678000190')).status).toBe(502)
+    expect((await chamar('22222222000191')).status).toBe(502)
   })
 })

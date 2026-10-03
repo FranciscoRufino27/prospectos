@@ -35,7 +35,9 @@ interface Resultado {
   count?: number | null
 }
 
-const TABELAS_SEM_ORGANIZACAO = new Set(['organizacoes'])
+// Tabelas globais por desenho (sem organizacao_id): o cache de inteligência
+// (enriquecimento_cache, 0056/0064) guarda fatos, não dados de uma org.
+const TABELAS_SEM_ORGANIZACAO = new Set(['organizacoes', 'enriquecimento_cache'])
 
 export class BancoFalso {
   private readonly tabelas = new Map<string, Linha[]>()

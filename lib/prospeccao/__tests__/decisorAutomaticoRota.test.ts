@@ -20,16 +20,19 @@ import { POST } from '@/app/api/prospeccao/decisor-automatico/route'
 const ORG_A = 'aaaaaaaa-0000-4000-8000-000000000001'
 const ORG_B = 'bbbbbbbb-0000-4000-8000-000000000002'
 const USUARIO_A = 'aaaaaaaa-1111-4111-8111-00000000000a'
+const ORG_C = 'cccccccc-0000-4000-8000-000000000003'
+const USUARIO_C = 'cccccccc-1111-4111-8111-00000000000c'
 const CNPJ = '12345678000199'
 const EMAIL_SALVO_B = 'joao.b@hotelsol.com.br'
 
 function montarBanco() {
   return new BancoFalso({
-    perfis: [{ id: USUARIO_A, organizacao_id: ORG_A, role: 'admin' }],
+    perfis: [{ id: USUARIO_A, organizacao_id: ORG_A, role: 'admin' }, { id: USUARIO_C, organizacao_id: ORG_C, role: 'admin' }],
     perfil_permissoes: [],
     organizacoes: [
       { id: ORG_A, configuracoes: { _schema_version: 6 } },
       { id: ORG_B, configuracoes: { _schema_version: 6 } },
+      { id: ORG_C, configuracoes: { _schema_version: 6 } },
     ],
     catalogo_estabelecimentos: [
       { cnpj: CNPJ, porte: 'pequeno', mei: false, email: 'contato@hotelsol.com.br', razao_social: 'HOTEL SOL LTDA', nome_fantasia: 'HOTEL SOL' },
@@ -103,6 +106,24 @@ describe('POST /api/prospeccao/decisor-automatico', () => {
     const daB = linhas.find((l) => l.organizacao_id === ORG_B)
     expect(daB).toMatchObject({ nome: 'Joao Silva' })
     expect((daB?.enriquecimento as { anymail: { email: string } }).anymail.email).toBe(EMAIL_SALVO_B)
+  })
+
+  it('outra org reaproveita os fatos já consultados (cache global) sem chamar API, com a própria análise', async () => {
+    await chamar({ cnpj: CNPJ })
+    const cache = banco().linhas('enriquecimento_cache')
+    expect(cache.map((l) => l.tipo).sort()).toEqual(['anymail_email', 'crustdata_pessoas', 'opencnpj'])
+    expect(cache.every((l) => l.pago_por_organizacao === ORG_A)).toBe(true)
+
+    chamadas.length = 0
+    estado.usuarioId = USUARIO_C
+    const r = await chamar({ cnpj: CNPJ })
+    expect(r.body).toMatchObject({ status: 'completo', email: 'maria@hotelsol.com.br', decisor: { nome: 'Maria Souza Lima' } })
+    expect(chamadas).toHaveLength(0)
+    // A análise (decisor escolhido) é da org C; a da org B segue intacta e invisível.
+    const daC = banco().linhas('prospeccao_decisores').filter((l) => l.organizacao_id === ORG_C)
+    expect(daC).toHaveLength(1)
+    expect(daC[0]).toMatchObject({ nome: 'Maria Souza Lima', atualizado_por: USUARIO_C })
+    expect(JSON.stringify(r.body)).not.toContain(EMAIL_SALVO_B)
   })
 
   it('segunda busca da mesma org não chama nenhuma API de novo', async () => {
