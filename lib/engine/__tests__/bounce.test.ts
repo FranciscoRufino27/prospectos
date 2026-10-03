@@ -14,6 +14,7 @@ function msgBounce(over: Partial<MensagemRecebida> = {}): MensagemRecebida {
     automatica: over.automatica ?? true,
     em: over.em ?? new Date(),
     mensagemId: over.mensagemId,
+    falhaEntrega: over.falhaEntrega,
   }
 }
 
@@ -185,6 +186,97 @@ describe('detectarResposta — bounce handling', () => {
 
     const leadOriginal = await store.buscarLead(lead.id)
     expect(leadOriginal?.bounced).toBe(false)
+  })
+
+  it('bounce sem lead casado guarda o endereço na lista de inválidos da org', async () => {
+    store = new MemoryStore([makeLead({ contato_email: 'outro@empresa.com.br' })])
+    email.injetar(msgBounce({
+      corpo: 'Message to desconhecido@naoexiste.com could not be delivered.',
+      falhaEntrega: { destinatarios: ['desconhecido@naoexiste.com'], status: ['5.1.1'], somenteAtraso: false },
+    }))
+
+    await detectarResposta(store, email, fila)
+
+    expect(store.emailsInvalidos.get('desconhecido@naoexiste.com')).toBe('5.1.1')
+  })
+
+  it('usa o destinatário do delivery-status, não o primeiro endereço do texto', async () => {
+    const caixa = makeLead({ contato_email: 'comercial@laudo.test', estagio: 'primeiro_contato' })
+    const cliente = makeLead({ contato_email: 'fulano@yahoo.com.br', estagio: 'primeiro_contato' })
+    store = new MemoryStore([caixa, cliente])
+    email.injetar(msgBounce({
+      assunto: 'Delivery Status Notification (Failure)',
+      corpo: 'Enviado por comercial@laudo.test. Your message to fulano@yahoo.com.br was not delivered.',
+      falhaEntrega: { destinatarios: ['fulano@yahoo.com.br'], status: ['5.1.1'], somenteAtraso: false },
+    }))
+
+    const r = await detectarResposta(store, email, fila)
+
+    expect(r.bounces).toBe(1)
+    expect((await store.buscarLead(cliente.id))?.bounced).toBe(true)
+    expect((await store.buscarLead(caixa.id))?.bounced).toBe(false)
+    const nota = store.interacoes.find((i) => i.lead_id === cliente.id)
+    expect(nota?.descricao).toMatch(/^Bounce SMTP detectado: .*\(status 5\.1\.1\).*removido da cadência automática e das campanhas/)
+  })
+
+  it('marca TODOS os leads da org com o endereço, inclusive fora do motor (owner n8n)', async () => {
+    const doMotor = makeLead({ contato_email: 'loja@habibs.com.br', owner: 'engine' })
+    const importado = makeLead({ contato_email: 'Loja@Habibs.com.br', owner: 'n8n' })
+    const outro = makeLead({ contato_email: 'outra@habibs.com.br', owner: 'n8n' })
+    store = new MemoryStore([doMotor, importado, outro])
+    email.injetar(msgBounce({
+      falhaEntrega: { destinatarios: ['loja@habibs.com.br'], status: ['5.4.14'], somenteAtraso: false },
+    }))
+
+    await detectarResposta(store, email, fila)
+
+    expect((await store.buscarLead(doMotor.id))?.bounced).toBe(true)
+    expect((await store.buscarLead(importado.id))?.bounced).toBe(true)
+    expect((await store.buscarLead(outro.id))?.bounced).toBe(false)
+  })
+
+  it('um aviso com vários destinatários marca cada um deles', async () => {
+    const a = makeLead({ contato_email: 'a@x.com.br' })
+    const b = makeLead({ contato_email: 'b@x.com.br' })
+    store = new MemoryStore([a, b])
+    email.injetar(msgBounce({
+      falhaEntrega: { destinatarios: ['a@x.com.br', 'b@x.com.br'], status: ['5.1.1'], somenteAtraso: false },
+    }))
+
+    await detectarResposta(store, email, fila)
+
+    expect((await store.buscarLead(a.id))?.bounced).toBe(true)
+    expect((await store.buscarLead(b.id))?.bounced).toBe(true)
+  })
+
+  it('aviso só de ATRASO não tira o lead da campanha nem entra na lista', async () => {
+    const lead = makeLead({ contato_email: 'renata@globo.com', estagio: 'primeiro_contato' })
+    store = new MemoryStore([lead])
+    email.injetar(msgBounce({
+      assunto: 'Delivery Status Notification (Delay)',
+      corpo: 'Message delivery to renata@globo.com has been delayed.',
+      falhaEntrega: { destinatarios: ['renata@globo.com'], status: ['4.4.1'], somenteAtraso: true },
+    }))
+
+    const r = await detectarResposta(store, email, fila)
+
+    expect(r.bounces).toBe(0)
+    expect((await store.buscarLead(lead.id))?.bounced).toBe(false)
+    expect(store.emailsInvalidos.size).toBe(0)
+    expect(store.interacoes).toHaveLength(0)
+  })
+
+  it('sem delivery-status, ignora o endereço do mailer-daemon citado no texto', async () => {
+    const lead = makeLead({ contato_email: 'contato@acme.com.br' })
+    store = new MemoryStore([lead])
+    email.injetar(msgBounce({
+      corpo: 'From: MAILER-DAEMON@smtp.acme.com.br\nYour message to contato@acme.com.br could not be delivered.',
+      falhaEntrega: null,
+    }))
+
+    await detectarResposta(store, email, fila)
+
+    expect((await store.buscarLead(lead.id))?.bounced).toBe(true)
   })
 
   it('auto-reply de férias NÃO é tratado como bounce', async () => {

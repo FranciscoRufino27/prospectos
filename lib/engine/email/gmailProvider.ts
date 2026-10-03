@@ -8,6 +8,7 @@
 import nodemailer, { type Transporter } from 'nodemailer'
 import { ImapFlow } from 'imapflow'
 import { simpleParser, type ParsedMail } from 'mailparser'
+import { lerFalhaEntrega } from './dsn'
 import type { AnexoEmail, EmailProvider } from './provider'
 import type { MensagemRecebida } from '../types'
 import { engineConfig } from '../config'
@@ -247,7 +248,8 @@ export class GmailProvider implements EmailProvider {
         })
       }
       for await (const m of client.fetch(recentes, { source: true, uid: true }, { uid: true })) {
-        const parsed = await simpleParser(m.source as Buffer)
+        const fonte = m.source as Buffer
+        const parsed = await simpleParser(fonte)
         const de = parsed.from?.value?.[0]?.address?.toLowerCase() ?? ''
         const idRecebimento = `${mailbox}\u0000${m.uid}`
         if (m.uid) this.recebimentosPendentes.set(idRecebimento, { mailbox, uid: m.uid })
@@ -261,6 +263,9 @@ export class GmailProvider implements EmailProvider {
           corpo: corpoTexto(parsed),
           automatica: detectarAutomatica(parsed),
           em: parsed.date ?? new Date(),
+          // A própria caixa aparece no aviso (remetente da mensagem original) e
+          // nunca é o destinatário que falhou.
+          falhaEntrega: lerFalhaEntrega(fonte.toString('utf8'), [this.cred.user]),
         })
       }
       log.info('IMAP caixa consultada', {

@@ -18,13 +18,16 @@ class MockChain {
   eqCalls: [string, unknown][] = []
   insertPayload: Record<string, unknown> | null = null
   updatePayload: Record<string, unknown> | null = null
+  upsertPayload: Record<string, unknown> | null = null
+  ilikeCalls: [string, string][] = []
   constructor(private result: { data?: unknown; count?: number } = { data: [] }) {}
   select() { return this }
   update(row: Record<string, unknown>) { this.updatePayload = row; return this }
   insert(row: Record<string, unknown>) { this.insertPayload = row; return this }
+  upsert(row: Record<string, unknown>) { this.upsertPayload = row; return this }
   eq(c: string, v: unknown) { this.eqCalls.push([c, v]); return this }
   in() { return this }
-  ilike() { return this }
+  ilike(c: string, v: string) { this.ilikeCalls.push([c, v]); return this }
   is() { return this }
   gte() { return this }
   order() { return this }
@@ -102,6 +105,22 @@ describe('multi-tenant — SupabaseStore filtra/grava organizacao_id', () => {
     const { client, chains } = mockClient()
     await new SupabaseStore(ORG, client).buscarTemplateEmail('oticas', 'primeiro_contato')
     expect(chains.templates.temEq('organizacao_id', ORG)).toBe(true)
+  })
+
+  it('buscarLeadsPorEmail filtra por organizacao_id, sem trava de owner, e escapa curingas', async () => {
+    const { client, chains } = mockClient()
+    await new SupabaseStore(ORG, client).buscarLeadsPorEmail(' Leandro_Pedro7@Hotmail.com ')
+    expect(chains.leads.temEq('organizacao_id', ORG)).toBe(true)
+    expect(chains.leads.eqCalls.some(([c]) => c === 'owner')).toBe(false)
+    expect(chains.leads.ilikeCalls).toEqual([['contato_email', 'leandro\\_pedro7@hotmail.com']])
+  })
+
+  it('registrarEmailInvalido GRAVA organizacao_id e o e-mail normalizado', async () => {
+    const { client, chains } = mockClient()
+    await new SupabaseStore(ORG, client).registrarEmailInvalido(' Fulano@Yahoo.com.br ', '5.1.1')
+    expect(chains.emails_invalidos.upsertPayload).toEqual({
+      organizacao_id: ORG, email: 'fulano@yahoo.com.br', motivo: '5.1.1', origem: 'bounce',
+    })
   })
 
   it('expõe organizacaoId (os fluxos leem daqui p/ a config da org certa)', () => {

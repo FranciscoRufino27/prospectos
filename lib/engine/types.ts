@@ -54,6 +54,20 @@ export interface MensagemRecebida {
   corpo: string
   automatica?: boolean // dica do provedor: é auto-resposta?
   em: Date
+  // Campos estruturados do aviso de falha de entrega (DSN), quando a mensagem
+  // traz a parte delivery-status. Ausente/null: o fluxo cai na leitura do texto.
+  falhaEntrega?: FalhaEntrega | null
+}
+
+// O que um aviso de falha de entrega (RFC 3464) declara — ver email/dsn.ts.
+export interface FalhaEntrega {
+  // Destinatários que o servidor declarou como não entregues, em minúsculas.
+  destinatarios: string[]
+  // Códigos de status, ex.: '5.1.1' (endereço inexistente), '4.4.1' (timeout).
+  status: string[]
+  // true quando o aviso só informa ATRASO (Action: delayed): o servidor segue
+  // tentando e, se desistir, manda outro aviso com Action: failed.
+  somenteAtraso: boolean
 }
 
 // Usuário (closer/responsável) — subconjunto necessário ao motor.
