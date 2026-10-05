@@ -5,9 +5,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { parseWorkspaceConfig, type ProspeccaoConfig } from '@/lib/config/workspaceConfig'
 import { dominioDaEmpresa } from './dominioEmpresa'
+import { travasDaConfig, type TravasCusto } from './travasCusto'
 
 export type ContextoEmpresa =
-  | { ok: true; dominio: string; perfil: ProspeccaoConfig | undefined }
+  | { ok: true; dominio: string; perfil: ProspeccaoConfig | undefined; travas: TravasCusto }
   | { ok: false; erro: string; status: number }
 
 export async function contextoDaEmpresa(admin: SupabaseClient, org: string, cnpj: string): Promise<ContextoEmpresa> {
@@ -22,5 +23,6 @@ export async function contextoDaEmpresa(admin: SupabaseClient, org: string, cnpj
   if (!dominio) {
     return { ok: false, erro: 'A empresa não tem domínio próprio (o e-mail da Receita é pessoal, de contador ou ausente).', status: 422 }
   }
-  return { ok: true, dominio: dominio.dominio, perfil: parseWorkspaceConfig(orgRow.data?.configuracoes).prospeccao }
+  const config = parseWorkspaceConfig(orgRow.data?.configuracoes)
+  return { ok: true, dominio: dominio.dominio, perfil: config.prospeccao, travas: travasDaConfig(config.enriquecimentoPago) }
 }

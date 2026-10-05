@@ -17,7 +17,7 @@
 import { PAISES_INTERNACIONAL, type CodigoPais } from '@/lib/prospeccao/crustdata'
 
 // Suba este número ao mudar o formato do blob, e adicione o passo em `migrar()`.
-export const WORKSPACE_CONFIG_SCHEMA_VERSION = 10
+export const WORKSPACE_CONFIG_SCHEMA_VERSION = 11
 
 // Objetivos que o produto já consegue medir de ponta a ponta. Novos objetivos
 // só entram nesta allowlist quando houver dado operacional real para dashboard,
@@ -345,8 +345,38 @@ export interface WorkspaceConfig {
   operacao?: OperacaoConfig
   roi?: RoiConfig
   comercial?: ComercialConfig
+  // Travas de custo do enriquecimento pago da Prospecção. Ausência = DESLIGADO.
+  enriquecimentoPago?: EnriquecimentoPagoConfig
   // Configuração de campos por workspace (Personalização > Campos). Ausência = todos no padrão.
   camposUI?: CampoUI[]
+}
+
+// Enriquecimento pago da Prospecção (Crustdata, Anymail): liga/desliga e
+// orçamento mensal em créditos POR FONTE. Fonte sem orçamento definido não
+// gasta nada. As chaves das APIs são da plataforma; esta configuração decide
+// se ESTA organização pode gastá-las e quanto.
+export const FONTES_PAGAS = ['crustdata', 'anymail'] as const
+export type FontePaga = (typeof FONTES_PAGAS)[number]
+export const ORCAMENTO_MAXIMO_CREDITOS = 100_000
+
+export interface EnriquecimentoPagoConfig {
+  ativo?: boolean
+  orcamentoMensal?: Partial<Record<FontePaga, number>>
+}
+
+export function parseEnriquecimentoPago(bruto: unknown): EnriquecimentoPagoConfig | undefined {
+  if (!ehObjeto(bruto)) return undefined
+  const out: EnriquecimentoPagoConfig = {}
+  if (typeof bruto.ativo === 'boolean') out.ativo = bruto.ativo
+  if (ehObjeto(bruto.orcamentoMensal)) {
+    const orc: Partial<Record<FontePaga, number>> = {}
+    for (const fonte of FONTES_PAGAS) {
+      const v = bruto.orcamentoMensal[fonte]
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= ORCAMENTO_MAXIMO_CREDITOS) orc[fonte] = Math.round(v * 100) / 100
+    }
+    if (Object.keys(orc).length) out.orcamentoMensal = orc
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 // Chaves de feature conhecidas (tipadas). Só estas são aceitas na leitura do
@@ -396,6 +426,8 @@ function migrar(bruto: Record<string, unknown>): Record<string, unknown> {
   if (v < 9) cfg = { ...cfg, _schema_version: 9 }
   // v9 -> v10: adiciona prospeccao.paises (busca internacional). Ausência = nenhum país-alvo.
   if (v < 10) cfg = { ...cfg, _schema_version: 10 }
+  // v10 -> v11: adiciona enriquecimentoPago (travas de custo). Ausência = desligado.
+  if (v < 11) cfg = { ...cfg, _schema_version: 11 }
   return cfg
 }
 
@@ -503,6 +535,8 @@ export function parseWorkspaceConfig(bruto: unknown): WorkspaceConfig {
   if (prospeccao) out.prospeccao = prospeccao
   const pesquisas = parsePesquisasSalvas(obj.prospeccaoPesquisas)
   if (pesquisas) out.prospeccaoPesquisas = pesquisas
+  const pago = parseEnriquecimentoPago(obj.enriquecimentoPago)
+  if (pago) out.enriquecimentoPago = pago
   return out
 }
 
@@ -559,6 +593,8 @@ export interface WorkspaceConfigEditavel {
   prospeccao?: ProspeccaoConfig | null
   // Pesquisas salvas. Substitui a lista inteira; lista vazia/null LIMPA.
   prospeccaoPesquisas?: PesquisaSalva[] | null
+  // Travas de custo do enriquecimento pago. Substitui a seção inteira; null DESLIGA (limpa).
+  enriquecimentoPago?: EnriquecimentoPagoConfig | null
 }
 
 export function mesclarWorkspaceConfig(atual: WorkspaceConfig, patch: WorkspaceConfigEditavel): WorkspaceConfig {
@@ -613,6 +649,11 @@ export function mesclarWorkspaceConfig(atual: WorkspaceConfig, patch: WorkspaceC
     const lista = patch.prospeccaoPesquisas === null ? undefined : parsePesquisasSalvas(patch.prospeccaoPesquisas)
     if (lista) next.prospeccaoPesquisas = lista
     else delete next.prospeccaoPesquisas
+  }
+  if (patch.enriquecimentoPago !== undefined) {
+    const pago = patch.enriquecimentoPago === null ? undefined : parseEnriquecimentoPago(patch.enriquecimentoPago)
+    if (pago) next.enriquecimentoPago = pago
+    else delete next.enriquecimentoPago
   }
   return serializeWorkspaceConfig(next)
 }

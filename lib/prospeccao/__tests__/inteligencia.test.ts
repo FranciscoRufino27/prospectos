@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { BancoFalso } from '@/lib/templates/__tests__/bancoFalso'
 import {
   buscarEmailComCache, buscarPessoasComCache, chaveEmail, chavePessoas, consultarOpenCnpjComCache, consultarSociosComCache,
-  CUSTO_PESSOA_CRUSTDATA, type ContextoInteligencia,
+  CUSTO_PESSOA_CRUSTDATA, type ContextoInteligencia, type ContextoPago,
 } from '../inteligencia'
 import type { CandidatoDecisor, EmailDecisor } from '../enriquecimento'
 
@@ -14,8 +14,9 @@ const ORG_B = 'bbbbbbbb-0000-4000-8000-000000000002'
 const DIA = 86_400_000
 const T0 = Date.UTC(2026, 9, 3)
 
-function contexto(banco: BancoFalso, org: string, agora = T0): ContextoInteligencia {
-  return { admin: banco.cliente(), organizacaoId: org, agora: () => agora }
+// Travas ligadas com orçamento folgado: aqui o assunto é o cache (bloqueios em travasCusto.test.ts).
+function contexto(banco: BancoFalso, org: string, agora = T0): ContextoPago {
+  return { admin: banco.cliente(), organizacaoId: org, agora: () => agora, travas: { ativo: true, orcamentoMensal: { crustdata: 1000, anymail: 1000 } } }
 }
 
 const emailValido = (nome: string): EmailDecisor => ({ nome, dominio: 'hotelsol.com.br', status: 'valido', email: 'maria@hotelsol.com.br', consultadoEm: 'x' })
@@ -77,12 +78,13 @@ describe('buscarEmailComCache', () => {
     expect(instavel).toHaveBeenCalledTimes(2)
   })
 
-  it('cache fora do ar não bloqueia: consulta a API normalmente', async () => {
+  it('banco fora do ar: sem cache e sem conferir o gasto, a fonte paga não é chamada', async () => {
     const quebrado = { from: () => { throw new Error('tabela inexistente') } } as unknown as ContextoInteligencia['admin']
     const api = vi.fn(async () => ({ ok: true as const, resultado: emailValido('Maria') }))
-    const r = await buscarEmailComCache({ admin: quebrado, organizacaoId: ORG_A, agora: () => T0 }, 'Maria', 'hotelsol.com.br', api)
-    expect(r.ok).toBe(true)
-    expect(api).toHaveBeenCalledTimes(1)
+    // Sem conseguir conferir o gasto (banco fora), a trava BLOQUEIA: não gasta sem contar.
+    const r = await buscarEmailComCache({ admin: quebrado, organizacaoId: ORG_A, agora: () => T0, travas: { ativo: true, orcamentoMensal: { anymail: 10 } } }, 'Maria', 'hotelsol.com.br', api)
+    expect(r).toMatchObject({ ok: false, motivo: 'orcamento_esgotado' })
+    expect(api).not.toHaveBeenCalled()
   })
 })
 

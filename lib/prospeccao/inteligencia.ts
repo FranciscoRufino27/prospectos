@@ -5,6 +5,7 @@ import { consultarOpenCnpj, type ResultadoOpenCnpj } from '@/lib/integracoes/hub
 import { soLetras } from './emailNominal'
 import type { AlvoPessoas, CandidatoDecisor, EmailDecisor, FalhaEnriquecimento } from './enriquecimento'
 import type { Socio } from './socios'
+import { autorizarGasto, registrarConsumo, type ContextoCusto, type TravasCusto } from './travasCusto'
 
 // Inteligência da Prospecção: tudo que a plataforma já consultou sobre uma
 // empresa ou pessoa fica no cache GLOBAL (enriquecimento_cache, 0056/0064) e
@@ -17,8 +18,13 @@ import type { Socio } from './socios'
 // Nunca viram cache (não são fatos sobre a empresa): chave ausente, conta sem
 // crédito e limite de requisições. Instabilidade ("indisponivel") vira falha
 // de 10 min. Cache fora do ar não bloqueia: a consulta segue como antes.
+//
+// Fontes PAGAS: cache válido responde primeiro e NÃO passa pelas travas nem
+// gera custo (consumo registrado com origem 'cache' e custo 0). Só na falta do
+// cache entram as travas da organização (liga/desliga + orçamento, ver
+// travasCusto.ts) e, autorizada, a chamada — registrada com o custo real.
 
-/** Créditos estimados (auditoria): Crustdata cobra por pessoa devolvida; Anymail, por e-mail válido. */
+/** Créditos estimados: Crustdata cobra por pessoa devolvida; Anymail, por e-mail achado. */
 export const CUSTO_PESSOA_CRUSTDATA = 0.13
 export const CUSTO_EMAIL_VALIDO_ANYMAIL = 1
 
@@ -28,6 +34,14 @@ export interface ContextoInteligencia {
   organizacaoId: string
   agora?: () => number
 }
+
+/** Contexto das fontes pagas: travas da organização e quem disparou. */
+export interface ContextoPago extends ContextoInteligencia {
+  travas: TravasCusto
+  usuarioId?: string | null
+}
+
+const custoDe = (ctx: ContextoPago): ContextoCusto => ({ admin: ctx.admin, organizacaoId: ctx.organizacaoId, travas: ctx.travas, usuarioId: ctx.usuarioId, agora: ctx.agora })
 
 const agoraDe = (ctx: ContextoInteligencia) => (ctx.agora ?? Date.now)()
 
@@ -105,60 +119,89 @@ export async function consultarSociosComCache(
 // Crustdata People Search (pago por pessoa devolvida)
 // ---------------------------------------------------------------------------
 
-type ResultadoPessoas = { ok: true; candidatos: CandidatoDecisor[] } | { ok: false; motivo: FalhaEnriquecimento }
+type FalhaPaga = { ok: false; motivo: FalhaEnriquecimento; detalhe?: string }
+type ResultadoPessoas = { ok: true; candidatos: CandidatoDecisor[] } | FalhaPaga
 
 export async function buscarPessoasComCache(
-  ctx: ContextoInteligencia,
+  ctx: ContextoPago,
   alvo: AlvoPessoas,
   titulos: readonly string[],
   limite: number,
   buscar: () => Promise<ResultadoPessoas>,
 ): Promise<ResultadoPessoas> {
   const chave = chavePessoas(alvo, titulos, limite)
+  const referencia = typeof alvo === 'string' ? alvo : alvo.dominioEmpresa ?? alvo.nomeEmpresa
+  const consumo = { fonte: 'crustdata' as const, operacao: 'pessoas' as const, chave, referencia }
+
   const hit = await ler<CandidatoDecisor[]>(ctx, 'crustdata_pessoas', chave)
-  if (hit?.status === 'ok') return { ok: true, candidatos: Array.isArray(hit.resultado) ? hit.resultado : [] }
-  if (hit?.status === 'nao_encontrado') return { ok: true, candidatos: [] }
-  if (hit?.status === 'falha') return { ok: false, motivo: 'indisponivel' }
+  if (hit) {
+    await registrarConsumo(custoDe(ctx), { ...consumo, origem: 'cache', resultado: hit.status, custo: 0 })
+    if (hit.status === 'ok') return { ok: true, candidatos: Array.isArray(hit.resultado) ? hit.resultado : [] }
+    if (hit.status === 'nao_encontrado') return { ok: true, candidatos: [] }
+    return { ok: false, motivo: 'indisponivel' }
+  }
+
+  const autorizacao = await autorizarGasto(custoDe(ctx), 'crustdata', limite * CUSTO_PESSOA_CRUSTDATA)
+  if (!autorizacao.ok) return { ok: false, motivo: autorizacao.motivo, detalhe: autorizacao.detalhe }
 
   const r = await buscar()
   if (r.ok) {
-    await gravar(ctx, 'crustdata_pessoas', chave,
-      { status: r.candidatos.length ? 'ok' : 'nao_encontrado', resultado: r.candidatos },
-      Number((r.candidatos.length * CUSTO_PESSOA_CRUSTDATA).toFixed(4)))
+    const custo = Number((r.candidatos.length * CUSTO_PESSOA_CRUSTDATA).toFixed(4))
+    const status = r.candidatos.length ? 'ok' as const : 'nao_encontrado' as const
+    await gravar(ctx, 'crustdata_pessoas', chave, { status, resultado: r.candidatos }, custo)
+    await registrarConsumo(custoDe(ctx), { ...consumo, origem: 'api', resultado: status, custo })
   } else if (r.motivo === 'indisponivel') {
     await gravar(ctx, 'crustdata_pessoas', chave, { status: 'falha', resultado: [] }, 0)
+    await registrarConsumo(custoDe(ctx), { ...consumo, origem: 'api', resultado: 'falha', custo: 0 })
+  } else if (r.motivo !== 'sem_chave') {
+    // Sem crédito / limite: a fonte foi chamada e recusou (sem custo, sem cache).
+    await registrarConsumo(custoDe(ctx), { ...consumo, origem: 'api', resultado: 'falha', custo: 0 })
   }
   return r
 }
 
 // ---------------------------------------------------------------------------
-// Anymail Finder (pago por e-mail válido; "não encontrado" não cobra)
+// Anymail Finder (pago por e-mail achado; "não encontrado" não cobra)
 // ---------------------------------------------------------------------------
 
-type ResultadoEmail = { ok: true; resultado: EmailDecisor } | { ok: false; motivo: FalhaEnriquecimento }
+type ResultadoEmail = { ok: true; resultado: EmailDecisor } | FalhaPaga
+
+/** E-mail válido = 1 crédito; "arriscado" conta 1 por segurança (estimativa); não achou = 0. */
+export const custoEmail = (status: EmailDecisor['status']) => (status === 'nao_encontrado' ? 0 : CUSTO_EMAIL_VALIDO_ANYMAIL)
 
 export async function buscarEmailComCache(
-  ctx: ContextoInteligencia,
+  ctx: ContextoPago,
   nome: string,
   dominio: string,
   buscar: () => Promise<ResultadoEmail>,
 ): Promise<ResultadoEmail> {
   const chave = chaveEmail(nome, dominio)
+  const consumo = { fonte: 'anymail' as const, operacao: 'email' as const, chave, referencia: dominio, pessoa: nome }
+
   const hit = await ler<EmailDecisor>(ctx, 'anymail_email', chave)
-  if (hit?.status === 'ok' && hit.resultado?.email) return { ok: true, resultado: hit.resultado }
-  if (hit?.status === 'nao_encontrado') {
-    return { ok: true, resultado: { nome, dominio, status: 'nao_encontrado', email: null, consultadoEm: hit.consultadoEm } }
+  if (hit && !(hit.status === 'ok' && !hit.resultado?.email)) {
+    await registrarConsumo(custoDe(ctx), { ...consumo, origem: 'cache', resultado: hit.status, custo: 0 })
+    if (hit.status === 'ok') return { ok: true, resultado: hit.resultado }
+    if (hit.status === 'nao_encontrado') {
+      return { ok: true, resultado: { nome, dominio, status: 'nao_encontrado', email: null, consultadoEm: hit.consultadoEm } }
+    }
+    return { ok: false, motivo: 'indisponivel' }
   }
-  if (hit?.status === 'falha') return { ok: false, motivo: 'indisponivel' }
+
+  const autorizacao = await autorizarGasto(custoDe(ctx), 'anymail', CUSTO_EMAIL_VALIDO_ANYMAIL)
+  if (!autorizacao.ok) return { ok: false, motivo: autorizacao.motivo, detalhe: autorizacao.detalhe }
 
   const r = await buscar()
   if (r.ok) {
     const achou = r.resultado.status !== 'nao_encontrado'
-    // Estimativa: e-mail válido = 1 crédito; "arriscado" não tem custo conhecido.
-    const custo = r.resultado.status === 'valido' ? CUSTO_EMAIL_VALIDO_ANYMAIL : achou ? null : 0
+    const custo = custoEmail(r.resultado.status)
     await gravar(ctx, 'anymail_email', chave, { status: achou ? 'ok' : 'nao_encontrado', resultado: r.resultado }, custo)
+    await registrarConsumo(custoDe(ctx), { ...consumo, origem: 'api', resultado: achou ? 'ok' : 'nao_encontrado', custo })
   } else if (r.motivo === 'indisponivel') {
     await gravar(ctx, 'anymail_email', chave, { status: 'falha', resultado: null }, 0)
+    await registrarConsumo(custoDe(ctx), { ...consumo, origem: 'api', resultado: 'falha', custo: 0 })
+  } else if (r.motivo !== 'sem_chave') {
+    await registrarConsumo(custoDe(ctx), { ...consumo, origem: 'api', resultado: 'falha', custo: 0 })
   }
   return r
 }

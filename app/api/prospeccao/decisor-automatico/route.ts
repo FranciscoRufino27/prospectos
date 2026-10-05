@@ -9,6 +9,7 @@ import { buscarDecisoresCrustdata, buscarEmailAnymail, LIMITE_CANDIDATOS } from 
 import { buscarEmailComCache, buscarPessoasComCache, consultarSociosComCache } from '@/lib/prospeccao/inteligencia'
 import { carregarAnalises, salvarConsulta, salvarDecisor, salvarEnriquecimento } from '@/lib/prospeccao/decisoresServidor'
 import { resolverDecisorAutomatico } from '@/lib/prospeccao/decisorAutomatico'
+import { travasDaConfig } from '@/lib/prospeccao/travasCusto'
 import type { AnaliseSalva } from '@/lib/prospeccao/decisores'
 
 export const runtime = 'nodejs'
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
     // Só CNPJ do catálogo: a rota não é um proxy aberto das APIs pagas.
     if (!empresa.data) return NextResponse.json({ erro: 'CNPJ fora do catálogo.' }, { status: 404 })
 
-    const perfil = parseWorkspaceConfig(orgRow.data?.configuracoes).prospeccao
+    const config = parseWorkspaceConfig(orgRow.data?.configuracoes)
+    const perfil = config.prospeccao
     // Sem o salvo (falha de leitura), segue consultando: só perde o reaproveitamento.
     const analises = await carregarAnalises(admin, org, [cnpj]).catch((e) => {
       console.error('[prospeccao/decisor-automatico] sem análise salva:', e)
@@ -42,7 +44,8 @@ export async function POST(req: Request) {
     const salvo = analises[cnpj] ?? null
 
     // Toda consulta externa passa antes pelo cache de inteligência (global).
-    const intel = { admin, organizacaoId: org }
+    // Travas de custo da org (liga/desliga + orçamento) valem para Crustdata e Anymail.
+    const intel = { admin, organizacaoId: org, travas: travasDaConfig(config.enriquecimentoPago), usuarioId: user.id }
     const r = await resolverDecisorAutomatico(empresa.data, perfil, salvo, {
       consultarSocios: (c) => consultarSociosComCache(intel, c),
       buscarEmail: (nome, dominio) => buscarEmailComCache(intel, nome, dominio,

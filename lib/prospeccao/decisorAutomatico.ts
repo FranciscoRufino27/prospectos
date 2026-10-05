@@ -39,17 +39,32 @@ export interface EmpresaParaDecisor {
 }
 
 /** sem_decisor: só na busca internacional (ninguém com cargo-alvo na Crustdata). */
-export type MotivoIncompleto = 'sem_dominio' | 'sem_socio' | 'sem_decisor' | 'sem_email'
+/** bloqueado_*: a fonte paga necessária está bloqueada (travas de custo, chave ou crédito) — a busca em lote SEGUE. */
+export type MotivoIncompleto = 'sem_dominio' | 'sem_socio' | 'sem_decisor' | 'sem_email' | 'bloqueado_crustdata' | 'bloqueado_anymail'
+
+/** Por que a fonte paga não foi chamada para esta empresa. */
+export interface BloqueioFonte {
+  fonte: 'crustdata' | 'anymail'
+  motivo: FalhaEnriquecimento
+  mensagem: string
+}
+
+// Bloqueio da FONTE (não da busca): desligada, sem orçamento, sem chave ou sem
+// crédito. No lote a empresa fica incompleta e as outras continuam; só a ação
+// paga direta do usuário (rotas manuais) responde 402/503. Limite de
+// requisições (429) e instabilidade seguem como falha.
+const BLOQUEIOS_DA_FONTE: readonly FalhaEnriquecimento[] = ['pago_desligado', 'orcamento_esgotado', 'sem_chave', 'sem_credito']
+export const ehBloqueioDaFonte = (motivo: FalhaEnriquecimento) => BLOQUEIOS_DA_FONTE.includes(motivo)
 
 export type ResultadoDecisorAutomatico =
   | { status: 'completo'; decisor: Decisor; email: string; consulta: ConsultaSocios; enriquecimento: Enriquecimento }
-  | { status: 'incompleto'; motivo: MotivoIncompleto; consulta: ConsultaSocios | null; enriquecimento: Enriquecimento | null }
+  | { status: 'incompleto'; motivo: MotivoIncompleto; consulta: ConsultaSocios | null; enriquecimento: Enriquecimento | null; bloqueio?: BloqueioFonte }
   | { status: 'falha'; erro: string; httpStatus: number }
 
 export interface DependenciasDecisor {
   consultarSocios(cnpj: string): Promise<{ ok: true; socios: Socio[] } | { ok: false; motivo: 'nao_encontrado' | 'indisponivel' }>
-  buscarEmail(nome: string, dominio: string): Promise<{ ok: true; resultado: EmailDecisor } | { ok: false; motivo: FalhaEnriquecimento }>
-  buscarPessoas(alvo: AlvoPessoas, titulos: string[]): Promise<{ ok: true; candidatos: CandidatoDecisor[] } | { ok: false; motivo: FalhaEnriquecimento }>
+  buscarEmail(nome: string, dominio: string): Promise<{ ok: true; resultado: EmailDecisor } | { ok: false; motivo: FalhaEnriquecimento; detalhe?: string }>
+  buscarPessoas(alvo: AlvoPessoas, titulos: string[]): Promise<{ ok: true; candidatos: CandidatoDecisor[] } | { ok: false; motivo: FalhaEnriquecimento; detalhe?: string }>
   /** Persistência por organização (a rota amarra a org da sessão). */
   salvarConsulta(consulta: ConsultaSocios): Promise<void>
   salvarEnriquecimento(parte: Enriquecimento): Promise<void>
@@ -72,17 +87,36 @@ export function mesmaPessoa(nomeReceita: string, nomePerfil: string): boolean {
   return perfil.slice(1).every((p) => receita.slice(1).includes(p))
 }
 
-function mensagemFalha(motivo: FalhaEnriquecimento, fonte: string): { erro: string; httpStatus: number } {
+function mensagemFalha(falha: { motivo: FalhaEnriquecimento; detalhe?: string }, fonte: string): { erro: string; httpStatus: number } {
+  // 402/429/503 fazem a busca automática parar (a tela trata como fatal).
   const textos: Record<FalhaEnriquecimento, [string, number]> = {
     sem_chave: ['integração não configurada (chave ausente ou inválida).', 503],
     sem_credito: ['a conta está sem crédito.', 402],
     limite: ['muitas consultas seguidas; aguarde um minuto.', 429],
     indisponivel: ['serviço indisponível no momento.', 502],
+    pago_desligado: ['enriquecimento pago desligado para esta organização.', 503],
+    orcamento_esgotado: ['orçamento do enriquecimento pago esgotado.', 402],
   }
-  const [texto, httpStatus] = textos[motivo]
-  return { erro: `${fonte}: ${texto}`, httpStatus }
+  const [texto, httpStatus] = textos[falha.motivo]
+  const detalhe = falha.detalhe && falha.motivo === 'orcamento_esgotado' ? ` (${falha.detalhe})` : ''
+  return { erro: `${fonte}: ${texto}${detalhe}`, httpStatus }
 }
 
+function bloqueioDe(falha: { motivo: FalhaEnriquecimento; detalhe?: string }, fonte: BloqueioFonte['fonte']): BloqueioFonte {
+  return { fonte, motivo: falha.motivo, mensagem: mensagemFalha(falha, fonte === 'crustdata' ? 'Crustdata' : 'Anymail').erro }
+}
+
+/**
+ * Brasil, do mais barato ao mais caro:
+ *   1. decisor grátis: escolha salva da org > sócio (OpenCNPJ, via cache) que
+ *      serve pelo perfil (cargos-alvo + porte). Achou → Crustdata NÃO é chamada;
+ *   2. Crustdata SÓ quando falta decisor (sem sócio, ou sócio fora do perfil):
+ *      a pessoa de cargo mais alto no domínio;
+ *   3. e-mail: o da Receita, se for nominal do decisor; senão o já consultado
+ *      pela org; só então Anymail (decisor existe e falta e-mail).
+ * Toda chamada externa passa pelo cache de inteligência e pelas travas de
+ * custo (as dependências injetadas pela rota).
+ */
 export async function resolverDecisorAutomatico(
   empresa: EmpresaParaDecisor,
   perfil: ProspeccaoConfig | undefined,
@@ -93,65 +127,72 @@ export async function resolverDecisorAutomatico(
   // Sem domínio próprio nenhuma fonte paga acha o e-mail: nem consulta.
   if (!dominio) return { status: 'incompleto', motivo: 'sem_dominio', consulta: salvo?.consulta ?? null, enriquecimento: salvo?.enriquecimento ?? null }
 
-  // 1. Quem é o decisor: escolha já salva pela org vence; senão o sócio sugerido.
+  // 1. Sócios (grátis).
   let consulta = salvo?.consulta ?? null
   if (!consulta) {
     const r = await deps.consultarSocios(empresa.cnpj)
-    if (!r.ok) {
-      if (r.motivo === 'nao_encontrado') return { status: 'incompleto', motivo: 'sem_socio', consulta: null, enriquecimento: salvo?.enriquecimento ?? null }
-      return { status: 'falha', erro: 'OpenCNPJ indisponível no momento.', httpStatus: 502 }
-    }
-    const dono = donoDoEmail(empresa.email, r.socios)
-    const avaliacao = avaliarDecisor(r.socios, empresa, perfil, dono)
+    if (!r.ok && r.motivo === 'indisponivel') return { status: 'falha', erro: 'OpenCNPJ indisponível no momento.', httpStatus: 502 }
+    const socios = r.ok ? r.socios : []
+    const dono = donoDoEmail(empresa.email, socios)
+    const avaliacao = avaliarDecisor(socios, empresa, perfil, dono)
     consulta = { socios: avaliacao.socios, sugerido: avaliacao.sugerido, status: avaliacao.status, motivo: avaliacao.motivo, emailNominalDe: dono?.nome ?? null }
-    await deps.salvarConsulta(consulta).catch((e) => console.error('[prospeccao/decisor-automatico] não salvou a consulta:', e))
+    if (r.ok) await deps.salvarConsulta(consulta).catch((e) => console.error('[prospeccao/decisor-automatico] não salvou a consulta:', e))
   }
-  const nome = salvo?.decisor?.nome ?? consulta.sugerido?.nome ?? null
-  if (!nome) return { status: 'incompleto', motivo: 'sem_socio', consulta, enriquecimento: salvo?.enriquecimento ?? null }
 
-  // 2. E-mail do decisor. Resultado salvo para a mesma pessoa e domínio volta
-  // sem nova consulta (inclusive "não encontrado": a busca automática não
-  // insiste; o botão manual do detalhe ainda pode tentar de novo).
   let enriquecimento: Enriquecimento = { ...(salvo?.enriquecimento ?? {}) }
-  const anterior = enriquecimento.anymail
-  let anymail: EmailDecisor
-  if (anterior && anterior.dominio === dominio && soLetras(anterior.nome) === soLetras(nome)) {
-    anymail = anterior
-  } else {
-    const r = await deps.buscarEmail(nome, dominio)
-    if (!r.ok) return { status: 'falha', ...mensagemFalha(r.motivo, 'Anymail') }
-    anymail = r.resultado
-    enriquecimento = { ...enriquecimento, anymail }
-    await deps.salvarEnriquecimento({ anymail }).catch((e) => console.error('[prospeccao/decisor-automatico] não salvou o e-mail:', e))
-  }
-  if (anymail.status !== 'valido' || !anymail.email) return { status: 'incompleto', motivo: 'sem_email', consulta, enriquecimento }
+  const socioServe = consulta.status !== 'precisa_outro_decisor' && !!consulta.sugerido
+  let nome = salvo?.decisor?.nome ?? (socioServe ? consulta.sugerido!.nome : null)
+  let cargo = salvo?.decisor?.nome === nome ? salvo?.decisor?.cargo ?? '' : (socioServe && consulta.sugerido?.nome === nome ? consulta.sugerido!.qualificacao : '')
+  let linkedin = salvo?.decisor?.nome === nome ? salvo?.decisor?.linkedin ?? null : null
+  let dominioEmail = dominio
 
-  // 3. LinkedIn e cargo atual do mesmo decisor. Opcional: sem perfil, a
-  // empresa continua completa com o cargo da Receita.
-  let crustdata = enriquecimento.crustdata?.dominio === dominio ? enriquecimento.crustdata : undefined
-  if (!crustdata) {
-    const r = await deps.buscarPessoas(dominio, titulosDeDecisao(perfil?.cargosAlvo))
-    if (r.ok) {
+  // 2. Crustdata só quando falta decisor.
+  if (!nome) {
+    let crustdata = enriquecimento.crustdata?.dominio === dominio ? enriquecimento.crustdata : undefined
+    if (!crustdata) {
+      const r = await deps.buscarPessoas(dominio, titulosDeDecisao(perfil?.cargosAlvo))
+      if (!r.ok && ehBloqueioDaFonte(r.motivo)) return { status: 'incompleto', motivo: 'bloqueado_crustdata', consulta, enriquecimento, bloqueio: bloqueioDe(r, 'crustdata') }
+      if (!r.ok) return { status: 'falha', ...mensagemFalha(r, 'Crustdata') }
       crustdata = { dominio, candidatos: r.candidatos, consultadoEm: new Date().toISOString() }
       enriquecimento = { ...enriquecimento, crustdata }
       await deps.salvarEnriquecimento({ crustdata }).catch((e) => console.error('[prospeccao/decisor-automatico] não salvou a Crustdata:', e))
-    } else {
-      console.error('[prospeccao/decisor-automatico] Crustdata falhou:', r.motivo)
     }
+    const pessoa = crustdata.candidatos[0]
+    if (!pessoa) return { status: 'incompleto', motivo: consulta.socios.length ? 'sem_decisor' : 'sem_socio', consulta, enriquecimento }
+    nome = pessoa.nome
+    cargo = pessoa.cargo
+    linkedin = pessoa.linkedin
+    dominioEmail = pessoa.dominio ?? dominio
   }
-  const perfilPessoa = crustdata?.candidatos.find((c) => mesmaPessoa(nome, c.nome)) ?? null
 
-  const escolhido = salvo?.decisor?.nome === nome ? salvo.decisor : null
-  const socio = consulta.sugerido?.nome === nome ? consulta.sugerido : null
-  const decisor: Decisor = {
-    nome,
-    cargo: perfilPessoa?.cargo ?? escolhido?.cargo ?? socio?.qualificacao ?? '',
-    ...(perfilPessoa?.linkedin ?? escolhido?.linkedin ? { linkedin: (perfilPessoa?.linkedin ?? escolhido?.linkedin)! } : {}),
+  // 3. E-mail: Receita nominal do decisor > já consultado pela org > Anymail.
+  let email: string | null = null
+  const nominal = consulta.emailNominalDe && soLetras(consulta.emailNominalDe) === soLetras(nome) ? empresa.email : null
+  if (nominal) {
+    email = nominal.trim().toLowerCase()
+  } else {
+    const anterior = enriquecimento.anymail
+    let anymail: EmailDecisor
+    if (anterior && anterior.dominio === dominioEmail && soLetras(anterior.nome) === soLetras(nome)) {
+      anymail = anterior
+    } else {
+      const r = await deps.buscarEmail(nome, dominioEmail)
+      if (!r.ok && ehBloqueioDaFonte(r.motivo)) return { status: 'incompleto', motivo: 'bloqueado_anymail', consulta, enriquecimento, bloqueio: bloqueioDe(r, 'anymail') }
+      if (!r.ok) return { status: 'falha', ...mensagemFalha(r, 'Anymail') }
+      anymail = r.resultado
+      enriquecimento = { ...enriquecimento, anymail }
+      await deps.salvarEnriquecimento({ anymail }).catch((e) => console.error('[prospeccao/decisor-automatico] não salvou o e-mail:', e))
+    }
+    if (anymail.status !== 'valido' || !anymail.email) return { status: 'incompleto', motivo: 'sem_email', consulta, enriquecimento }
+    email = anymail.email
   }
-  const mudou = !escolhido || escolhido.cargo !== decisor.cargo || (escolhido.linkedin ?? null) !== (decisor.linkedin ?? null)
+
+  const decisor: Decisor = { nome, cargo: cargo ?? '', ...(linkedin ? { linkedin } : {}) }
+  const escolhido = salvo?.decisor ?? null
+  const mudou = !escolhido || escolhido.nome !== decisor.nome || escolhido.cargo !== decisor.cargo || (escolhido.linkedin ?? null) !== (decisor.linkedin ?? null)
   if (mudou) await deps.salvarDecisor(decisor).catch((e) => console.error('[prospeccao/decisor-automatico] não salvou o decisor:', e))
 
-  return { status: 'completo', decisor, email: anymail.email, consulta, enriquecimento }
+  return { status: 'completo', decisor, email, consulta, enriquecimento }
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +214,7 @@ export interface SalvoInternacional {
 
 export type ResultadoDecisorInternacional =
   | { status: 'completo'; decisor: Decisor; email: string; candidatos: CandidatoDecisor[] }
-  | { status: 'incompleto'; motivo: Extract<MotivoIncompleto, 'sem_decisor' | 'sem_email'>; candidatos: CandidatoDecisor[] }
+  | { status: 'incompleto'; motivo: Extract<MotivoIncompleto, 'sem_decisor' | 'sem_email' | 'bloqueado_crustdata' | 'bloqueado_anymail'>; candidatos: CandidatoDecisor[]; bloqueio?: BloqueioFonte }
   | { status: 'falha'; erro: string; httpStatus: number }
 
 export interface DependenciasInternacional {
@@ -200,12 +241,14 @@ export async function resolverDecisorInternacional(
   if (!candidatos) {
     const titulos = titulosDeDecisao(perfil?.cargosAlvo)
     const r = await deps.buscarPessoas(dominio, titulos)
-    if (!r.ok) return { status: 'falha', ...mensagemFalha(r.motivo, 'Crustdata') }
+    if (!r.ok && ehBloqueioDaFonte(r.motivo)) return { status: 'incompleto', motivo: 'bloqueado_crustdata', candidatos: [], bloqueio: bloqueioDe(r, 'crustdata') }
+    if (!r.ok) return { status: 'falha', ...mensagemFalha(r, 'Crustdata') }
     candidatos = r.candidatos
     const nomeBusca = nomeEmpresa ? nomeParaBuscaDePessoas(nomeEmpresa) : ''
     if (candidatos.length === 0 && nomeBusca.length >= 3) {
       const porNome = await deps.buscarPessoas({ nomeEmpresa: nomeBusca, dominioEmpresa: dominio }, titulos)
-      if (!porNome.ok) return { status: 'falha', ...mensagemFalha(porNome.motivo, 'Crustdata') }
+      if (!porNome.ok && ehBloqueioDaFonte(porNome.motivo)) return { status: 'incompleto', motivo: 'bloqueado_crustdata', candidatos: [], bloqueio: bloqueioDe(porNome, 'crustdata') }
+      if (!porNome.ok) return { status: 'falha', ...mensagemFalha(porNome, 'Crustdata') }
       candidatos = porNome.candidatos
     }
     // Lista vazia não custou nada (a Crustdata cobra por pessoa devolvida):
@@ -222,7 +265,8 @@ export async function resolverDecisorInternacional(
     let resultado = consultas.find((a) => a.dominio === dominioEmail && soLetras(a.nome) === soLetras(pessoa.nome))
     if (!resultado) {
       const r = await deps.buscarEmail(pessoa.nome, dominioEmail)
-      if (!r.ok) return { status: 'falha', ...mensagemFalha(r.motivo, 'Anymail') }
+      if (!r.ok && ehBloqueioDaFonte(r.motivo)) return { status: 'incompleto', motivo: 'bloqueado_anymail', candidatos, bloqueio: bloqueioDe(r, 'anymail') }
+      if (!r.ok) return { status: 'falha', ...mensagemFalha(r, 'Anymail') }
       resultado = r.resultado
       consultas.push(resultado)
       await deps.salvar({ anymail: consultas }).catch(aviso)

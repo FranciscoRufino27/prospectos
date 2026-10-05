@@ -62,8 +62,25 @@ export class BancoFalso {
     return this.operacoes.filter((op) => op.tipo !== 'select' && (!tabela || op.tabela === tabela))
   }
 
+  /** Funções do banco simuladas; outras devolvem erro (como função inexistente). */
+  falharRpc = false
+
   cliente(): SupabaseClient {
-    return { from: (tabela: string) => new ConsultaFalsa(this, tabela) } as unknown as SupabaseClient
+    return {
+      from: (tabela: string) => new ConsultaFalsa(this, tabela),
+      rpc: async (nome: string, args: Record<string, unknown>) => {
+        if (!this.falharRpc && nome === 'prospeccao_consumo_mes') {
+          // Mesma regra da migration 0065: soma do custo via API da org/fonte desde a data.
+          const desde = new Date(String(args.p_desde)).getTime()
+          const soma = this.linhas('prospeccao_consumo')
+            .filter((l) => l.organizacao_id === args.p_org && l.fonte === args.p_fonte && l.origem === 'api'
+              && new Date(String(l.criado_em ?? l.created_at)).getTime() >= desde)
+            .reduce((t, l) => t + Number(l.custo ?? 0), 0)
+          return { data: soma, error: null }
+        }
+        return { data: null, error: { message: `function ${nome} does not exist`, code: '42883' } }
+      },
+    } as unknown as SupabaseClient
   }
 }
 

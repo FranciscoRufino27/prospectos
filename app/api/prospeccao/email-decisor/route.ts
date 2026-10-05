@@ -15,7 +15,7 @@ export const maxDuration = 60
 export async function POST(req: Request) {
   const acc = await resolverAcesso()
   if ('erro' in acc) return acc.erro
-  const { admin, org } = acc.acesso
+  const { admin, org, user } = acc.acesso
 
   const corpo = (await req.json().catch(() => ({}))) as { cnpj?: unknown; nome?: unknown }
   const cnpj = typeof corpo.cnpj === 'string' ? corpo.cnpj.replace(/\D/g, '') : ''
@@ -36,12 +36,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ ...anterior, reaproveitado: true })
     }
 
-    const r = await buscarEmailComCache({ admin, organizacaoId: org }, nome, ctx.dominio,
+    const r = await buscarEmailComCache({ admin, organizacaoId: org, travas: ctx.travas, usuarioId: user.id }, nome, ctx.dominio,
       () => buscarEmailAnymail(nome, ctx.dominio, process.env.ANYMAILFINDER_API_KEY))
     if (!r.ok) {
       console.error('[prospeccao/email-decisor] falha:', r.motivo)
       const { texto, status } = MENSAGEM_FALHA_ENRIQUECIMENTO[r.motivo]
-      return NextResponse.json({ erro: `Anymail: ${texto}` }, { status })
+      return NextResponse.json({ erro: `Anymail: ${texto}${r.detalhe ? ` (${r.detalhe})` : ''}` }, { status })
     }
     await salvarEnriquecimento(admin, org, cnpj, { anymail: r.resultado }).catch((e) => console.error('[prospeccao/email-decisor] não salvou:', e))
     return NextResponse.json({ ...r.resultado, reaproveitado: false })

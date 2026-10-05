@@ -27,7 +27,7 @@ beforeEach(() => {
   estado.banco = new BancoFalso({
     perfis: [{ id: USUARIO_A, organizacao_id: ORG_A, role: 'admin' }],
     perfil_permissoes: [],
-    organizacoes: [{ id: ORG_A, configuracoes: { _schema_version: 9 } }, { id: ORG_B, configuracoes: { _schema_version: 9 } }],
+    organizacoes: [{ id: ORG_A, configuracoes: { _schema_version: 9, enriquecimentoPago: { ativo: true, orcamentoMensal: { crustdata: 100, anymail: 100 } } } }, { id: ORG_B, configuracoes: { _schema_version: 9 } }],
     // A org B já pagou por este domínio: nunca pode vazar para a A.
     prospeccao_decisores_internacionais: [{
       organizacao_id: ORG_B, dominio: 'hotel.pt',

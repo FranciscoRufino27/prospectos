@@ -177,7 +177,7 @@ describe('rotas de enriquecimento', () => {
       perfis: [{ id: USUARIO_A, organizacao_id: ORG_A, role: 'usuario' }],
       perfil_permissoes: [],
       organizacoes: [
-        { id: ORG_A, configuracoes: { _schema_version: 6, prospeccao: { cnaes: ['5510801'], cargosAlvo: ['diretor'] } } },
+        { id: ORG_A, configuracoes: { _schema_version: 6, prospeccao: { cnaes: ['5510801'], cargosAlvo: ['diretor'] }, enriquecimentoPago: { ativo: true, orcamentoMensal: { crustdata: 100, anymail: 100 } } } },
         { id: ORG_B, configuracoes: {} },
       ],
       catalogo_estabelecimentos: [
@@ -264,6 +264,22 @@ describe('rotas de enriquecimento', () => {
     const f = vi.fn()
     globalThis.fetch = f as unknown as typeof fetch
     expect((await (await email({ cnpj: CNPJ, nome: 'bruno lima' })).json()).reaproveitado).toBe(true)
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('ação paga manual com a fonte bloqueada PARA com 503/402 (hard stop), sem chamar a API', async () => {
+    const banco = estado.banco as BancoFalso
+    const f = vi.fn()
+    globalThis.fetch = f as unknown as typeof fetch
+    banco.linhas('organizacoes').find((o) => o.id === ORG_A)!.configuracoes = { prospeccao: { cnaes: ['5510801'] } }
+    const desligado = await email({ cnpj: CNPJ, nome: 'Ana Souza' })
+    expect(desligado.status).toBe(503)
+    expect((await desligado.json()).erro).toMatch(/desligado/)
+
+    banco.linhas('organizacoes').find((o) => o.id === ORG_A)!.configuracoes = { enriquecimentoPago: { ativo: true, orcamentoMensal: { anymail: 5 } } }
+    const semOrcamento = await decisor({ cnpj: CNPJ })
+    expect(semOrcamento.status).toBe(402)
+    expect((await semOrcamento.json()).erro).toMatch(/sem orçamento mensal definido para Crustdata/)
     expect(f).not.toHaveBeenCalled()
   })
 

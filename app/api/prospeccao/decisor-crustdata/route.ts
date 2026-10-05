@@ -13,7 +13,7 @@ export const runtime = 'nodejs'
 export async function POST(req: Request) {
   const acc = await resolverAcesso()
   if ('erro' in acc) return acc.erro
-  const { admin, org } = acc.acesso
+  const { admin, org, user } = acc.acesso
 
   const corpo = (await req.json().catch(() => ({}))) as { cnpj?: unknown }
   const cnpj = typeof corpo.cnpj === 'string' ? corpo.cnpj.replace(/\D/g, '') : ''
@@ -28,12 +28,12 @@ export async function POST(req: Request) {
     if (salvo?.crustdata?.dominio === ctx.dominio && salvo.crustdata.candidatos.length > 0) return NextResponse.json({ ...salvo.crustdata, reaproveitado: true })
 
     const titulos = titulosDeDecisao(ctx.perfil?.cargosAlvo)
-    const r = await buscarPessoasComCache({ admin, organizacaoId: org }, ctx.dominio, titulos, LIMITE_CANDIDATOS,
+    const r = await buscarPessoasComCache({ admin, organizacaoId: org, travas: ctx.travas, usuarioId: user.id }, ctx.dominio, titulos, LIMITE_CANDIDATOS,
       () => buscarDecisoresCrustdata(ctx.dominio, titulos, process.env.CRUSTDATA_API_KEY))
     if (!r.ok) {
       console.error('[prospeccao/decisor-crustdata] falha:', r.motivo)
       const { texto, status } = MENSAGEM_FALHA_ENRIQUECIMENTO[r.motivo]
-      return NextResponse.json({ erro: `Crustdata: ${texto}` }, { status })
+      return NextResponse.json({ erro: `Crustdata: ${texto}${r.detalhe ? ` (${r.detalhe})` : ''}` }, { status })
     }
     const crustdata = { dominio: ctx.dominio, candidatos: r.candidatos, consultadoEm: new Date().toISOString() }
     // Guardar falhou (ex.: banco sem a 0060): a consulta já foi paga, então

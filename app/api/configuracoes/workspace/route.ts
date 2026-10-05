@@ -66,6 +66,8 @@ export async function PUT(req: Request) {
     operacao: b.operacao && typeof b.operacao === 'object' ? b.operacao : undefined,
     // Perfil de busca da prospecção: objeto substitui (validado no parse); null limpa.
     prospeccao: b.prospeccao === null || (b.prospeccao && typeof b.prospeccao === 'object') ? b.prospeccao : undefined,
+    // Travas de custo do enriquecimento pago (validadas no parse); null desliga.
+    enriquecimentoPago: b.enriquecimentoPago === null || (b.enriquecimentoPago && typeof b.enriquecimentoPago === 'object') ? b.enriquecimentoPago : undefined,
   })
   // Um grupo comercial pertence a NO MÁXIMO uma organização: o callback de
   // grupo resolve a org pelo grupo, então a ambiguidade tem de ser barrada

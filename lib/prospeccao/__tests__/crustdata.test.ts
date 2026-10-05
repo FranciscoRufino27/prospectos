@@ -172,7 +172,7 @@ describe('rota /api/prospeccao/internacional', () => {
     estado.banco = new BancoFalso({
       perfis: [{ id: USUARIO, organizacao_id: ORG, role: 'usuario' }],
       perfil_permissoes: [{ organizacao_id: ORG, perfil_id: USUARIO, permissao: 'campaigns.view' }],
-      organizacoes: [{ id: ORG, configuracoes: {} }],
+      organizacoes: [{ id: ORG, configuracoes: { enriquecimentoPago: { ativo: true, orcamentoMensal: { crustdata: 100, anymail: 100 } } } }],
     })
     estado.usuarioId = null
     vi.stubEnv('CRUSTDATA_API_KEY', 'cd_teste')
@@ -205,6 +205,34 @@ describe('rota /api/prospeccao/internacional', () => {
     expect(res.status).toBe(200)
     expect(JSON.parse(texto).itens[0].nome).toBe('Boeira Garden Hotel Porto')
     expect(texto).not.toContain('cd_teste')
+    // Travas de custo: 1 empresa devolvida × 0,03 crédito, origem API, na org da sessão.
+    expect((estado.banco as BancoFalso).linhas('prospeccao_consumo')).toEqual([expect.objectContaining({
+      organizacao_id: ORG, fonte: 'crustdata', operacao: 'empresas_busca', origem: 'api', resultado: 'ok', custo: 0.03,
+    })])
+  })
+
+  it('enriquecimento pago desligado: 503 com o motivo, sem chamar a Crustdata', async () => {
+    estado.usuarioId = USUARIO
+    const banco = estado.banco as BancoFalso
+    banco.linhas('organizacoes')[0].configuracoes = {}
+    const f = vi.fn()
+    globalThis.fetch = f as unknown as typeof fetch
+    const res = await chamar({ pais: 'USA' })
+    expect(res.status).toBe(503)
+    expect((await res.json()).erro).toMatch(/desligado/)
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('orçamento da Crustdata não cobre a página (25 × 0,03): 402 sem chamar', async () => {
+    estado.usuarioId = USUARIO
+    const banco = estado.banco as BancoFalso
+    banco.linhas('prospeccao_consumo').push({ organizacao_id: ORG, fonte: 'crustdata', origem: 'api', custo: 99.5, criado_em: new Date().toISOString() })
+    const f = vi.fn()
+    globalThis.fetch = f as unknown as typeof fetch
+    const res = await chamar({ pais: 'USA' })
+    expect(res.status).toBe(402)
+    expect((await res.json()).erro).toMatch(/99,5 de 100 créditos/)
+    expect(f).not.toHaveBeenCalled()
   })
 
   it('sem chave configurada responde 503 honesto', async () => {

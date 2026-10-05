@@ -379,7 +379,8 @@ export default function ProspeccaoPage() {
           if (!res.ok) return { tipo: 'falha', erro: corpo.erro || 'Falha ao buscar o decisor.', fatal: [402, 429, 503].includes(res.status) };
           if (corpo.status === 'completo') return { tipo: 'completo', dados: corpo };
           if (corpo.status === 'incompleto' && corpo.consulta) consultasIncompletas.set(item.cnpj, corpo.consulta);
-          return { tipo: 'pulado', motivo: corpo.status === 'incompleto' ? corpo.motivo : 'erro' };
+          // Fonte paga bloqueada (travas, chave, crédito): só esta empresa fica de fora; a busca segue.
+          return { tipo: 'pulado', motivo: corpo.status === 'incompleto' ? corpo.motivo : 'erro', erro: corpo.status === 'incompleto' ? corpo.bloqueio?.mensagem : undefined };
         },
         aoDesfecho: (item, d) => {
           if (!ativo()) return;

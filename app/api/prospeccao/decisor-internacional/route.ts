@@ -9,6 +9,7 @@ import { buscarDecisoresCrustdata, buscarEmailAnymail } from '@/lib/prospeccao/e
 import { CANDIDATOS_EMAIL_INTERNACIONAL, resolverDecisorInternacional } from '@/lib/prospeccao/decisorAutomatico'
 import { dominioValido, lerDecisorInternacional, salvarDecisorInternacional } from '@/lib/prospeccao/decisoresInternacionaisServidor'
 import { buscarEmailComCache, buscarPessoasComCache } from '@/lib/prospeccao/inteligencia'
+import { travasDaConfig } from '@/lib/prospeccao/travasCusto'
 
 export const runtime = 'nodejs'
 // Crustdata (20s) + até 2 consultas Anymail (50s cada) no pior caso.
@@ -17,7 +18,7 @@ export const maxDuration = 120
 export async function POST(req: Request) {
   const acc = await resolverAcesso()
   if ('erro' in acc) return acc.erro
-  const { admin, org } = acc.acesso
+  const { admin, org, user } = acc.acesso
 
   const corpo = (await req.json().catch(() => ({}))) as { dominio?: unknown; nome?: unknown }
   const dominio = dominioValido(corpo.dominio)
@@ -26,7 +27,8 @@ export async function POST(req: Request) {
   try {
     const orgRow = await admin.from('organizacoes').select('configuracoes').eq('id', org).maybeSingle()
     if (orgRow.error) return NextResponse.json({ erro: 'Não foi possível consultar agora.' }, { status: 500 })
-    const perfil = parseWorkspaceConfig(orgRow.data?.configuracoes).prospeccao
+    const config = parseWorkspaceConfig(orgRow.data?.configuracoes)
+    const perfil = config.prospeccao
     // Sem a tabela da 0063 (ou falha de leitura) segue consultando: só perde o cache.
     const salvo = await lerDecisorInternacional(admin, org, dominio).catch((e) => {
       console.error('[prospeccao/decisor-internacional] sem cache:', e)
@@ -34,7 +36,8 @@ export async function POST(req: Request) {
     })
 
     // Toda consulta externa passa antes pelo cache de inteligência (global).
-    const intel = { admin, organizacaoId: org }
+    // Travas de custo da org (liga/desliga + orçamento) valem para Crustdata e Anymail.
+    const intel = { admin, organizacaoId: org, travas: travasDaConfig(config.enriquecimentoPago), usuarioId: user.id }
     const r = await resolverDecisorInternacional(dominio, perfil, salvo, {
       // Só pede quantas pessoas vai tentar na Anymail: cada uma devolvida custa.
       buscarPessoas: (alvo, titulos) => buscarPessoasComCache(intel, alvo, titulos, CANDIDATOS_EMAIL_INTERNACIONAL,
