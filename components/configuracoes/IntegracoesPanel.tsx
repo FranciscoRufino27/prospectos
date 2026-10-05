@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { AlertCircle, Building2, Check, Lock, Plug, RefreshCw, Unplug, Users } from 'lucide-react'
 import HubspotComerciaisPanel from './HubspotComerciaisPanel'
 import HubspotImportacaoPanel from './HubspotImportacaoPanel'
+import EnriquecimentoPagoPanel from './EnriquecimentoPagoPanel'
 
 interface StatusHubspot {
   conectado: boolean
@@ -203,6 +204,8 @@ export default function IntegracoesPanel() {
 
       {status?.conectado && podeGerenciar && visao === 'comerciais' && <HubspotComerciaisPanel />}
       {status?.conectado && podeGerenciar && visao === 'importar' && <HubspotImportacaoPanel />}
+
+      <EnriquecimentoPagoPanel />
     </div>
   )
 }

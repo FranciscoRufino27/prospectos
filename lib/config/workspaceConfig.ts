@@ -379,6 +379,27 @@ export function parseEnriquecimentoPago(bruto: unknown): EnriquecimentoPagoConfi
   return Object.keys(out).length ? out : undefined
 }
 
+/**
+ * Validação ESTRITA do que a tela envia (o parse acima descarta em silêncio,
+ * o que é certo ao LER o blob, mas esconderia erro de quem está editando).
+ * null = válido. Orçamento ausente/null = fonte sem orçamento (bloqueada).
+ */
+export function validarEnriquecimentoPago(bruto: unknown): string | null {
+  if (bruto === null) return null
+  if (!ehObjeto(bruto)) return 'Configuração de enriquecimento pago inválida.'
+  if (bruto.ativo !== undefined && typeof bruto.ativo !== 'boolean') return 'O liga/desliga do enriquecimento pago precisa ser verdadeiro ou falso.'
+  if (bruto.orcamentoMensal === undefined || bruto.orcamentoMensal === null) return null
+  if (!ehObjeto(bruto.orcamentoMensal)) return 'Orçamento mensal inválido.'
+  for (const [fonte, v] of Object.entries(bruto.orcamentoMensal)) {
+    if (!(FONTES_PAGAS as readonly string[]).includes(fonte)) return `Fonte desconhecida no orçamento: ${fonte}.`
+    if (v === null || v === undefined) continue
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > ORCAMENTO_MAXIMO_CREDITOS) {
+      return `Orçamento de ${fonte} inválido: use um número de 0 a ${ORCAMENTO_MAXIMO_CREDITOS.toLocaleString('pt-BR')} créditos.`
+    }
+  }
+  return null
+}
+
 // Chaves de feature conhecidas (tipadas). Só estas são aceitas na leitura do
 // blob — valor com tipo errado ou chave desconhecida é descartado.
 const FEATURES_BOOLEANAS: (keyof FeaturesConfig)[] = [

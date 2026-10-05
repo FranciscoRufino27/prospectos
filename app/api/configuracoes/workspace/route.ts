@@ -3,7 +3,7 @@
 // workspace.configure. Sempre org-scoped (organizacoes where id = org da sessão).
 import { NextResponse } from 'next/server'
 import { resolverAcesso, exigirPermissao } from '@/lib/rbac/servidor'
-import { parseWorkspaceConfig, mesclarWorkspaceConfig, type WorkspaceConfigEditavel } from '@/lib/config/workspaceConfig'
+import { parseWorkspaceConfig, mesclarWorkspaceConfig, validarEnriquecimentoPago, type WorkspaceConfigEditavel } from '@/lib/config/workspaceConfig'
 import { statusRemetenteProspeccaoDeConfig } from '@/lib/campanhas/opcoesServidor'
 
 export const runtime = 'nodejs'
@@ -31,6 +31,11 @@ export async function PUT(req: Request) {
   if ('erro' in acc) return acc.erro
   const { admin, org } = acc.acesso
   const b = (await req.json()) as WorkspaceConfigEditavel
+  // Travas de custo: valor inválido é recusado (não descartado em silêncio).
+  if (b.enriquecimentoPago !== undefined) {
+    const invalido = validarEnriquecimentoPago(b.enriquecimentoPago)
+    if (invalido) return NextResponse.json({ erro: invalido }, { status: 400 })
+  }
   const { data } = await admin.from('organizacoes').select('configuracoes').eq('id', org).maybeSingle()
   const atual = parseWorkspaceConfig(data?.configuracoes)
   const novo = mesclarWorkspaceConfig(atual, {

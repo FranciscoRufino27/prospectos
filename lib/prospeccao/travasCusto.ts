@@ -54,6 +54,52 @@ export interface ContextoCusto {
 const ROTULO_FONTE: Record<FontePaga, string> = { crustdata: 'Crustdata', anymail: 'Anymail' }
 const creditos = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
 
+/**
+ * Créditos gastos VIA API pela organização na fonte desde `desde` (função
+ * prospeccao_consumo_mes, 0065 — cache não entra). null = não deu para ler.
+ * É a mesma conta usada para bloquear: a tela mostra o que a trava enxerga.
+ */
+export async function gastoDoMes(admin: SupabaseClient, organizacaoId: string, fonte: FontePaga, desde: Date): Promise<number | null> {
+  try {
+    const { data, error } = await admin.rpc('prospeccao_consumo_mes', { p_org: organizacaoId, p_fonte: fonte, p_desde: desde.toISOString() })
+    if (error) {
+      console.error('[prospeccao/travas] não leu o gasto do mês:', error.message)
+      return null
+    }
+    return data !== null && data !== undefined && Number.isFinite(Number(data)) ? Number(data) : null
+  } catch (e) {
+    console.error('[prospeccao/travas] não leu o gasto do mês:', e instanceof Error ? e.message : e)
+    return null
+  }
+}
+
+export interface ConsumoFonte {
+  fonte: FontePaga
+  /** Orçamento mensal em créditos; null = sem orçamento (fonte bloqueada). */
+  orcamento: number | null
+  /** Gasto via API no mês; null = não foi possível ler. */
+  usado: number | null
+}
+
+export interface ConsumoDoMes {
+  ativo: boolean
+  /** Mês de referência no horário de Brasília, ex.: '2026-10'. */
+  mes: string
+  fontes: ConsumoFonte[]
+}
+
+/** Travas + uso do mês corrente de cada fonte paga, para a organização da sessão. */
+export async function consumoDoMes(admin: SupabaseClient, organizacaoId: string, travas: TravasCusto, agora: number = Date.now()): Promise<ConsumoDoMes> {
+  const desde = inicioDoMesBrasilia(agora)
+  const fontes = await Promise.all((['crustdata', 'anymail'] as const).map(async (fonte): Promise<ConsumoFonte> => {
+    const orcamento = travas.orcamentoMensal[fonte]
+    return { fonte, orcamento: orcamento === undefined ? null : orcamento, usado: await gastoDoMes(admin, organizacaoId, fonte, desde) }
+  }))
+  // desde = 03:00 UTC do dia 1 → o mês de Brasília é o mesmo mês UTC dessa data.
+  const mes = `${desde.getUTCFullYear()}-${String(desde.getUTCMonth() + 1).padStart(2, '0')}`
+  return { ativo: travas.ativo, mes, fontes }
+}
+
 export type Autorizacao = { ok: true } | { ok: false; motivo: BloqueioCusto; detalhe: string }
 
 /** Pode gastar até `custoMaximo` créditos de `fonte` agora? */
@@ -65,15 +111,7 @@ export async function autorizarGasto(ctx: ContextoCusto, fonte: FontePaga, custo
   if (orcamento === undefined || orcamento <= 0) {
     return { ok: false, motivo: 'orcamento_esgotado', detalhe: `sem orçamento mensal definido para ${ROTULO_FONTE[fonte]}` }
   }
-  const desde = inicioDoMesBrasilia((ctx.agora ?? Date.now)())
-  let gasto: number | null = null
-  try {
-    const { data, error } = await ctx.admin.rpc('prospeccao_consumo_mes', { p_org: ctx.organizacaoId, p_fonte: fonte, p_desde: desde.toISOString() })
-    if (error) console.error('[prospeccao/travas] não conferiu o gasto do mês; bloqueado:', error.message)
-    else if (data !== null && data !== undefined && Number.isFinite(Number(data))) gasto = Number(data)
-  } catch (e) {
-    console.error('[prospeccao/travas] não conferiu o gasto do mês; bloqueado:', e instanceof Error ? e.message : e)
-  }
+  const gasto = await gastoDoMes(ctx.admin, ctx.organizacaoId, fonte, inicioDoMesBrasilia((ctx.agora ?? Date.now)()))
   if (gasto === null) {
     return { ok: false, motivo: 'orcamento_esgotado', detalhe: `não foi possível conferir o gasto do mês de ${ROTULO_FONTE[fonte]}` }
   }
