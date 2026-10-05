@@ -5,6 +5,14 @@ import type { DefinicaoWorkflow } from '@/lib/workflows/types'
 export const LIMITE_CONFIRMACAO_CAMPANHA = 100
 export const LIMITE_PUBLICO_CAMPANHA = 2000
 export const LIMITE_HTML_CAMPANHA = 200_000
+// Follow-ups além da mensagem inicial. A mesma regra decide o botão do wizard
+// (podeAdicionarFollowup) e o que o servidor aceita (normalizarFollowups).
+export const LIMITE_FOLLOWUPS_CAMPANHA = 6
+const MENSAGEM_LIMITE_FOLLOWUPS = `A campanha aceita no máximo ${LIMITE_FOLLOWUPS_CAMPANHA} follow-ups.`
+
+export function podeAdicionarFollowup(quantidadeAtual: number): boolean {
+  return quantidadeAtual < LIMITE_FOLLOWUPS_CAMPANHA
+}
 
 export const TIPOS_CAMPANHA = [
   { id: 'prospeccao', label: 'Prospectar novos leads', descricao: 'Iniciar uma nova abordagem comercial.' },
@@ -221,8 +229,12 @@ function normalizarMensagem(raw: unknown): MensagemCampanha | undefined {
 
 function normalizarFollowups(raw: unknown): FollowupCampanha[] | undefined {
   if (!Array.isArray(raw)) return undefined
+  // Acima do limite a requisição é recusada inteira (as rotas respondem 400
+  // antes de gravar): cortar o excedente em silêncio publicaria a campanha com
+  // menos follow-ups do que o usuário montou.
+  if (raw.length > LIMITE_FOLLOWUPS_CAMPANHA) throw new Error(MENSAGEM_LIMITE_FOLLOWUPS)
   const itens: FollowupCampanha[] = []
-  for (const item of raw.slice(0, 4)) {
+  for (const item of raw) {
     const mensagem = normalizarMensagem(item)
     const diasApos = item && typeof item === 'object' && !Array.isArray(item)
       ? numeroPositivo((item as Record<string, unknown>).diasApos)
@@ -420,6 +432,7 @@ export function validarCampanhaGuiada(publico: Publico): string[] {
   if (!inicial?.corpo) erros.push('Escreva a mensagem inicial ou escolha um template.')
   if ((inicial?.html?.length ?? 0) > LIMITE_HTML_CAMPANHA) erros.push('O HTML da mensagem inicial excede 200 KB.')
   if (!urlPermitida(inicial?.link)) erros.push('O link da mensagem inicial precisa usar http ou https.')
+  if ((op?.followups?.length ?? 0) > LIMITE_FOLLOWUPS_CAMPANHA) erros.push(MENSAGEM_LIMITE_FOLLOWUPS)
   for (const [indice, followup] of (op?.followups ?? []).entries()) {
     if (!followup.assunto || !followup.corpo || !followup.diasApos) {
       erros.push(`Complete a mensagem e o intervalo do follow-up ${indice + 1}.`)

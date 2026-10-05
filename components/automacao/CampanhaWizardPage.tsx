@@ -46,9 +46,11 @@ import {
   GRUPOS_STATUS_PUBLICO,
   labelTipoCampanha,
   LIMITE_CONFIRMACAO_CAMPANHA,
+  LIMITE_FOLLOWUPS_CAMPANHA,
   modeloEmailRespostaCampanha,
   normalizarPublicoCampanha,
   regraPublicoCampanha,
+  podeAdicionarFollowup,
   podeUsarTipoCampanha,
   tiposCampanhaDisponiveis,
   VARIAVEIS_EMAIL_RESPOSTA,
@@ -597,7 +599,7 @@ export default function CampanhaWizardPage({
   }
 
   function adicionarFollowup() {
-    if (followups.length >= 4) return
+    if (!podeAdicionarFollowup(followups.length)) return
     const ultimoDia = followups.at(-1)?.diasApos ?? 0
     setPublico((atual) => ({
       ...atual,
@@ -1378,7 +1380,7 @@ export default function CampanhaWizardPage({
                 <h2 className="font-semibold text-slate-100">Cadência de acompanhamento</h2>
                 <p className="mt-1 text-sm text-slate-500">Os intervalos viram esperas persistentes no workflow versionado.</p>
               </div>
-              <button type="button" onClick={adicionarFollowup} disabled={followups.length >= 4} className="rounded-lg border border-indigo-500/40 px-3 py-2 text-xs text-indigo-300 hover:bg-indigo-500/10 disabled:opacity-40">Adicionar follow-up</button>
+              <button type="button" onClick={adicionarFollowup} disabled={!podeAdicionarFollowup(followups.length)} title={podeAdicionarFollowup(followups.length) ? undefined : `Máximo de ${LIMITE_FOLLOWUPS_CAMPANHA} follow-ups`} className="rounded-lg border border-indigo-500/40 px-3 py-2 text-xs text-indigo-300 hover:bg-indigo-500/10 disabled:opacity-40">Adicionar follow-up</button>
             </div>
             {!followups.length && <div className="rounded-lg border border-dashed border-[var(--border-strong)] p-6 text-center text-sm text-slate-500">Nenhum follow-up configurado. A campanha terá somente a mensagem inicial.</div>}
             <div className="space-y-4">
