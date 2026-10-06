@@ -1,10 +1,10 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { engineConfig } from '@/lib/engine/config'
-import { GmailProvider, lerCredenciaisGmail } from '@/lib/engine/email/gmailProvider'
+import { GmailProvider } from '@/lib/engine/email/gmailProvider'
 import { LIMITE_HTML_CAMPANHA } from './configuracaoGuiada'
 import { montarEmailCampanhaHtml } from './emailCampanha'
-import { buscarRemetenteCampanha, statusRemetenteProspeccao, type RemetenteCampanha } from './opcoesServidor'
+import { buscarRemetenteCampanha, buscarRemetenteProspeccao, type RemetenteOrganizacao } from './opcoesServidor'
 
 const LIMITE_ASSUNTO_TESTE = 200
 const LIMITE_CORPO_TESTE = 50_000
@@ -25,18 +25,18 @@ export interface DadosTesteEmailCampanha {
 // lib/campanhas/opcoesServidor.ts, lib/workflows/ambiente.ts) — sem
 // campanhaId aqui (o teste roda sobre um rascunho ainda não salvo), então
 // não dá para reusar `exigirEnvioRealCampanhaDisponivel` (que busca o tipo
-// pela campanha persistida); a checagem em si é a mesma `statusRemetenteProspeccao`.
+// pela campanha persistida); a checagem em si é a mesma `buscarRemetenteProspeccao`.
 async function resolverRemetenteTeste(
   admin: SupabaseClient,
   org: string,
   tipoCampanha: string | null,
-): Promise<RemetenteCampanha> {
+): Promise<RemetenteOrganizacao> {
   if (tipoCampanha === 'prospeccao') {
-    const status = await statusRemetenteProspeccao(admin, org)
-    if (!status.conectado) {
+    const dedicado = await buscarRemetenteProspeccao(admin, org)
+    if (!dedicado) {
       throw new Error('Configure um remetente em Configurações antes de iniciar a campanha.')
     }
-    return { conta: status.contaKey as string, email: status.email as string }
+    return dedicado
   }
   const remetente = await buscarRemetenteCampanha(admin, org)
   if (!remetente) throw new Error('Configure uma conta remetente no workspace antes de enviar o teste.')
@@ -77,8 +77,8 @@ export async function enviarTesteEmailCampanha(
   const tipoCampanha = typeof dados.tipo === 'string' ? dados.tipo : null
   const remetente = await resolverRemetenteTeste(admin, org, tipoCampanha)
 
-  const credenciais = lerCredenciaisGmail(remetente.conta)
-  if (!credenciais || credenciais.user.toLowerCase() !== remetente.email.toLowerCase()) {
+  const { credenciais } = remetente
+  if (credenciais.user.toLowerCase() !== remetente.email.toLowerCase()) {
     throw new Error('As credenciais da conta remetente não estão disponíveis.')
   }
 

@@ -10,7 +10,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { criarMotorReal } from '@/lib/engine/scheduler'
 import { normalizarNicho, preencher, indiceVariante } from '@/lib/engine/mensagem'
-import { GmailProvider, lerCredenciaisGmail } from '@/lib/engine/email/gmailProvider'
+import { GmailProvider } from '@/lib/engine/email/gmailProvider'
+import { situacaoRemetenteOrganizacao } from '@/lib/email/remetenteOrganizacao'
 import { engineConfig } from '@/lib/engine/config'
 import { log } from '@/lib/engine/logger'
 import type { Motor } from '@/lib/engine'
@@ -317,7 +318,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     }
     // Variáveis e credenciais de nível-org: lidas de uma única consulta.
     //   {nome_servico}  → nomenclaturas.nome_servico || organizacoes.nome
-    //   email_conta_key → seleciona GMAIL_USER_<KEY> / GMAIL_APP_PASSWORD_<KEY>
+    //   remetente       → conta conectada pela org ou chave legada (lib/email/remetenteOrganizacao)
     const { data: orgRow } = await this.db
       .from('organizacoes')
       .select('nome, configuracoes')
@@ -334,13 +335,14 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     }
     const assunto = preencher(tpl.assunto ?? '{empresa}', lead, extras)
     const corpo = preencher(tpl.corpo, lead, extras)
-    // Provider de e-mail: conta específica da org (email_conta_key) ou a padrão.
-    const emailContaKey = orgNomenclaturas?.['email_conta_key']
-    const emailCred = emailContaKey ? lerCredenciaisGmail(emailContaKey) : null
-    if (emailContaKey && !emailCred && !this.simular) {
-      throw new Error(`Envio bloqueado: credencial Gmail dedicada '${emailContaKey}' não configurada.`)
+    // Provider de e-mail: conta da organização (conectada ou legada) ou a padrão.
+    // Conta configurada mas inutilizável bloqueia — nunca cai na padrão.
+    const situacaoRemetente = await situacaoRemetenteOrganizacao(this.db, this.organizacaoId, { config: workspaceConfig })
+    if (situacaoRemetente.estado === 'incompleto' && !this.simular) {
+      throw new Error(situacaoRemetente.mensagem)
     }
-    const emailProvider = emailCred ? new GmailProvider(emailCred) : this.motor.email
+    const remetenteOrg = situacaoRemetente.estado === 'pronto' ? situacaoRemetente.remetente : null
+    const emailProvider = remetenteOrg ? new GmailProvider(remetenteOrg.credenciais) : this.motor.email
 
     // Simulação (Fase 5): não envia nem grava — quem loga é o executor.
     if (this.simular) return { enviado: false, assunto }
@@ -412,14 +414,14 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     }
 
     // TRAVA DE REMETENTE (E-mail de prospecção). Escopo estrito a
-    // campanhaTipo==='prospeccao': exige `email_conta_key` explicitamente
-    // configurado nesta organização (Configurações > E-mail de prospecção) —
+    // campanhaTipo==='prospeccao': exige remetente explicitamente configurado
+    // nesta organização (Configurações > Distribuição > E-mail de envio) —
     // nunca cai no fallback silencioso 'followup'/conta global de outra
     // organização (ver lib/campanhas/opcoesServidor.ts). Renovação e os demais
     // tipos preservam o fallback existente (`emailProvider` acima). Depois do
     // gate de opt-out/bounce: um lead já bloqueado não precisa de remetente
     // configurado para ser corretamente ignorado.
-    if (campanhaId && campanhaTipo === 'prospeccao' && !emailContaKey) {
+    if (campanhaId && campanhaTipo === 'prospeccao' && !remetenteOrg) {
       throw new Error('Configure um remetente em Configurações antes de iniciar a campanha.')
     }
 
@@ -510,7 +512,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
       const cc = copiarResponsavel
         ? resolverCcResponsavelRenovacao({
           para: lead.contato_email,
-          remetenteEmail: emailCred?.user,
+          remetenteEmail: remetenteOrg?.email,
           responsavelLead,
         })
         : undefined
@@ -521,7 +523,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
         assunto,
         corpo,
         html,
-        remetenteEmail: emailCred?.user,
+        remetenteEmail: remetenteOrg?.email,
         responsavelCampanha: contextoCampanha?.responsavel,
         responsavelLead,
         preferirResponsavelDoLead,

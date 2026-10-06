@@ -86,6 +86,57 @@ export function lerCredenciaisGmail(papel: PapelEmail | string = 'followup'): Gm
   return { user, appPassword }
 }
 
+export type VerificacaoGmail =
+  | { ok: true }
+  | { ok: false; etapa: 'smtp' | 'imap'; motivo: 'autenticacao' | 'conexao'; mensagem: string }
+
+// Confere a conta antes de salvá-la (Configurações > E-mail de envio): login
+// no SMTP (envio) e no IMAP (leitura das respostas), sem enviar nem ler nada.
+// Nunca registra a senha; a mensagem de erro é a do servidor, sem credenciais.
+export async function verificarCredenciaisGmail(cred: GmailCredenciais): Promise<VerificacaoGmail> {
+  const falha = (etapa: 'smtp' | 'imap', e: unknown): VerificacaoGmail => {
+    const err = e as { code?: string; responseCode?: number; authenticationFailed?: boolean; message?: string }
+    const autenticacao = err?.code === 'EAUTH' || err?.responseCode === 535 || err?.authenticationFailed === true
+      || /auth|credentials|invalid login/i.test(err?.message ?? '')
+    return { ok: false, etapa, motivo: autenticacao ? 'autenticacao' : 'conexao', mensagem: (err?.message ?? String(e)).slice(0, 300) }
+  }
+
+  const smtp = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user: cred.user, pass: cred.appPassword },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
+  })
+  try {
+    await smtp.verify()
+  } catch (e) {
+    return falha('smtp', e)
+  } finally {
+    smtp.close()
+  }
+
+  const imap = new ImapFlow({
+    host: 'imap.gmail.com',
+    port: 993,
+    secure: true,
+    auth: { user: cred.user, pass: cred.appPassword },
+    logger: false,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
+  })
+  imap.on('error', () => { /* tratado pelo catch do connect */ })
+  try {
+    await imap.connect()
+  } catch (e) {
+    return falha('imap', e)
+  }
+  await imap.logout().catch(() => {})
+  return { ok: true }
+}
+
 export class GmailProvider implements EmailProvider {
   private transporter: Transporter | null = null
   private recebimentosPendentes = new Map<string, { mailbox: string; uid: number }>()

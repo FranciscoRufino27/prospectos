@@ -85,6 +85,8 @@ describe('contexto server do Resumo operacional', () => {
     )
 
     expect(resumo).toEqual({ remetente: null, responsavel: null, workflow: null })
-    expect(queries).toHaveLength(1)
+    // organizacoes + conta conectada (filtrada pela org), nada mais.
+    expect(queries.map((q) => q.table).sort()).toEqual(['organizacao_remetentes_email', 'organizacoes'])
+    expect(queries.find((q) => q.table === 'organizacao_remetentes_email')?.temEq('organizacao_id', 'org-a')).toBe(true)
   })
 })

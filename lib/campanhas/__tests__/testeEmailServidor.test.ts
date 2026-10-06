@@ -4,8 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 const mocks = vi.hoisted(() => ({
   modoEnsaio: false,
   buscarRemetenteCampanha: vi.fn(),
-  statusRemetenteProspeccao: vi.fn(),
-  lerCredenciaisGmail: vi.fn(),
+  buscarRemetenteProspeccao: vi.fn(),
   enviar: vi.fn(),
 }))
 
@@ -16,7 +15,6 @@ vi.mock('@/lib/engine/config', () => ({
 }))
 
 vi.mock('@/lib/engine/email/gmailProvider', () => ({
-  lerCredenciaisGmail: mocks.lerCredenciaisGmail,
   GmailProvider: class {
     enviar = mocks.enviar
   },
@@ -24,7 +22,7 @@ vi.mock('@/lib/engine/email/gmailProvider', () => ({
 
 vi.mock('../opcoesServidor', () => ({
   buscarRemetenteCampanha: mocks.buscarRemetenteCampanha,
-  statusRemetenteProspeccao: mocks.statusRemetenteProspeccao,
+  buscarRemetenteProspeccao: mocks.buscarRemetenteProspeccao,
 }))
 
 import { enviarTesteEmailCampanha } from '../testeEmailServidor'
@@ -34,18 +32,18 @@ const admin = {} as SupabaseClient
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.modoEnsaio = false
+  // O resolvedor (lib/email/remetenteOrganizacao) devolve a conta já com as credenciais.
   mocks.buscarRemetenteCampanha.mockResolvedValue({
-    conta: 'prospeccao',
+    fonte: 'padrao',
+    conta: 'followup',
     email: 'remetente@empresa.com.br',
+    credenciais: { user: 'remetente@empresa.com.br', appPassword: 'segredo-nao-real' },
   })
-  mocks.lerCredenciaisGmail.mockReturnValue({
-    user: 'remetente@empresa.com.br',
-    appPassword: 'segredo-nao-real',
-  })
-  mocks.statusRemetenteProspeccao.mockResolvedValue({
-    contaKey: 'PROSPECCAO_ORG_A',
+  mocks.buscarRemetenteProspeccao.mockResolvedValue({
+    fonte: 'conectada',
+    conta: 'conectada',
     email: 'prospeccao@empresa.com.br',
-    conectado: true,
+    credenciais: { user: 'prospeccao@empresa.com.br', appPassword: 'segredo-nao-real' },
   })
   mocks.enviar.mockResolvedValue(undefined)
 })
@@ -88,13 +86,14 @@ describe('envio de teste da campanha', () => {
     expect(mocks.enviar).not.toHaveBeenCalled()
   })
 
-  it('bloqueia quando as credenciais do remetente não estão disponíveis', async () => {
-    mocks.lerCredenciaisGmail.mockReturnValue(null)
+  it('bloqueia quando a conta da organização está configurada mas inutilizável', async () => {
+    // O resolvedor devolve null (ex.: senha salva ilegível) — sem cair na conta padrão.
+    mocks.buscarRemetenteCampanha.mockResolvedValue(null)
 
     await expect(enviarTesteEmailCampanha(admin, 'org-a', {
       assunto: 'Teste',
       corpo: 'Conteúdo',
-    })).rejects.toThrow('As credenciais da conta remetente não estão disponíveis')
+    })).rejects.toThrow('Configure uma conta remetente no workspace antes de enviar o teste.')
 
     expect(mocks.enviar).not.toHaveBeenCalled()
   })
@@ -115,12 +114,7 @@ describe('envio de teste da campanha', () => {
 // fallback global ('followup'/GMAIL_USER) que `buscarRemetenteCampanha` usa
 // para os demais tipos.
 describe('envio de teste — campanha tipo=prospeccao', () => {
-  it('usa o remetente DEDICADO da organização (statusRemetenteProspeccao), não o fallback', async () => {
-    mocks.lerCredenciaisGmail.mockReturnValue({
-      user: 'prospeccao@empresa.com.br',
-      appPassword: 'segredo-nao-real',
-    })
-
+  it('usa o remetente DEDICADO da organização (buscarRemetenteProspeccao), não o fallback', async () => {
     const resultado = await enviarTesteEmailCampanha(admin, 'org-a', {
       assunto: 'Apresentação',
       corpo: 'Olá, {nome}.',
@@ -131,13 +125,12 @@ describe('envio de teste — campanha tipo=prospeccao', () => {
       destinatario: 'prospeccao@empresa.com.br',
       assunto: '[TESTE] Apresentação',
     })
-    expect(mocks.statusRemetenteProspeccao).toHaveBeenCalledWith(admin, 'org-a')
+    expect(mocks.buscarRemetenteProspeccao).toHaveBeenCalledWith(admin, 'org-a')
     expect(mocks.buscarRemetenteCampanha).not.toHaveBeenCalled()
-    expect(mocks.lerCredenciaisGmail).toHaveBeenCalledWith('PROSPECCAO_ORG_A')
   })
 
   it('bloqueia sem fallback quando a organização não tem remetente configurado', async () => {
-    mocks.statusRemetenteProspeccao.mockResolvedValue({ contaKey: null, email: null, conectado: false })
+    mocks.buscarRemetenteProspeccao.mockResolvedValue(null)
 
     await expect(enviarTesteEmailCampanha(admin, 'org-a', {
       assunto: 'Apresentação',
@@ -157,6 +150,6 @@ describe('envio de teste — campanha tipo=prospeccao', () => {
     })
 
     expect(mocks.buscarRemetenteCampanha).toHaveBeenCalledWith(admin, 'org-a')
-    expect(mocks.statusRemetenteProspeccao).not.toHaveBeenCalled()
+    expect(mocks.buscarRemetenteProspeccao).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { resolverAcesso } from '@/lib/rbac/servidor'
-import { buscarRemetenteCampanha, statusRemetenteProspeccao } from '@/lib/campanhas/opcoesServidor'
+import { buscarRemetenteDoTipo, remetentePublico } from '@/lib/campanhas/opcoesServidor'
 import { listarTemplates } from '@/lib/templates/repository'
 import { engineConfig } from '@/lib/engine/config'
 import { perfisComWhatsappAvisos } from '@/lib/campanhas/retornoWhatsappServidor'
@@ -22,9 +22,8 @@ export async function GET(req: Request) {
   // chamadas sem `tipo`) preservam o comportamento anterior.
   const tipo = new URL(req.url).searchParams.get('tipo')
   try {
-    const remetentePromise = tipo === 'prospeccao'
-      ? statusRemetenteProspeccao(admin, org).then((s) => (s.conectado ? { conta: s.contaKey as string, email: s.email as string } : null))
-      : buscarRemetenteCampanha(admin, org)
+    // Só conta + e-mail saem daqui — as credenciais ficam no servidor.
+    const remetentePromise = buscarRemetenteDoTipo(admin, org, tipo).then(remetentePublico)
     const [templates, { data: leads, error: leadsError }, remetente, perfisWhatsapp, comercial] = await Promise.all([
       // Mesma biblioteca da tela de Templates: só e-mail ativo da organização e
       // sem as cópias `campanha_*` geradas por outras campanhas.

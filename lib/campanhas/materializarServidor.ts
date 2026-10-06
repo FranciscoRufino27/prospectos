@@ -11,7 +11,7 @@ import {
 } from './configuracaoGuiada'
 import { extrairAcaoIdsPublicados, mensagensNaOrdem, resolverAcaoIds } from './acaoId'
 import { criarWorkflow, salvarRascunho, SupabaseWorkflowStore } from '@/lib/workflows'
-import { buscarRemetenteCampanha, statusRemetenteProspeccao } from './opcoesServidor'
+import { buscarRemetenteDoTipo } from './opcoesServidor'
 import { exigirTemplatesDaOrganizacao } from './templatesCampanha'
 
 interface Materializacao {
@@ -105,9 +105,7 @@ export async function materializarCampanhaGuiada(
   // configurado) — nunca o fallback 'followup'/conta global que
   // `buscarRemetenteCampanha` usa para os demais tipos (preservado como
   // estava). Ver lib/campanhas/opcoesServidor.ts.
-  const remetente = tipoCampanha === 'prospeccao'
-    ? await statusRemetenteProspeccao(admin, org).then((s) => (s.conectado ? { conta: s.contaKey as string, email: s.email as string } : null))
-    : await buscarRemetenteCampanha(admin, org)
+  const remetente = await buscarRemetenteDoTipo(admin, org, tipoCampanha)
   const publico: Publico = {
     ...normalizado,
     operacao: {

@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
-import { lerCredenciaisGmail } from '@/lib/engine/email/gmailProvider'
+import { remetenteComPadrao } from '@/lib/email/remetenteOrganizacao'
 import type { DefinicaoWorkflow } from '@/lib/workflows/types'
 import type { ContextoResumoOperacional } from './resumoOperacional'
 
@@ -55,9 +55,14 @@ export async function buscarContextoResumoOperacional(
     .maybeSingle()
   if (orgError) throw orgError
   const config = parseWorkspaceConfig((orgRow as { configuracoes?: unknown } | null)?.configuracoes)
-  const conta = config.nomenclaturas?.email_conta_key?.trim() || 'followup'
-  const resolverRemetente = opcoes.resolverRemetente ?? ((papel: string) => lerCredenciaisGmail(papel)?.user ?? null)
-  const remetente = resolverRemetente(conta)
+  // Mesma regra do envio (conta conectada → chave legada → padrão); só o e-mail sai daqui.
+  const resolverRemetente = opcoes.resolverRemetente
+  const remetente = (await remetenteComPadrao(admin, org, {
+    config,
+    ...(resolverRemetente
+      ? { lerCredenciais: (conta: string) => { const user = resolverRemetente(conta); return user ? { user, appPassword: '' } : null } }
+      : {}),
+  }))?.email ?? null
 
   let workflow: ContextoResumoOperacional['workflow'] = null
   if (campanha.workflow_id) {

@@ -9,7 +9,7 @@ import type { DefinicaoWorkflow, Workflow, WorkflowVersao } from '@/lib/workflow
 
 const mocks = vi.hoisted(() => ({
   atualizarCampanha: vi.fn(async () => {}),
-  buscarRemetenteCampanha: vi.fn(async () => ({ conta: 'PADRAO', email: 'padrao@empresa.com' })),
+  buscarRemetenteDoTipo: vi.fn(async () => ({ conta: 'PADRAO', email: 'padrao@empresa.com' })),
   criarWorkflow: vi.fn(),
   salvarRascunho: vi.fn(async (_store: unknown, _id: string, def: DefinicaoWorkflow) => ({ rascunho_definicao: def })),
   buscarWorkflow: vi.fn(async (): Promise<Workflow | null> => null),
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../repository', () => ({ atualizarCampanha: mocks.atualizarCampanha }))
-vi.mock('../opcoesServidor', () => ({ buscarRemetenteCampanha: mocks.buscarRemetenteCampanha }))
+vi.mock('../opcoesServidor', () => ({ buscarRemetenteDoTipo: mocks.buscarRemetenteDoTipo }))
 vi.mock('@/lib/workflows', () => ({
   criarWorkflow: mocks.criarWorkflow,
   salvarRascunho: mocks.salvarRascunho,
