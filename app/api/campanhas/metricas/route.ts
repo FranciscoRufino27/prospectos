@@ -13,17 +13,19 @@ export async function GET() {
   }
   const { admin, org } = acc.acesso
 
-  // Contatos em cadência = execuções ativas vinculadas a alguma campanha.
-  const { count: emCadencia, error } = await admin
+  // Execuções ativas de campanha, separadas em: já receberam o 1º e-mail e
+  // aguardam o próximo passo (em cadência) × ainda na fila do 1º envio (passo 0).
+  const ativas = () => admin
     .from('workflow_execucoes')
     .select('id', { count: 'exact', head: true })
     .eq('organizacao_id', org)
     .not('campanha_id', 'is', null)
     .in('status', ['em_andamento', 'aguardando'])
+  const [cadencia, fila] = await Promise.all([ativas().gt('passo_atual', 0), ativas().eq('passo_atual', 0)])
 
-  if (error) {
-    return NextResponse.json({ emCadencia: null })
+  if (cadencia.error || fila.error) {
+    return NextResponse.json({ emCadencia: null, naFila: null })
   }
 
-  return NextResponse.json({ emCadencia: emCadencia ?? 0 })
+  return NextResponse.json({ emCadencia: cadencia.count ?? 0, naFila: fila.count ?? 0 })
 }

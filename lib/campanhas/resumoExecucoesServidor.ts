@@ -8,8 +8,13 @@ export interface ResumoExecucoesCampanha {
   // Pendentes que ainda NÃO receberam o 1º e-mail (passo 0). O restante de
   // emAndamento+aguardando já recebeu e espera o próximo follow-up.
   aguardandoPrimeiroEnvio: number
+  // Execuções que já passaram do 1º passo (o 1º e-mail saiu ou foi tentado).
+  jaContatados: number
   concluidas: number
   canceladas: number
+  // Canceladas cujo lead está marcado como devolvido (bounce). O restante das
+  // canceladas saiu por resposta, descadastro ou cancelamento manual.
+  devolvidos: number
   erros: number
   // Mensagens que SAÍRAM (evento `email_enviado` com `enviado: true`). Conta
   // cada passo de envio — numa cadência com follow-up passa de `total`. Ensaio
@@ -19,8 +24,8 @@ export interface ResumoExecucoesCampanha {
 }
 
 const vazio = (): ResumoExecucoesCampanha => ({
-  total: 0, emAndamento: 0, aguardando: 0, aguardandoPrimeiroEnvio: 0, concluidas: 0,
-  canceladas: 0, erros: 0, emailsEnviados: 0, respostas: 0,
+  total: 0, emAndamento: 0, aguardando: 0, aguardandoPrimeiroEnvio: 0, jaContatados: 0, concluidas: 0,
+  canceladas: 0, devolvidos: 0, erros: 0, emailsEnviados: 0, respostas: 0,
 })
 
 // O PostgREST devolve no máximo 1000 linhas por consulta: sem paginar, campanha
@@ -79,6 +84,7 @@ export async function buscarResumosExecucoesCampanhas(
     if ((execucao.status === 'aguardando' || execucao.status === 'em_andamento') && (execucao.passo_atual ?? 0) === 0) {
       resumo.aguardandoPrimeiroEnvio += 1
     }
+    if ((execucao.passo_atual ?? 0) > 0) resumo.jaContatados += 1
     if (execucao.status === 'concluido') resumo.concluidas += 1
     if (execucao.status === 'cancelado') resumo.canceladas += 1
     if (execucao.status === 'erro') resumo.erros += 1
@@ -108,6 +114,26 @@ export async function buscarResumosExecucoesCampanhas(
     for (const evento of eventos) {
       const campanhaId = execucaoParaCampanha.get(evento.execucao_id)
       if (campanhaId && evento.detalhe?.enviado === true) resumos[campanhaId].emailsEnviados += 1
+    }
+  }
+
+  // Devolução: execução cancelada cujo lead ficou marcado como bounced.
+  const canceladasComLead = execucoes.filter((execucao) => execucao.status === 'cancelado' && execucao.lead_id)
+  if (canceladasComLead.length) {
+    const devolvidos = await lerEmLotes<{ id: string }>(
+      [...new Set(canceladasComLead.map((execucao) => execucao.lead_id as string))],
+      (lote, de, ate) => admin
+        .from('leads')
+        .select('id')
+        .eq('organizacao_id', organizacaoId)
+        .in('id', lote)
+        .eq('bounced', true)
+        .order('id')
+        .range(de, ate),
+    )
+    const leadsDevolvidos = new Set(devolvidos.map((lead) => lead.id))
+    for (const execucao of canceladasComLead) {
+      if (leadsDevolvidos.has(execucao.lead_id as string)) resumos[execucao.campanha_id].devolvidos += 1
     }
   }
 

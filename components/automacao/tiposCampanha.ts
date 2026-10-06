@@ -170,8 +170,11 @@ export interface Campanha {
     total: number;
     emAndamento: number;
     aguardando: number;
+    aguardandoPrimeiroEnvio?: number;
+    jaContatados?: number;
     concluidas: number;
     canceladas: number;
+    devolvidos?: number;
     erros: number;
     emailsEnviados: number;
     respostas: number;

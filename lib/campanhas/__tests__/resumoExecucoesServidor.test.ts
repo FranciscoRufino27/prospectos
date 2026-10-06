@@ -111,3 +111,29 @@ describe('resumo de execuções das campanhas', () => {
     expect(resumos['camp-1']).toMatchObject({ total: 1, emailsEnviados: 1 })
   })
 })
+
+describe('resumo: fila do 1º envio, contatados e devoluções', () => {
+  it('separa quem ainda não recebeu o 1º e-mail e conta como devolução só o lead bounced da org', async () => {
+    const ex = (i: number, status: string, passo: number) => ({ ...execucao(i, 'camp-1', status), passo_atual: passo })
+    const { client, queries } = criarClient({
+      workflow_execucoes: [
+        ex(1, 'aguardando', 0), ex(2, 'aguardando', 0),   // na fila do 1º envio
+        ex(3, 'aguardando', 2),                          // contatado, na cadência
+        ex(4, 'cancelado', 2), ex(5, 'cancelado', 2),    // 4 devolvido; 5 saiu por resposta
+        ex(6, 'concluido', 5),
+      ],
+      workflow_execucao_eventos: [],
+      interacoes: [],
+      leads: [
+        { id: 'lead-4', organizacao_id: 'org-a', bounced: true },
+        { id: 'lead-5', organizacao_id: 'org-a', bounced: false },
+        // Mesmo id em outra organização marcado como bounced: não conta.
+        { id: 'lead-5', organizacao_id: 'org-b', bounced: true },
+      ],
+    })
+    const r = (await buscarResumosExecucoesCampanhas(client, 'org-a', ['camp-1']))['camp-1']
+
+    expect(r).toMatchObject({ total: 6, aguardando: 3, aguardandoPrimeiroEnvio: 2, jaContatados: 4, canceladas: 2, devolvidos: 1, concluidas: 1 })
+    expect(queries.find((q) => q.table === 'leads')?.temEq('organizacao_id', 'org-a')).toBe(true)
+  })
+})
