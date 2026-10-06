@@ -35,7 +35,7 @@ import {
   inscreverLeadManual,
 } from '@/lib/workflows'
 import { agendarExecucoesCampanha } from './filaDisparoServidor'
-import { agendaPermiteProcessar } from './agenda'
+import { agendaPermiteProcessar, janelaDoPublico } from './agenda'
 import { buscarPreviaPublicoCampanha } from './publicoServidor'
 import { aplicarRegraPublicoPorTipo } from './configuracaoGuiada'
 import type { Publico } from '@/components/automacao/tiposCampanha'
@@ -173,6 +173,7 @@ export class CadenciaProspeccaoAutomatica {
       this.org,
       this.campanha.id,
       execucaoIds.slice(0, this.campanha.limiteDiario),
+      { janela: janelaDoPublico(this.campanha.publico) },
     )
   }
 }

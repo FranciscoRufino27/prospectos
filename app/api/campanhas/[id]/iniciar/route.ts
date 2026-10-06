@@ -6,6 +6,8 @@ import { NextResponse } from 'next/server'
 import { exigirPermissao } from '@/lib/rbac/servidor'
 import { iniciarCampanhaReal } from '@/lib/campanhas/ativacaoServidor'
 import { agendarExecucoesCampanha } from '@/lib/campanhas/filaDisparoServidor'
+import { buscarCampanha } from '@/lib/campanhas/repository'
+import { janelaDoPublico } from '@/lib/campanhas/agenda'
 import { SupabaseWorkflowStore } from '@/lib/workflows'
 
 export const runtime = 'nodejs'
@@ -25,11 +27,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       typeof body.confirmarQuantidade === 'number' ? body.confirmarQuantidade : undefined,
     )
     const { admin, org } = acc.acesso
+    // Envios só dentro da janela (dias + horário) da campanha.
+    const campanha = await buscarCampanha(admin, org, id)
     const fila = await agendarExecucoesCampanha(
       new SupabaseWorkflowStore(org, admin),
       org,
       id,
       execucaoIds,
+      { janela: janelaDoPublico(campanha?.publico) },
     )
     return NextResponse.json({ ok: true, ...resultado, fila })
   } catch (e) {

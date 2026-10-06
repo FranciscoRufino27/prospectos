@@ -14,6 +14,8 @@ export interface ResumoExecucoesSituacao {
   total: number
   emAndamento: number
   aguardando: number
+  /** Pendentes que ainda não receberam o 1º e-mail (ausente em respostas antigas). */
+  aguardandoPrimeiroEnvio?: number
   canceladas: number
   erros: number
   respostas: number
@@ -25,6 +27,19 @@ export function temFalhaOperacional(resumo: ResumoExecucoesSituacao | null | und
 
 export function execucoesPendentes(resumo: ResumoExecucoesSituacao | null | undefined): number {
   return (resumo?.emAndamento ?? 0) + (resumo?.aguardando ?? 0)
+}
+
+/** "117 aguardando 1º envio · 89 aguardando follow-up" — nunca "pendentes" somados. */
+export function textoPendentes(resumo: ResumoExecucoesSituacao | null | undefined): string | null {
+  const pendentes = execucoesPendentes(resumo)
+  if (!pendentes) return null
+  const primeiro = resumo?.aguardandoPrimeiroEnvio
+  if (primeiro === undefined) return `${pendentes.toLocaleString('pt-BR')} pendentes`
+  const followup = Math.max(0, pendentes - primeiro)
+  return [
+    primeiro ? `${primeiro.toLocaleString('pt-BR')} aguardando 1º envio` : null,
+    followup ? `${followup.toLocaleString('pt-BR')} aguardando follow-up` : null,
+  ].filter(Boolean).join(' · ')
 }
 
 export function aguardandoRespostasDoDisparo(params: {

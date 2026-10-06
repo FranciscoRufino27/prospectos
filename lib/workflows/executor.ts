@@ -12,7 +12,7 @@ import type { AmbienteWorkflow } from './ambiente'
 import { ErroEnvioIncerto } from './ambiente'
 import type { DefinicaoWorkflow } from './types'
 import type { EnfileirarRetomada } from './retomadaProspeccao'
-import { agendaPermiteProcessar } from '@/lib/campanhas/agenda'
+import { agendaPermiteProcessar, encaixarNaJanela, type JanelaCampanha } from '@/lib/campanhas/agenda'
 
 function ctxDe(
   store: WorkflowStore,
@@ -78,9 +78,14 @@ export async function processarExecucao(
     // execuções já existentes terminarem — "concluir" encerra novas entradas,
     // não corta cadências em andamento.
     let campanhaTipo: string | null = null
+    // Janela de envio da campanha: as esperas (follow-ups) terminam dentro dela.
+    let janela: JanelaCampanha | null = null
     if (ex.campanha_id) {
       const controle = await ambiente.buscarControleExecucaoCampanha(ex.campanha_id)
       if (!controle || controle.status === 'pausada') return
+      if (!controle.disparoUnico) {
+        janela = { diasSemana: controle.diasSemana, horarioInicio: controle.horarioInicio, horarioFim: controle.horarioFim }
+      }
       if (controle.status !== 'ativa' && controle.status !== 'concluida') return
       if (
         !controle.disparoUnico
@@ -95,6 +100,36 @@ export async function processarExecucao(
       // prospecção que pertence ao worker com claim atômico.
       if (campanhaTipo === 'prospeccao' && store.organizacaoId && ex.status === 'aguardando'
         && (!opcoes.claimToken || ex.claim_token !== opcoes.claimToken)) return
+    }
+
+    // Janela de envio (dias + horário de Brasília): chegou a hora fora dela —
+    // inclusive retomadas/filas agendadas antes desta regra — não executa nada
+    // e adia para a próxima abertura, espalhado nas primeiras horas (sem rajada).
+    if (janela) {
+      const agora = new Date(agoraISO)
+      const abertura = encaixarNaJanela(agora, janela)
+      if (abertura.getTime() > agora.getTime()) {
+        const ate = new Date(abertura.getTime() + espalhamentoNaAbertura(ex.id)).toISOString()
+        if (campanhaTipo === 'prospeccao' && store.organizacaoId) {
+          if (!opcoes.claimToken || !store.agendarEsperaProspeccao) return
+          const adiada = await store.agendarEsperaProspeccao(ex.id, ex.passo_atual, ex.passo_atual, ate, opcoes.claimToken)
+          if (!adiada) return
+          await log('adiado_fora_da_janela', { ate, geracao: adiada.agendamento_geracao })
+          try {
+            const { publicarRetomadaProspeccao } = await import('./retomadaProspeccao')
+            await publicarRetomadaProspeccao(store, adiada, { enfileirar: opcoes.enfileirarRetomada })
+          } catch (erro) {
+            await log('retomada_publicacao_falhou', {
+              geracao: adiada.agendamento_geracao,
+              mensagem: erro instanceof Error ? erro.message : String(erro),
+            })
+          }
+          return
+        }
+        await store.atualizarExecucao(ex.id, { status: 'aguardando', proxima_verificacao_em: ate, atualizado_em: agoraISO })
+        await log('adiado_fora_da_janela', { ate })
+        return
+      }
     }
 
     const def = await definicaoDaExecucao(store, ex.versao_id)
@@ -132,11 +167,12 @@ export async function processarExecucao(
       await log('acao_executada', { passo, acao: bloco.tipo })
 
       if (res.tipo === 'esperar') {
+        const ate = janela ? encaixarNaJanela(new Date(res.ate), janela).toISOString() : res.ate
         if (campanhaTipo === 'prospeccao' && store.organizacaoId) {
           if (!store.agendarEsperaProspeccao) throw new Error('Store sem agendamento durável de prospecção.')
-          const agendada = await store.agendarEsperaProspeccao(ex.id, passo, passo + 1, res.ate, opcoes.claimToken)
+          const agendada = await store.agendarEsperaProspeccao(ex.id, passo, passo + 1, ate, opcoes.claimToken)
           if (!agendada) return // cancelamento ou claim perdido venceu a corrida
-          await log('aguardando', { ate: res.ate, geracao: agendada.agendamento_geracao })
+          await log('aguardando', { ate, geracao: agendada.agendamento_geracao })
           try {
             const { publicarRetomadaProspeccao } = await import('./retomadaProspeccao')
             await publicarRetomadaProspeccao(store, agendada, { enfileirar: opcoes.enfileirarRetomada })
@@ -151,9 +187,9 @@ export async function processarExecucao(
         }
         await store.atualizarExecucao(ex.id, {
           passo_atual: passo + 1, status: 'aguardando',
-          proxima_verificacao_em: res.ate, atualizado_em: agoraISO,
+          proxima_verificacao_em: ate, atualizado_em: agoraISO,
         })
-        await log('aguardando', { ate: res.ate })
+        await log('aguardando', { ate })
         return
       }
 
@@ -308,4 +344,12 @@ export async function processarExecucoesCampanha(
   }
   await ambiente.sincronizarConclusaoCampanha(campanhaId)
   return processadas
+}
+
+// Até 2h depois da abertura, determinístico por execução: quem foi adiado não
+// sai todo no mesmo minuto quando a janela abre.
+function espalhamentoNaAbertura(execucaoId: string): number {
+  let h = 0
+  for (let i = 0; i < execucaoId.length; i++) h = (h * 31 + execucaoId.charCodeAt(i)) >>> 0
+  return (h % 120) * 60_000
 }

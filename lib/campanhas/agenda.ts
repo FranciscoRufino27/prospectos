@@ -1,7 +1,7 @@
-// Regras client-safe da agenda de campanhas. O processador de produção roda
-// diariamente; por isso a agenda operacional da campanha controla os DIAS em
-// que execuções já inscritas podem avançar. O horário exato continua sendo o do
-// cron da infraestrutura e não é prometido por esta camada.
+// Regras client-safe da agenda de campanhas: os DIAS em que execuções podem
+// avançar e a JANELA de envio (dias + horário de Brasília, `encaixarNaJanela`),
+// aplicada ao agendar o disparo, ao agendar as esperas dos follow-ups e, como
+// trava final, no momento do envio (lib/workflows/executor.ts).
 
 export const DIAS_CAMPANHA = [
   { id: 'dom', label: 'Dom' },
@@ -87,4 +87,62 @@ export function publicoComDiasAtualizados(
       diasSemana: dias,
     },
   }
+}
+
+// ---- Janela de envio (dias + horário) ---------------------------------------
+// Horário de Brasília (UTC−3, sem horário de verão desde 2019). A janela é
+// meio-aberta: [horarioInicio, horarioFim). Fora dela, o envio vai para a
+// próxima abertura — nunca é descartado.
+
+export interface JanelaCampanha {
+  diasSemana?: unknown
+  horarioInicio?: unknown
+  horarioFim?: unknown
+}
+
+const OFFSET_BRASILIA_MS = 3 * 60 * 60 * 1000
+const ORDEM_DIAS: DiaCampanha[] = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab']
+
+function minutosDoHorario(valor: unknown): number | null {
+  if (typeof valor !== 'string') return null
+  const m = /^(\d{1,2}):(\d{2})$/.exec(valor.trim())
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  if (h > 24 || min > 59 || (h === 24 && min > 0)) return null
+  return h * 60 + min
+}
+
+/** Primeiro instante >= `instante` dentro da janela da campanha. */
+export function encaixarNaJanela(instante: Date, janela: JanelaCampanha | null | undefined): Date {
+  if (!janela || Number.isNaN(instante.getTime())) return instante
+  const dias = janela.diasSemana == null ? null : normalizarDiasCampanha(janela.diasSemana)
+  // Agenda vazia/inválida é barrada por agendaPermiteProcessar; aqui não inventa horário.
+  if (dias && !dias.length) return instante
+  let inicio = minutosDoHorario(janela.horarioInicio)
+  let fim = minutosDoHorario(janela.horarioFim)
+  if (inicio === null || fim === null || fim <= inicio) { inicio = 0; fim = 24 * 60 }
+
+  const local = new Date(instante.getTime() - OFFSET_BRASILIA_MS) // campos UTC = hora de Brasília
+  const meiaNoite = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate())
+  const minutoAgora = local.getUTCHours() * 60 + local.getUTCMinutes() + local.getUTCSeconds() / 60
+  for (let d = 0; d < 8; d++) {
+    const diaInicio = meiaNoite + d * 86_400_000
+    const dia = ORDEM_DIAS[new Date(diaInicio).getUTCDay()]
+    if (dias && !dias.includes(dia)) continue
+    const abre = new Date(diaInicio + inicio * 60_000 + OFFSET_BRASILIA_MS)
+    if (d > 0) return abre
+    if (minutoAgora < inicio) return abre
+    if (minutoAgora < fim) return instante
+  }
+  return instante
+}
+
+/** Janela a partir de campanhas.publico (agenda). null = sem agenda persistida. */
+export function janelaDoPublico(publico: unknown): JanelaCampanha | null {
+  if (!publico || typeof publico !== 'object' || Array.isArray(publico)) return null
+  const agenda = (publico as Record<string, unknown>).agenda
+  if (!agenda || typeof agenda !== 'object' || Array.isArray(agenda)) return null
+  const a = agenda as Record<string, unknown>
+  return { diasSemana: a.diasSemana, horarioInicio: a.horarioInicio, horarioFim: a.horarioFim }
 }

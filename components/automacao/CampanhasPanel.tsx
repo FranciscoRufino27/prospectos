@@ -15,6 +15,7 @@ import { campanhaEhDisparoUnico } from '@/lib/campanhas/configuracaoGuiada';
 import {
   aguardandoRespostasDoDisparo,
   execucoesPendentes,
+  textoPendentes,
   temFalhaOperacional,
 } from '@/lib/campanhas/situacaoDisparo';
 import { motivoBloqueioExclusao } from '@/lib/campanhas/exclusao';
@@ -278,7 +279,7 @@ export default function CampanhasPanel() {
                     </div>
                     <div className={`text-xs ${falha ? 'text-red-300/80' : 'text-slate-500'}`}>
                       {resumo?.total
-                        ? `${resumo.total.toLocaleString('pt-BR')} contatos${pendentes ? ` · ${pendentes} pendentes` : ''} · ${resumo.canceladas} cancelados · ${resumo.erros} erros`
+                        ? [`${resumo.total.toLocaleString('pt-BR')} contatos`, textoPendentes(resumo), `${resumo.canceladas} cancelados`, `${resumo.erros} erros`].filter(Boolean).join(' · ')
                         : c.tipo ?? 'campanha'}
                     </div>
                   </td>

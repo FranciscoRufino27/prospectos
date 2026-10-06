@@ -83,7 +83,9 @@ describe('CadenciaProspeccaoAutomatica', () => {
     )
     expect(resultado).toMatchObject({ jaInscrito: false, precisaAgendar: true })
     expect(agenda.agendadas).toBe(1)
-    expect(mocks.agendarExecucoesCampanha).toHaveBeenCalledWith(expect.anything(), 'org-1', 'campanha-1', ['execucao-1'])
+    expect(mocks.agendarExecucoesCampanha).toHaveBeenCalledWith(expect.anything(), 'org-1', 'campanha-1', ['execucao-1'],
+      // Campanha sem agenda gravada: sem restrição de janela.
+      { janela: null })
   })
 
   it('não ativa sem campanha real e bloqueia duas campanhas para evitar duplicidade', async () => {

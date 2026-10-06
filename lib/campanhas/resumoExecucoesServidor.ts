@@ -5,6 +5,9 @@ export interface ResumoExecucoesCampanha {
   total: number
   emAndamento: number
   aguardando: number
+  // Pendentes que ainda NÃO receberam o 1º e-mail (passo 0). O restante de
+  // emAndamento+aguardando já recebeu e espera o próximo follow-up.
+  aguardandoPrimeiroEnvio: number
   concluidas: number
   canceladas: number
   erros: number
@@ -16,7 +19,7 @@ export interface ResumoExecucoesCampanha {
 }
 
 const vazio = (): ResumoExecucoesCampanha => ({
-  total: 0, emAndamento: 0, aguardando: 0, concluidas: 0,
+  total: 0, emAndamento: 0, aguardando: 0, aguardandoPrimeiroEnvio: 0, concluidas: 0,
   canceladas: 0, erros: 0, emailsEnviados: 0, respostas: 0,
 })
 
@@ -54,10 +57,10 @@ export async function buscarResumosExecucoesCampanhas(
   if (!idsCampanha.length) return {}
 
   const execucoes = await lerTodas<{
-    id: string; campanha_id: string; lead_id: string | null; status: string; iniciado_em: string
+    id: string; campanha_id: string; lead_id: string | null; status: string; iniciado_em: string; passo_atual: number | null
   }>((de, ate) => admin
     .from('workflow_execucoes')
-    .select('id, campanha_id, lead_id, status, iniciado_em')
+    .select('id, campanha_id, lead_id, status, iniciado_em, passo_atual')
     .eq('organizacao_id', organizacaoId)
     .in('campanha_id', idsCampanha)
     .order('id')
@@ -73,6 +76,9 @@ export async function buscarResumosExecucoesCampanhas(
     resumo.total += 1
     if (execucao.status === 'em_andamento') resumo.emAndamento += 1
     if (execucao.status === 'aguardando') resumo.aguardando += 1
+    if ((execucao.status === 'aguardando' || execucao.status === 'em_andamento') && (execucao.passo_atual ?? 0) === 0) {
+      resumo.aguardandoPrimeiroEnvio += 1
+    }
     if (execucao.status === 'concluido') resumo.concluidas += 1
     if (execucao.status === 'cancelado') resumo.canceladas += 1
     if (execucao.status === 'erro') resumo.erros += 1

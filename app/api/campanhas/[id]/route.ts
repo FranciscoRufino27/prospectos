@@ -16,6 +16,9 @@ import { engineConfig } from '@/lib/engine/config'
 import { buscarResumoExecucoesCampanha } from '@/lib/campanhas/resumoExecucoesServidor'
 import { apagarCampanha, ErroExclusaoCampanha } from '@/lib/campanhas/exclusaoServidor'
 import { ErroTemplateCampanha } from '@/lib/campanhas/templatesCampanha'
+import { reagendarPrimeirosEnviosAoRetomar } from '@/lib/campanhas/filaDisparoServidor'
+import { janelaDoPublico } from '@/lib/campanhas/agenda'
+import { SupabaseWorkflowStore } from '@/lib/workflows'
 
 export const runtime = 'nodejs'
 
@@ -129,6 +132,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     await atualizarCampanha(admin, org, id, b)
+    // Retomar: o que não saiu durante a pausa volta para a fila, dentro da janela.
+    if (atual.status === 'pausada' && b.status === 'ativa') {
+      const disparoUnico = campanhaEhDisparoUnico(atual.tipo)
+      const fila = await reagendarPrimeirosEnviosAoRetomar(
+        new SupabaseWorkflowStore(org, admin), admin, org, id,
+        disparoUnico ? null : janelaDoPublico(atual.publico),
+      )
+      return NextResponse.json({ ok: true, workflow_id: atual.workflow_id, fila })
+    }
     return NextResponse.json({ ok: true, workflow_id: atual.workflow_id })
   } catch (e) {
     // Template de outra organização responde como inexistente, sem gravar nada.
