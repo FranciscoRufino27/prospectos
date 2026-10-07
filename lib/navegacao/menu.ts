@@ -30,7 +30,7 @@ export const ITENS_MENU: readonly ItemMenu[] = [
   { id: 'dashboard', href: '/dashboard', label: 'Dashboard', descricao: 'Visão geral e indicadores.', grupo: 'visao' },
   { id: 'inteligencia_comercial', href: '/inteligencia-comercial', label: 'Inteligência Comercial', descricao: 'Análises da prospecção.', grupo: 'visao' },
   { id: 'prospeccao', href: '/prospeccao', label: 'Prospecção', descricao: 'Busca de empresas no catálogo da Receita.', grupo: 'execucao' },
-  { id: 'automacao', href: '/automacao', label: 'Campanhas', descricao: 'Campanhas, workflows e modelos.', grupo: 'execucao' },
+  { id: 'automacao', href: '/campanhas', label: 'Campanhas', descricao: 'Campanhas, workflows e modelos.', grupo: 'execucao' },
   { id: 'pipeline', href: '/pipeline', label: 'Pipeline de Contato', descricao: 'Kanban, lista e cadência dos leads.', grupo: 'gestao' },
   { id: 'base_leads', href: '/base-leads', label: 'Base de Leads', descricao: 'Banco geral de leads, com filtros.', grupo: 'gestao' },
   { id: 'reunioes', href: '/reunioes', label: 'Reuniões', descricao: 'Agenda e reuniões marcadas.', grupo: 'gestao' },

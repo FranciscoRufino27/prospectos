@@ -507,7 +507,7 @@ export default function VencimentosRenovacoes({
             <RefreshCw aria-hidden size={13} className={atualizando ? styles.spinning : undefined} />
             Atualizado às {atualizado}
           </button>
-          <Link href="/automacao/campanhas/nova?tipo=renovacao" className={styles.primaryButton}>
+          <Link href="/campanhas/nova?tipo=renovacao" className={styles.primaryButton}>
             <span aria-hidden>+</span> Criar campanha de renovação
           </Link>
         </div>

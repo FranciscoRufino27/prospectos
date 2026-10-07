@@ -459,7 +459,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
       const r = await fetch(`/api/workflows/${id}`, { method: 'DELETE' });
       const data = await r.json();
       if (!r.ok) throw new Error(data?.erro || 'Falha ao excluir');
-      router.push('/automacao?tab=workflows');
+      router.push('/campanhas?tab=workflows');
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao excluir');
       setOcupado(false);
@@ -476,7 +476,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
   if (erro && !workflow) {
     return (
       <div className="p-6">
-        <Link href="/automacao?tab=workflows" className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"><ArrowLeft size={14} /> Voltar</Link>
+        <Link href="/campanhas?tab=workflows" className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"><ArrowLeft size={14} /> Voltar</Link>
         <div className="text-center py-20 text-slate-400 text-sm">{erro}</div>
       </div>
     );
@@ -495,7 +495,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
         fixo em 360px. */}
     <div className="p-6 max-w-[110rem]">
       {/* Cabeçalho */}
-      <Link href="/automacao?tab=workflows" className="text-sm text-slate-400 hover:text-slate-200 inline-flex items-center gap-1 mb-3 focus-ring rounded">
+      <Link href="/campanhas?tab=workflows" className="text-sm text-slate-400 hover:text-slate-200 inline-flex items-center gap-1 mb-3 focus-ring rounded">
         <ArrowLeft size={14} /> Workflows
       </Link>
       <div className="min-w-0">

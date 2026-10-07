@@ -291,7 +291,7 @@ function ProximasAcoes({ tarefas, titulo }: { tarefas: TarefaDashboard[]; titulo
     <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 font-semibold text-slate-100"><Clock3 size={16} className="text-cyan-400" /> {titulo}</h2>
-        <Link href="/automacao?tab=execucoes" className="text-xs text-indigo-400 hover:underline">Ver todas</Link>
+        <Link href="/campanhas?tab=execucoes" className="text-xs text-indigo-400 hover:underline">Ver todas</Link>
       </div>
       {tarefas.length === 0 ? (
         <div className="py-10 text-center text-sm text-slate-500">Nenhuma tarefa aberta neste módulo.</div>
@@ -485,7 +485,7 @@ function PainelProspeccao({
       <section className={styles.activityCard}>
         <div className={styles.activityHeader}>
           <CabecalhoBloco Icon={ListTodo} titulo="Atividade comercial registrada" subtitulo="Últimas mensagens, respostas e movimentações da carteira selecionada." />
-          <Link href="/automacao?tab=execucoes" className={styles.historyLink}>Ver histórico <ArrowRight size={14} aria-hidden="true" /></Link>
+          <Link href="/campanhas?tab=execucoes" className={styles.historyLink}>Ver histórico <ArrowRight size={14} aria-hidden="true" /></Link>
         </div>
         {dados.prospeccao.atividades.length === 0 ? (
           <div className={styles.emptyState}>Nenhuma atividade registrada nos últimos 30 dias.</div>
@@ -761,7 +761,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
                         <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-medium ${operacional.cls}`}>{operacional.label}</span>
                         {item.campanha && (
                           <p className="mt-1 truncate text-[11px] text-slate-500" title={item.campanha.nome}>
-                            <Link href={`/automacao/campanhas/${item.campanha.id}`} className="hover:text-cyan-300 hover:underline">{item.campanha.nome}</Link>
+                            <Link href={`/campanhas/${item.campanha.id}`} className="hover:text-cyan-300 hover:underline">{item.campanha.nome}</Link>
                           </p>
                         )}
                         {item.situacao === 'respondido' && item.ultimaRespostaEm
@@ -782,7 +782,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
         )}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-3 text-xs text-slate-500">
           <span>{vencimentosFiltrados.length} de {dados.vencimentos.length} clientes na fila priorizada · {empresas.totalMonitoradas.toLocaleString('pt-BR')} empresas monitoradas</span>
-          <Link href="/automacao/campanhas/nova?tipo=renovacao" className="font-medium text-cyan-400 hover:underline">Criar campanha de renovação <ArrowRight className="inline" size={11} /></Link>
+          <Link href="/campanhas/nova?tipo=renovacao" className="font-medium text-cyan-400 hover:underline">Criar campanha de renovação <ArrowRight className="inline" size={11} /></Link>
         </div>
       </section>
 

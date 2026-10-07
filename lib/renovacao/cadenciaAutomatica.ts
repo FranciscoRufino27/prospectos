@@ -176,7 +176,7 @@ export async function alertarConfiguracaoRenovacao(
     mensagem: mensagem.slice(0, 500),
     origem: 'renovacao',
     motivo,
-    link: '/automacao',
+    link: '/campanhas',
   })
   if (error) throw error
 }

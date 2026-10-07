@@ -27,13 +27,13 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
   if (estado === 'carregando') return <div className="flex items-center justify-center gap-2 py-24 text-slate-500"><Loader2 size={18} className="animate-spin" /> Carregando campanha…</div>;
   if (estado === 'erro' || !campanha) return (
     <div className="p-6">
-      <Link href="/automacao?tab=campanhas" className="text-sm text-indigo-300 hover:text-indigo-200">← Campanhas</Link>
+      <Link href="/campanhas?tab=campanhas" className="text-sm text-indigo-300 hover:text-indigo-200">← Campanhas</Link>
       <div className="text-center py-20 text-slate-400 text-sm">Campanha não encontrada.</div>
     </div>
   );
   if (campanha.status !== 'rascunho') return (
     <div className="mx-auto max-w-2xl p-6">
-      <Link href="/automacao?tab=campanhas" className="text-sm text-indigo-300 hover:text-indigo-200">← Campanhas</Link>
+      <Link href="/campanhas?tab=campanhas" className="text-sm text-indigo-300 hover:text-indigo-200">← Campanhas</Link>
       <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
         <h1 className="text-lg font-bold text-slate-100">Campanha já publicada</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-400">
@@ -42,14 +42,14 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         <div className="mt-5 flex flex-wrap gap-2">
           {(campanha.status === 'ativa' || campanha.status === 'pausada') && (
             <Link
-              href={`/automacao/campanhas/${campanha.id}/mensagens`}
+              href={`/campanhas/${campanha.id}/mensagens`}
               className="inline-flex rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500"
             >
               Editar mensagens
             </Link>
           )}
           <Link
-            href={`/automacao/campanhas/${campanha.id}`}
+            href={`/campanhas/${campanha.id}`}
             className="inline-flex rounded-lg border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-[var(--bg-base)]"
           >
             Abrir campanha e editar agenda

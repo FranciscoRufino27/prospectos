@@ -20,7 +20,8 @@ import {
 } from '@/lib/campanhas/resumoOperacional';
 import { DIAS_CAMPANHA, normalizarDiasCampanha, type DiaCampanha } from '@/lib/campanhas/agenda';
 import { descreverCadencia, rotuloDoDia, rotuloDaEspera } from '@/lib/campanhas/cadenciaLegivel';
-import { campanhaEhDisparoUnico } from '@/lib/campanhas/configuracaoGuiada';
+import { campanhaEhDisparoUnico, labelTipoCampanha } from '@/lib/campanhas/configuracaoGuiada';
+import PainelCadencia from './PainelCadencia';
 import {
   aguardandoRespostasDoDisparo,
   execucoesPendentes,
@@ -49,6 +50,7 @@ interface LinhaDoTempo {
 interface ResumoExecucoes {
   total: number; emAndamento: number; aguardando: number; concluidas: number;
   canceladas: number; erros: number; emailsEnviados: number; respostas: number;
+  aguardandoPrimeiroEnvio?: number; jaContatados?: number; devolvidos?: number;
 }
 const ABAS: { id: Aba; label: string; Icon: typeof Building2 }[] = [
   { id: 'geral', label: 'Visão geral', Icon: ClipboardList },
@@ -197,7 +199,7 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
   if (estado === 'carregando') return <div className="flex items-center justify-center gap-2 py-24 text-slate-500"><Loader2 size={18} className="animate-spin" /> Carregando campanha…</div>;
   if (estado === 'erro' || !c) return (
     <div className="p-6">
-      <Link href="/automacao?tab=campanhas" className="text-sm text-indigo-300 hover:text-indigo-200">← Campanhas</Link>
+      <Link href="/campanhas?tab=campanhas" className="text-sm text-indigo-300 hover:text-indigo-200">← Campanhas</Link>
       <div className="text-center py-20 text-slate-400 text-sm">Campanha não encontrada.</div>
     </div>
   );
@@ -280,13 +282,13 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
         </div>
       )}
 
-      {temFalhaOperacional && resumoExecucoes && (
+      {resumoExecucoes && resumoExecucoes.erros > 0 && (
         <div className="flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           <AlertTriangle size={17} className="mt-0.5 shrink-0 text-red-400" />
           <div>
-            <div className="font-semibold">Campanha com falha operacional — não está concluída</div>
+            <div className="font-semibold">{resumoExecucoes.erros} execução(ões) parada(s) com erro</div>
             <div className="mt-1 text-xs text-red-300/90">
-              {resumoExecucoes.canceladas} execução(ões) cancelada(s) e {resumoExecucoes.erros} com erro. Foram enviadas {resumoExecucoes.emailsEnviados} mensagem(ns) para {resumoExecucoes.total} contato(s) inscrito(s). Revise as execuções antes de concluir manualmente.
+              Esses contatos não avançam na cadência até o erro ser resolvido. Revise as execuções antes de concluir a campanha.
             </div>
           </div>
         </div>
@@ -408,14 +410,23 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-xs text-slate-500 flex items-center gap-1 mb-1">
-            <Link href="/automacao?tab=campanhas" className="hover:text-slate-300">Campanhas</Link>
+            <Link href="/campanhas?tab=campanhas" className="hover:text-slate-300">Campanhas</Link>
             <ChevronRight size={12} /> <span className="text-slate-400 truncate">{c.nome}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold text-slate-100">{c.nome}</h1>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full ${temFalhaOperacional ? 'bg-red-500/15 text-red-300' : aguardandoRespostas ? 'bg-indigo-500/15 text-indigo-300' : STATUS_BADGE[c.status] ?? STATUS_BADGE.rascunho}`}>
-              {temFalhaOperacional ? 'Atenção necessária' : aguardandoRespostas ? 'Aguardando respostas' : STATUS_LABEL[c.status] ?? c.status}
+            <span className={`text-[11px] px-2 py-0.5 rounded-full ${aguardandoRespostas ? 'bg-indigo-500/15 text-indigo-300' : STATUS_BADGE[c.status] ?? STATUS_BADGE.rascunho}`}>
+              {aguardandoRespostas ? 'Aguardando respostas' : STATUS_LABEL[c.status] ?? c.status}
             </span>
+            {c.status === 'ativa' && c.dry_run !== false && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300">em ensaio</span>
+            )}
+          </div>
+          <div className="mt-1 text-sm text-slate-400">
+            {[labelTipoCampanha(c.tipo), resumoPublico(c.publico)].filter(Boolean).join(' · ')}
+          </div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            Criada em {fmtData(c.criado_em)}{c.iniciada_em ? ` · Iniciada em ${fmtData(c.iniciada_em)}` : ''} · Atualizada em {fmtData(c.atualizado_em)}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -430,7 +441,7 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
             </button>
           )}
           {(c.status === 'ativa' || c.status === 'pausada') && (
-            <Link href={`/automacao/campanhas/${c.id}/mensagens`}
+            <Link href={`/campanhas/${c.id}/mensagens`}
               className="inline-flex items-center gap-1 rounded-lg border border-indigo-500/40 px-3 py-2 text-sm font-semibold text-indigo-200 hover:bg-indigo-500/10">
               <PencilLine size={14} /> Editar mensagens
             </Link>
@@ -443,13 +454,15 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
             </button>
           ))}
           {c.status === 'rascunho' && (
-            <Link href={`/automacao/campanhas/${c.id}/editar`}
+            <Link href={`/campanhas/${c.id}/editar`}
               className="text-sm px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-500 inline-flex items-center gap-1">
               <PencilLine size={14} /> Revisar e publicar
             </Link>
           )}
         </div>
       </div>
+
+      {c.status !== 'rascunho' && <PainelCadencia campanhaId={c.id} resumo={resumoExecucoes} />}
 
       {/* Abas */}
       <div className="flex items-center gap-1 border-b border-[var(--border)] overflow-x-auto">
@@ -590,7 +603,7 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
             <p className="text-xs text-slate-600">
               A sequência — quantidade de mensagens e dias — fica congelada quando a campanha é ativada.
               {(c.status === 'ativa' || c.status === 'pausada') && (
-                <> O conteúdo pode ser ajustado em <Link href={`/automacao/campanhas/${c.id}/mensagens`} className="text-indigo-300 hover:text-indigo-200">Editar mensagens</Link> e vale para os próximos envios.</>
+                <> O conteúdo pode ser ajustado em <Link href={`/campanhas/${c.id}/mensagens`} className="text-indigo-300 hover:text-indigo-200">Editar mensagens</Link> e vale para os próximos envios.</>
               )}
             </p>
             {c.workflow_id && (

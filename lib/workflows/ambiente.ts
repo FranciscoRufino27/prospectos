@@ -176,7 +176,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
       lead_id: execucao.lead_id,
       origem: 'workflow',
       motivo,
-      link: execucao.lead_id ? `/leads/${execucao.lead_id}` : '/automacao',
+      link: execucao.lead_id ? `/leads/${execucao.lead_id}` : '/campanhas',
     })
     if (error) throw error
   }

@@ -10,7 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Linha = Record<string, unknown>
 
-type OperadorFiltro = 'eq' | 'neq' | 'is' | 'not_is' | 'in' | 'ilike'
+type OperadorFiltro = 'eq' | 'neq' | 'is' | 'not_is' | 'in' | 'ilike' | 'gte' | 'gt' | 'lte'
 export interface Filtro {
   op: OperadorFiltro
   coluna: string
@@ -103,6 +103,7 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
   private payload: unknown
   private modo: 'lista' | 'single' | 'maybe' = 'lista'
   private limite: number | null = null
+  private intervalo: [number, number] | null = null
   private readonly ordens: { coluna: string; asc: boolean }[] = []
   private conflito: string[] = []
 
@@ -130,6 +131,11 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
   is(coluna: string, valor: unknown) { this.filtros.push({ op: 'is', coluna, valor }); return this }
   in(coluna: string, valor: unknown[]) { this.filtros.push({ op: 'in', coluna, valor }); return this }
   ilike(coluna: string, valor: string) { this.filtros.push({ op: 'ilike', coluna, valor }); return this }
+  gte(coluna: string, valor: unknown) { this.filtros.push({ op: 'gte', coluna, valor }); return this }
+  gt(coluna: string, valor: unknown) { this.filtros.push({ op: 'gt', coluna, valor }); return this }
+  lte(coluna: string, valor: unknown) { this.filtros.push({ op: 'lte', coluna, valor }); return this }
+  /** Paginação do PostgREST: [de, ate] inclusivo. */
+  range(de: number, ate: number) { this.intervalo = [de, ate]; return this }
   not(coluna: string, operador: string, valor: unknown) {
     if (operador !== 'is') throw new Error(`BancoFalso: not(${operador}) não suportado`)
     this.filtros.push({ op: 'not_is', coluna, valor })
@@ -160,6 +166,9 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
         case 'not_is': return valor === null ? atual !== null && atual !== undefined : atual !== valor
         case 'in': return Array.isArray(valor) && valor.includes(atual)
         case 'ilike': return casaIlike(atual, valor)
+        case 'gte': return atual !== null && atual !== undefined && (atual as number | string) >= (valor as number | string)
+        case 'gt': return atual !== null && atual !== undefined && (atual as number | string) > (valor as number | string)
+        case 'lte': return atual !== null && atual !== undefined && (atual as number | string) <= (valor as number | string)
       }
     })
   }
@@ -198,6 +207,7 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
         })
       }
       const total = linhas.length
+      if (this.intervalo) linhas = linhas.slice(this.intervalo[0], this.intervalo[1] + 1)
       if (this.limite !== null) linhas = linhas.slice(0, this.limite)
       if (this.contar) {
         return { data: this.somenteContagem ? null : linhas.map((l) => this.projetar(l)), count: total, error: null }

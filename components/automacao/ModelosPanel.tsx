@@ -63,7 +63,7 @@ function ModelosWorkflow() {
             </div>
             <div className="mt-3 flex items-center justify-between">
               <span className="text-[11px] text-slate-500">{etapas} bloco{etapas === 1 ? '' : 's'}</span>
-              <Link href="/automacao?tab=workflows" className="text-xs text-indigo-300 hover:text-indigo-200 inline-flex items-center gap-1">
+              <Link href="/campanhas?tab=workflows" className="text-xs text-indigo-300 hover:text-indigo-200 inline-flex items-center gap-1">
                 Usar no builder <ArrowRight size={12} />
               </Link>
             </div>

@@ -126,7 +126,7 @@ export default function CampanhaMensagensEditor({ id }: { id: string }) {
   if (estado === 'erro' || !campanha || !rascunho) {
     return (
       <div className="p-6">
-        <Link href="/automacao?tab=campanhas" className="text-sm text-indigo-300 hover:text-indigo-200">← Campanhas</Link>
+        <Link href="/campanhas?tab=campanhas" className="text-sm text-indigo-300 hover:text-indigo-200">← Campanhas</Link>
         <div className="py-20 text-center text-sm text-slate-400">Campanha não encontrada.</div>
       </div>
     );
@@ -136,12 +136,12 @@ export default function CampanhaMensagensEditor({ id }: { id: string }) {
   if (bloqueio) {
     return (
       <div className="mx-auto max-w-2xl p-6">
-        <Link href={`/automacao/campanhas/${campanha.id}`} className="text-sm text-indigo-300 hover:text-indigo-200">← Voltar para a campanha</Link>
+        <Link href={`/campanhas/${campanha.id}`} className="text-sm text-indigo-300 hover:text-indigo-200">← Voltar para a campanha</Link>
         <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
           <h1 className="text-lg font-bold text-slate-100">Mensagens não editáveis</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">{bloqueio}</p>
           {campanha.status === 'rascunho' && (
-            <Link href={`/automacao/campanhas/${campanha.id}/editar`} className="mt-5 inline-flex rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500">
+            <Link href={`/campanhas/${campanha.id}/editar`} className="mt-5 inline-flex rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500">
               Abrir assistente
             </Link>
           )}
@@ -170,9 +170,9 @@ export default function CampanhaMensagensEditor({ id }: { id: string }) {
     <div className="mx-auto max-w-[100rem] space-y-5 p-6">
       <div>
         <div className="mb-1 flex items-center gap-1 text-xs text-slate-500">
-          <Link href="/automacao?tab=campanhas" className="hover:text-slate-300">Campanhas</Link>
+          <Link href="/campanhas?tab=campanhas" className="hover:text-slate-300">Campanhas</Link>
           <ChevronRight size={12} />
-          <Link href={`/automacao/campanhas/${campanha.id}`} className="truncate hover:text-slate-300">{campanha.nome}</Link>
+          <Link href={`/campanhas/${campanha.id}`} className="truncate hover:text-slate-300">{campanha.nome}</Link>
           <ChevronRight size={12} /> <span className="text-slate-400">Editar mensagens</span>
         </div>
         <h1 className="text-2xl font-bold text-slate-100">Editar mensagens</h1>
@@ -267,7 +267,7 @@ export default function CampanhaMensagensEditor({ id }: { id: string }) {
       )}
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)]/95 px-4 py-3 backdrop-blur">
-        <Link href={`/automacao/campanhas/${campanha.id}`} className="text-sm text-slate-400 hover:text-slate-200">← Voltar para a campanha</Link>
+        <Link href={`/campanhas/${campanha.id}`} className="text-sm text-slate-400 hover:text-slate-200">← Voltar para a campanha</Link>
         <div className="flex items-center gap-3">
           {salvoEm && (
             <span className="inline-flex items-center gap-1.5 text-xs text-emerald-300">

@@ -674,7 +674,7 @@ export default function CampanhaWizardPage({
     if (!id) throw new Error('A campanha foi salva sem um identificador.')
     if (!campanhaId) {
       setCampanhaId(id)
-      window.history.replaceState(null, '', `/automacao/campanhas/${id}/editar`)
+      window.history.replaceState(null, '', `/campanhas/${id}/editar`)
     }
     return id
   }
@@ -706,7 +706,7 @@ export default function CampanhaWizardPage({
       })
       const dados = await res.json()
       if (!res.ok) throw new Error(dados.erro || 'Não foi possível ativar a campanha.')
-      router.push(`/automacao/campanhas/${id}`)
+      router.push(`/campanhas/${id}`)
       router.refresh()
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao ativar.')
@@ -728,7 +728,7 @@ export default function CampanhaWizardPage({
       })
       const dados = await res.json()
       if (!res.ok) throw new Error(dados.erro || 'Não foi possível iniciar a campanha.')
-      router.push(`/automacao/campanhas/${id}`)
+      router.push(`/campanhas/${id}`)
       router.refresh()
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao iniciar a campanha.')
@@ -817,7 +817,7 @@ export default function CampanhaWizardPage({
     <div className="mx-auto max-w-[1500px] p-4 font-sans sm:p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link href={campanhaId ? `/automacao/campanhas/${campanhaId}` : '/automacao?tab=campanhas'} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
+          <Link href={campanhaId ? `/campanhas/${campanhaId}` : '/campanhas?tab=campanhas'} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
             <ArrowLeft size={15} /> Campanhas
           </Link>
           <h1 className="text-2xl font-semibold text-slate-100">{campanhaId ? 'Editar campanha' : 'Nova campanha'}</h1>

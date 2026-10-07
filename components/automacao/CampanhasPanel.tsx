@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Plus, Play, Pause, CheckCircle2, Megaphone, Users, MessageSquare, Coins,
+  Plus, Play, Pause, CheckCircle2, Megaphone, Users, MessageSquare, Send, Eye,
   Search, FileSpreadsheet, PencilLine, ArrowRight, Activity, Info,
   CalendarDays, AlertTriangle, Trash2, Loader2,
 } from 'lucide-react';
@@ -48,8 +48,7 @@ export default function CampanhasPanel() {
   const router = useRouter();
   const [itens, setItens] = useState<Campanha[]>([]);
   const [ativasTotal, setAtivasTotal] = useState(0);
-  const [emCadencia, setEmCadencia] = useState<number | null>(null);
-  const [naFila, setNaFila] = useState<number | null>(null);
+  const [metricas, setMetricas] = useState<MetricasCampanhas | null>(null);
   const [filtro, setFiltro] = useState<string>('');
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(true);
@@ -75,8 +74,7 @@ export default function CampanhasPanel() {
       const ra = resAtivas.ok ? await resAtivas.json() : { campanhas: [] };
       setAtivasTotal((ra.campanhas ?? []).length);
       const met = resMet.ok ? await resMet.json() : null;
-      setEmCadencia(met?.emCadencia ?? null);
-      setNaFila(met?.naFila ?? null);
+      setMetricas(met);
     } catch {
       setItens([]);
     } finally {
@@ -198,25 +196,44 @@ export default function CampanhasPanel() {
             className="text-sm px-3 py-2 rounded-lg border border-[var(--border)] text-slate-200 hover:bg-[var(--bg-base)] inline-flex items-center gap-1.5">
             <FileSpreadsheet size={14} /> Importar leads
           </button>
-          <Link href="/automacao/campanhas/nova"
+          <Link href="/campanhas/nova"
             className="text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-500 inline-flex items-center gap-1">
             <Plus size={15} /> Nova campanha
           </Link>
         </div>
       </div>
 
-      {/* KPIs */}
-      <section className={estilosModulo.kpiGrid}>
+      {/* KPIs — visão executiva; o detalhe por etapa fica dentro da campanha. */}
+      <section className={`${estilosModulo.kpiGrid} ${estilosModulo.kpiGrid5}`}>
         <IndicadorModulo tom="violet" icone={Megaphone} rotulo="Campanhas ativas" valor={String(ativasTotal)} detalhe="com status ativa" />
         <IndicadorModulo
           tom="cyan"
-          icone={Users}
-          rotulo="Contatos em cadência"
-          valor={emCadencia != null ? emCadencia.toLocaleString('pt-BR') : '—'}
-          detalhe={emCadencia == null ? 'não calculável' : naFila ? `já contatados · ${naFila.toLocaleString('pt-BR')} na fila do 1º envio` : 'já contatados, aguardando o próximo passo'}
+          icone={Send}
+          rotulo="Mensagens enviadas"
+          valor={num(metricas?.mensagensEnviadas)}
+          detalhe={metricas?.mensagensEnviadas == null ? 'não calculável' : 'e-mails que saíram de fato'}
         />
-        <IndicadorModulo tom="emerald" icone={MessageSquare} rotulo="Respostas" valor="—" detalhe="não calculável" />
-        <IndicadorModulo tom="amber" icone={Coins} rotulo="Conversões" valor="—" detalhe="não calculável" />
+        <IndicadorModulo
+          tom="blue"
+          icone={Users}
+          rotulo="Em follow-up"
+          valor={num(metricas?.emFollowup)}
+          detalhe={metricas?.emFollowup == null ? 'não calculável' : 'já contatados, seguem na cadência'}
+        />
+        <IndicadorModulo
+          tom="emerald"
+          icone={MessageSquare}
+          rotulo="Respostas"
+          valor={num(metricas?.respostas)}
+          detalhe={taxaSobreContatados(metricas?.respostas, metricas?.contatados)}
+        />
+        <IndicadorModulo
+          tom="amber"
+          icone={AlertTriangle}
+          rotulo="Devoluções"
+          valor={num(metricas?.devolucoes)}
+          detalhe={taxaSobreContatados(metricas?.devolucoes, metricas?.contatados)}
+        />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
@@ -271,7 +288,7 @@ export default function CampanhasPanel() {
                   resumo,
                 });
                 return (
-                <tr key={c.id} onClick={() => router.push(`/automacao/campanhas/${c.id}`)}
+                <tr key={c.id} onClick={() => router.push(`/campanhas/${c.id}`)}
                   className={`border-b last:border-0 align-top hover:bg-[var(--bg-base)] transition-colors cursor-pointer ${comErro ? 'border-red-500/25 bg-red-500/[0.04]' : 'border-[var(--border)]'}`}>
                   <td className="px-5 py-3.5 min-w-[280px]">
                     <div className="flex items-center gap-2">
@@ -325,7 +342,7 @@ export default function CampanhasPanel() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center justify-end gap-1.5">
                       {c.status === 'rascunho' && (
-                        <Link href={`/automacao/campanhas/${c.id}/editar`} onClick={(e) => e.stopPropagation()}
+                        <Link href={`/campanhas/${c.id}/editar`} onClick={(e) => e.stopPropagation()}
                           className="text-xs px-2 py-1.5 rounded-lg bg-[var(--bg-input)] text-slate-200 hover:bg-[var(--bg-card-hover)] inline-flex items-center gap-1">
                           <PencilLine size={12} /> Editar
                         </Link>
@@ -337,7 +354,7 @@ export default function CampanhasPanel() {
                         </button>
                       ))}
                       {!campanhaEhDisparoUnico(c.tipo) && (c.status === 'ativa' || c.status === 'pausada') && (
-                        <Link href={`/automacao/campanhas/${c.id}`} onClick={(e) => e.stopPropagation()}
+                        <Link href={`/campanhas/${c.id}`} onClick={(e) => e.stopPropagation()}
                           title="Editar agenda" aria-label={`Editar agenda de ${c.nome}`}
                           className="text-xs p-1.5 rounded-lg bg-[var(--bg-input)] text-slate-300 hover:bg-indigo-500/20 hover:text-indigo-200 inline-flex items-center">
                           <CalendarDays size={13} />
@@ -356,7 +373,10 @@ export default function CampanhasPanel() {
                           </span>
                         );
                       })()}
-                      <ArrowRight size={13} className="text-slate-600" />
+                      <Link href={`/campanhas/${c.id}`} onClick={(e) => e.stopPropagation()}
+                        className="text-xs px-2.5 py-1.5 rounded-lg border border-indigo-500/40 text-indigo-200 hover:bg-indigo-500/10 inline-flex items-center gap-1 whitespace-nowrap">
+                        <Eye size={12} /> Ver detalhes
+                      </Link>
                     </div>
                   </td>
                 </tr>
@@ -407,37 +427,44 @@ const COR_DEVOLUCAO: Record<ProgressoCampanha['nivelDevolucao'], string> = {
   alto: 'text-red-300',
 };
 
-// Barra única dos contatos da campanha: cada contato está em um só segmento.
+// Indicador simples de progresso: quantos já foram contatados. A divisão por
+// etapa (fila, follow-ups, respostas, devoluções) fica no detalhe da campanha.
 function ProgressoContatos({ p }: { p: ProgressoCampanha }) {
   const segmentos = [
     { chave: 'concluidos', valor: p.concluidos, cor: 'bg-emerald-400', rotulo: 'concluíram' },
-    { chave: 'cadencia', valor: p.emCadencia, cor: 'bg-indigo-400', rotulo: 'na cadência' },
-    { chave: 'devolvidos', valor: p.devolvidos, cor: p.nivelDevolucao === 'alto' ? 'bg-red-400' : 'bg-amber-400', rotulo: p.devolvidos === 1 ? 'devolvido' : 'devolvidos' },
+    { chave: 'cadencia', valor: p.emCadencia, cor: 'bg-indigo-400', rotulo: 'em follow-up' },
+    { chave: 'devolvidos', valor: p.devolvidos, cor: p.nivelDevolucao === 'alto' ? 'bg-red-400' : 'bg-amber-400', rotulo: 'devolvidos' },
     { chave: 'sairam', valor: p.sairam, cor: 'bg-slate-400', rotulo: 'saíram (resposta/descadastro)' },
     { chave: 'erros', valor: p.erros, cor: 'bg-red-500', rotulo: 'com erro' },
-    { chave: 'fila', valor: p.naFila, cor: 'bg-white/[0.14]', rotulo: 'na fila do 1º envio' },
   ].filter((s) => s.valor > 0);
+  const resumo = [...segmentos.map((s) => `${s.valor} ${s.rotulo}`), `${p.naFila} aguardando 1º contato`].join(' · ');
   return (
-    <div className="mt-2.5 max-w-[420px]">
-      <div className="flex items-center gap-2">
-        <div className="flex h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]" role="img"
-          aria-label={segmentos.map((s) => `${s.valor} ${s.rotulo}`).join(', ')}>
-          {segmentos.map((s) => (
-            <div key={s.chave} className={`h-full ${s.cor}`} style={{ width: `${(s.valor / p.total) * 100}%` }} />
-          ))}
-        </div>
-        <span className="text-[11px] tabular-nums text-slate-400 whitespace-nowrap">
-          <b className="font-semibold text-slate-200">{p.contatados.toLocaleString('pt-BR')}</b>/{p.total.toLocaleString('pt-BR')} contatados
-        </span>
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+    <div className="mt-2.5 flex max-w-[380px] items-center gap-2" title={resumo}>
+      <div className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]" role="img" aria-label={resumo}>
         {segmentos.map((s) => (
-          <span key={s.chave} className="inline-flex items-center gap-1">
-            <span className={`h-1.5 w-1.5 rounded-full ${s.cor}`} />
-            <span className="tabular-nums text-slate-300">{s.valor.toLocaleString('pt-BR')}</span> {s.rotulo}
-          </span>
+          <div key={s.chave} className={`h-full ${s.cor}`} style={{ width: `${(s.valor / p.total) * 100}%` }} />
         ))}
       </div>
+      <span className="text-[11px] tabular-nums text-slate-400 whitespace-nowrap">
+        <b className="font-semibold text-slate-200">{p.contatados.toLocaleString('pt-BR')}</b>/{p.total.toLocaleString('pt-BR')} contatados
+      </span>
     </div>
   );
+}
+
+interface MetricasCampanhas {
+  mensagensEnviadas: number | null;
+  emFollowup: number | null;
+  aguardando1oEnvio: number | null;
+  respostas: number | null;
+  devolucoes: number | null;
+  contatados: number | null;
+}
+
+const num = (v: number | null | undefined) => (v == null ? '—' : v.toLocaleString('pt-BR'));
+
+function taxaSobreContatados(valor: number | null | undefined, contatados: number | null | undefined): string {
+  if (valor == null || contatados == null) return 'não calculável';
+  if (contatados === 0) return 'ninguém contatado ainda';
+  return `${pct(valor / contatados)} dos contatados`;
 }

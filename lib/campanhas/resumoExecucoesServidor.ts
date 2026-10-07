@@ -36,7 +36,7 @@ const LOTE_IDS = 150
 
 type Pagina<T> = PromiseLike<{ data: T[] | null; error: unknown }>
 
-async function lerTodas<T>(consulta: (de: number, ate: number) => Pagina<T>): Promise<T[]> {
+export async function lerTodas<T>(consulta: (de: number, ate: number) => Pagina<T>): Promise<T[]> {
   const linhas: T[] = []
   for (let de = 0; ; de += PAGINA) {
     const { data, error } = await consulta(de, de + PAGINA - 1)
@@ -46,7 +46,7 @@ async function lerTodas<T>(consulta: (de: number, ate: number) => Pagina<T>): Pr
   }
 }
 
-async function lerEmLotes<T>(ids: string[], consulta: (lote: string[], de: number, ate: number) => Pagina<T>): Promise<T[]> {
+export async function lerEmLotes<T>(ids: string[], consulta: (lote: string[], de: number, ate: number) => Pagina<T>): Promise<T[]> {
   const lotes: string[][] = []
   for (let i = 0; i < ids.length; i += LOTE_IDS) lotes.push(ids.slice(i, i + LOTE_IDS))
   const resultados = await Promise.all(lotes.map((lote) => lerTodas<T>((de, ate) => consulta(lote, de, ate))))
