@@ -8,6 +8,7 @@
 // acontece só no texto do composer, que a pessoa revisa antes de enviar.
 import { preencher } from '@/lib/engine/mensagem'
 import type { Lead } from '@/lib/engine/types'
+import { fraseValidadeRenovacao, saudacaoRenovacao } from '@/lib/renovacao/emailArtLaudos'
 import type { CanalTemplate, TemplateBiblioteca } from './tipos'
 
 export type CanalComposer = 'email' | 'whatsapp'
@@ -98,7 +99,14 @@ export function materializarTemplateParaLead(
 ): TemplateMaterializado | null {
   const conteudo = conteudoParaComposer(template, canal)
   if (!conteudo) return null
-  const extras: Record<string, string> = dados.nomeServico ? { nome_servico: dados.nomeServico } : {}
+  // Mesmas extras do envio automático (lib/workflows/ambiente.ts), senão um
+  // template de renovação que usa {{frase_validade}}/{{saudacao_renovacao}}
+  // fica com variável "pendente" só aqui e trava o envio manual à toa.
+  const extras: Record<string, string> = {
+    ...(dados.nomeServico ? { nome_servico: dados.nomeServico } : {}),
+    frase_validade: fraseValidadeRenovacao(dados.lead.data_validade),
+    saudacao_renovacao: saudacaoRenovacao(dados.lead.contato_nome),
+  }
   const assunto = conteudo.assunto ? preencher(conteudo.assunto, dados.lead, extras) : null
   const texto = preencher(conteudo.texto, dados.lead, extras)
   return {

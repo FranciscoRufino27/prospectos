@@ -108,6 +108,22 @@ describe('materialização com os dados do lead aberto', () => {
     expect(r).toMatchObject({ assunto: null, texto: 'Oi Geiza, sobre Laudo Técnico', html: false, pendentes: [] })
   })
 
+  it('materializa {{frase_validade}} e {{saudacao_renovacao}} como no envio automático (sem travar por variável pendente)', () => {
+    const r = materializarTemplateParaLead(
+      template({ assunto: null, corpo: '{{saudacao_renovacao}} O laudo {{frase_validade}} {{data_validade}}.' }),
+      'email',
+      DADOS,
+    )!
+    expect(r.texto).toBe('Olá, Geiza, tudo bem? O laudo está com vencimento previsto para 30/10/2026.')
+    expect(r.pendentes).toEqual([])
+  })
+
+  it('{{saudacao_renovacao}} cai no fallback sem nome, sem vírgula sobrando', () => {
+    const semNome = { lead: lead({ contato_nome: null }), nomeServico: 'Laudo Técnico' }
+    const r = materializarTemplateParaLead(template({ assunto: null, corpo: '{{saudacao_renovacao}}' }), 'email', semNome)!
+    expect(r.texto).toBe('Olá, tudo bem?')
+  })
+
   it('usa os fallbacks do renderizador quando o dado falta — nunca undefined/null', () => {
     const semDados = { lead: lead({ contato_nome: null, empresa: null, segmento: null, cidade: null, responsavel_nome: null, data_validade: null }), nomeServico: '' }
     const r = materializarTemplateParaLead(template({ assunto: null, corpo: TODAS }), 'email', semDados)!
