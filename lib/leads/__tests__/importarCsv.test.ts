@@ -66,6 +66,14 @@ describe('processarPlanilhaPadrao', () => {
     })
   })
 
+  it('mapeia o header composto Nicho/Segmento anunciado pelo modal de importação', () => {
+    const csv = 'Nome,E-mail,Empresa,Nicho/Segmento,Origem,Responsavel\n' +
+      'Ana,ana@x.com,Acme,Laudos de Brinquedos,Planilha,Ana'
+    const { validos, pulados } = processarPlanilhaPadrao(csv)
+    expect(pulados).toHaveLength(0)
+    expect(validos[0].segmento).toBe('laudos_de_brinquedos')
+  })
+
   it('pula linhas sem nome, e-mail válido, empresa ou responsável', () => {
     const csv = 'nome;email;empresa;nicho;responsavel\n' +
       ';a@x.com;Acme;Varejo;Ana\n' +      // sem_nome
