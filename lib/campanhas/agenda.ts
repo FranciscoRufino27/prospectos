@@ -2,6 +2,7 @@
 // avançar e a JANELA de envio (dias + horário de Brasília, `encaixarNaJanela`),
 // aplicada ao agendar o disparo, ao agendar as esperas dos follow-ups e, como
 // trava final, no momento do envio (lib/workflows/executor.ts).
+import { campanhaEhDisparoUnico } from './configuracaoGuiada'
 
 export const DIAS_CAMPANHA = [
   { id: 'dom', label: 'Dom' },
@@ -145,4 +146,23 @@ export function janelaDoPublico(publico: unknown): JanelaCampanha | null {
   if (!agenda || typeof agenda !== 'object' || Array.isArray(agenda)) return null
   const a = agenda as Record<string, unknown>
   return { diasSemana: a.diasSemana, horarioInicio: a.horarioInicio, horarioFim: a.horarioFim }
+}
+
+/**
+ * Janela usada ao agendar a fila da campanha. Disparo único não tem agenda
+ * semanal (o executor já o ignora): a `agenda` padrão gravada no público não
+ * pode segurar o envio para o próximo dia útil.
+ */
+export function janelaDeEnvioDaCampanha(
+  campanha: { tipo?: string | null; publico?: unknown } | null | undefined,
+): JanelaCampanha | null {
+  if (!campanha) return null
+  const publico = campanha.publico && typeof campanha.publico === 'object' && !Array.isArray(campanha.publico)
+    ? campanha.publico as Record<string, unknown>
+    : null
+  const operacao = publico?.operacao && typeof publico.operacao === 'object' && !Array.isArray(publico.operacao)
+    ? publico.operacao as Record<string, unknown>
+    : null
+  if (operacao?.modoEnvio === 'disparo_unico' || campanhaEhDisparoUnico(campanha.tipo)) return null
+  return janelaDoPublico(publico)
 }

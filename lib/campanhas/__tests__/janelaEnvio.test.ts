@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 vi.mock('@vercel/queue', () => ({ send: vi.fn() }))
 
-import { encaixarNaJanela, janelaDoPublico, type JanelaCampanha } from '../agenda'
+import { encaixarNaJanela, janelaDeEnvioDaCampanha, janelaDoPublico, type JanelaCampanha } from '../agenda'
 import { montarAgendaDisparoCampanha, reagendarPrimeirosEnviosAoRetomar } from '../filaDisparoServidor'
 import { textoPendentes } from '../situacaoDisparo'
 import { BancoFalso } from '@/lib/templates/__tests__/bancoFalso'
@@ -54,6 +54,14 @@ describe('encaixarNaJanela', () => {
     expect(janelaDoPublico({ agenda: { diasSemana: ['seg'], horarioInicio: '09:00', horarioFim: '18:00' } }))
       .toEqual({ diasSemana: ['seg'], horarioInicio: '09:00', horarioFim: '18:00' })
     expect(janelaDoPublico(null)).toBeNull()
+  })
+
+  it('disparo único agenda a fila sem janela, mesmo com a agenda padrão gravada no público', () => {
+    const agenda = { diasSemana: ['seg', 'ter', 'qua', 'qui', 'sex'], horarioInicio: '09:00', horarioFim: '18:00' }
+    expect(janelaDeEnvioDaCampanha({ tipo: 'novidade_clientes', publico: { agenda } })).toBeNull()
+    expect(janelaDeEnvioDaCampanha({ tipo: 'comunicado', publico: { agenda, operacao: { modoEnvio: 'disparo_unico' } } })).toBeNull()
+    expect(janelaDeEnvioDaCampanha({ tipo: 'prospeccao', publico: { agenda, operacao: { modoEnvio: 'cadencia' } } })).toEqual(agenda)
+    expect(janelaDeEnvioDaCampanha(null)).toBeNull()
   })
 })
 

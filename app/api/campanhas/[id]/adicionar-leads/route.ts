@@ -10,7 +10,7 @@ import {
 } from '@/lib/campanhas/adicionarLeadsServidor'
 import { agendarExecucoesCampanha } from '@/lib/campanhas/filaDisparoServidor'
 import { buscarCampanha } from '@/lib/campanhas/repository'
-import { janelaDoPublico } from '@/lib/campanhas/agenda'
+import { janelaDeEnvioDaCampanha } from '@/lib/campanhas/agenda'
 import { SupabaseWorkflowStore } from '@/lib/workflows'
 
 export const runtime = 'nodejs'
@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       org,
       id,
       execucaoIds,
-      { janela: janelaDoPublico(campanha?.publico) },
+      { janela: janelaDeEnvioDaCampanha(campanha) },
     )
     return NextResponse.json({ ok: true, ...resultado, fila })
   } catch (e) {
