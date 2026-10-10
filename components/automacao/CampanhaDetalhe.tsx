@@ -5,8 +5,9 @@ import Link from 'next/link';
 import {
   ChevronRight, Loader2, PencilLine, Play, Pause, CheckCircle2, Building2, Users,
   MessageSquare, BarChart3, ClipboardList, Workflow, Info, AlertTriangle, Activity, CalendarDays, Clock,
-  Send, CornerUpLeft, UserCheck, XCircle, MailX,
+  Send, CornerUpLeft, UserCheck, XCircle, MailX, UserPlus,
 } from 'lucide-react';
+import AdicionarLeadsModal from './AdicionarLeadsModal';
 import { type Campanha, type Publico, STATUS_BADGE, STATUS_LABEL, fmtData, resumoPublico } from './tiposCampanha';
 import {
   NAO_CONFIGURADO,
@@ -78,6 +79,7 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
   const [agindo, setAgindo] = useState(false);
   const [modalDryRun, setModalDryRun] = useState(false);
   const [modalAgenda, setModalAgenda] = useState(false);
+  const [modalAdicionarLeads, setModalAdicionarLeads] = useState(false);
   const [diasAgenda, setDiasAgenda] = useState<DiaCampanha[]>([]);
   const [salvandoAgenda, setSalvandoAgenda] = useState(false);
   const [erroAgenda, setErroAgenda] = useState<string | null>(null);
@@ -340,6 +342,14 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
         </div>
       )}
 
+      {modalAdicionarLeads && (
+        <AdicionarLeadsModal
+          campanhaId={c.id}
+          onClose={() => setModalAdicionarLeads(false)}
+          onAdicionados={carregar}
+        />
+      )}
+
       {/* Edição restrita de campanha ativa: somente os próximos dias de execução. */}
       {modalAgenda && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
@@ -430,6 +440,17 @@ export default function CampanhaDetalhe({ id }: { id: string }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {c.status === 'ativa' && c.tipo !== 'renovacao' && !!c.workflow_id && (
+            <button
+              type="button"
+              onClick={() => setModalAdicionarLeads(true)}
+              disabled={agindo || emEnsaio}
+              title={emEnsaio ? 'Em modo ensaio, use "Ativar envio real" para inscrever o público.' : undefined}
+              className="inline-flex items-center gap-1 rounded-lg border border-indigo-500/40 px-3 py-2 text-sm font-semibold text-indigo-200 hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <UserPlus size={14} /> Adicionar leads
+            </button>
+          )}
           {!disparoUnico && (c.status === 'ativa' || c.status === 'pausada') && (
             <button
               type="button"
