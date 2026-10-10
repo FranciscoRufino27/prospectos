@@ -540,3 +540,85 @@ describe('cópia ao responsável nos envios da campanha (publico.operacao.respon
     expect(enviosGmailMock[0].cc).toBe('aline@org.com.br')
   })
 })
+
+describe('aviso de envio no WhatsApp (publico.operacao.avisoEnvio)', () => {
+  const GRUPO = '120363000000000099-group'
+  const publicoComAviso = (avisoEnvio?: Record<string, unknown>) => ({
+    operacao: {
+      mensagemInicial: { templateTipo: 'renovacao_1' },
+      followups: [{ templateTipo: 'renovacao_2' }, { templateTipo: 'renovacao_3' }],
+      ...(avisoEnvio ? { avisoEnvio } : {}),
+    },
+  })
+
+  it('envio real avisa com campanha, etapa, assunto e a chave do envio', async () => {
+    const { motor } = motorFalso(leadBase({ estagio: 'renovacao' }), [template()])
+    const avisarEnvio = vi.fn().mockResolvedValue({ tipo: 'processado', resultados: [] })
+    const client = banco({ tipo: 'renovacao', nome: 'CAMPANHA INICIAL', publico: publicoComAviso({ whatsapp: ['grupo'], grupoWhatsappId: GRUPO }) }).cliente()
+    const ambiente = new AmbienteSupabase(ORG, { client, motor, avisarEnvio })
+
+    const r = await comEnvioReal(() => ambiente.enviarEmailTemplate(LEAD, 'renovacao_3', CAMPANHA, 'exec-1:email-3'))
+
+    expect(r.enviado).toBe(true)
+    expect(avisarEnvio).toHaveBeenCalledTimes(1)
+    expect(avisarEnvio).toHaveBeenCalledWith({
+      organizacaoId: ORG,
+      leadId: LEAD,
+      eventoId: 'envio:exec-1:email-3',
+      destinos: ['grupo'],
+      grupoIdCampanha: GRUPO,
+      responsavelPerfil: { id: 'u1', nome: 'Aline' },
+      campanhaNome: 'CAMPANHA INICIAL',
+      etapa: 'follow-up 2',
+      assunto: 'Contato — Empresa Exemplo',
+    })
+  })
+
+  it('mensagem inicial é identificada como tal', async () => {
+    const { motor } = motorFalso(leadBase({ estagio: 'renovacao' }), [template()])
+    const avisarEnvio = vi.fn().mockResolvedValue({ tipo: 'processado', resultados: [] })
+    const client = banco({ tipo: 'renovacao', nome: 'C', publico: publicoComAviso({ whatsapp: ['grupo'] }) }).cliente()
+    await comEnvioReal(() => new AmbienteSupabase(ORG, { client, motor, avisarEnvio })
+      .enviarEmailTemplate(LEAD, 'renovacao_1', CAMPANHA, 'exec-1:email-1'))
+    expect(avisarEnvio.mock.calls[0][0]).toMatchObject({ etapa: 'mensagem inicial', grupoIdCampanha: null })
+  })
+
+  it('sem avisoEnvio na campanha não avisa', async () => {
+    const { motor } = motorFalso(leadBase({ estagio: 'renovacao' }), [template()])
+    const avisarEnvio = vi.fn()
+    const client = banco({ tipo: 'renovacao', publico: publicoComAviso() }).cliente()
+    await comEnvioReal(() => new AmbienteSupabase(ORG, { client, motor, avisarEnvio })
+      .enviarEmailTemplate(LEAD, 'renovacao_1', CAMPANHA, 'exec-1:email-1'))
+    expect(avisarEnvio).not.toHaveBeenCalled()
+  })
+
+  it('campanha em dry_run não envia nem avisa', async () => {
+    const { motor, enviados } = motorFalso(leadBase({ estagio: 'renovacao' }), [template()])
+    const avisarEnvio = vi.fn()
+    const client = banco({ tipo: 'renovacao', dry_run: true, publico: publicoComAviso({ whatsapp: ['grupo'] }) }).cliente()
+    const r = await comEnvioReal(() => new AmbienteSupabase(ORG, { client, motor, avisarEnvio })
+      .enviarEmailTemplate(LEAD, 'renovacao_1', CAMPANHA, 'exec-1:email-1'))
+    expect(r.enviado).toBe(false)
+    expect(enviados).toHaveLength(0)
+    expect(avisarEnvio).not.toHaveBeenCalled()
+  })
+
+  it('simulação não avisa', async () => {
+    const { motor } = motorFalso(leadBase({ estagio: 'renovacao' }), [template()])
+    const avisarEnvio = vi.fn()
+    const client = banco({ tipo: 'renovacao', publico: publicoComAviso({ whatsapp: ['grupo'] }) }).cliente()
+    await comEnvioReal(() => new AmbienteSupabase(ORG, { client, motor, avisarEnvio, simular: true })
+      .enviarEmailTemplate(LEAD, 'renovacao_1', CAMPANHA, 'exec-1:email-1'))
+    expect(avisarEnvio).not.toHaveBeenCalled()
+  })
+
+  it('falha no aviso não derruba o envio já feito', async () => {
+    const { motor, enviados } = motorFalso(leadBase({ estagio: 'renovacao' }), [template()])
+    const avisarEnvio = vi.fn().mockRejectedValue(new Error('Z-API fora'))
+    const client = banco({ tipo: 'renovacao', publico: publicoComAviso({ whatsapp: ['grupo'] }) }).cliente()
+    const r = await comEnvioReal(() => new AmbienteSupabase(ORG, { client, motor, avisarEnvio })
+      .enviarEmailTemplate(LEAD, 'renovacao_1', CAMPANHA, 'exec-1:email-1'))
+    expect(r.enviado).toBe(true)
+    expect(enviados).toHaveLength(1)
+  })
+})

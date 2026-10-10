@@ -5,7 +5,7 @@ import { lerConfigZapi } from '@/lib/whatsapp/zapi'
 import { lerWhatsappDoPerfil, lerWhatsappResponsavel } from '@/lib/comercial/avisosResposta/composicao'
 import { numeroWhatsappAvisos } from '@/lib/comercial/avisosResposta/numero'
 import { lerGrupoComercialDaOrg } from '@/lib/comercial/handoff/composicao'
-import { avisoRetornoCampanha } from './configuracaoGuiada'
+import { avisoEnvioCampanha, avisoRetornoCampanha } from './configuracaoGuiada'
 
 // Pré-condições do aviso de resposta escolhido na campanha, conferidas antes
 // de sair do ensaio. O wizard mostra os mesmos bloqueios antes, no que dá para
@@ -93,6 +93,30 @@ export async function exigirAvisoRetornoPronto(
   if (semNumero.length) {
     const quem = semNumero.join(', ')
     throw new Error(`Aviso só por WhatsApp: ${quem} ainda não ${semNumero.length === 1 ? 'ligou' : 'ligaram'} o WhatsApp de avisos (Meu perfil > Avisos no WhatsApp) — as respostas não chegariam a ninguém. Peça o cadastro, marque o grupo ou marque também o e-mail.`)
+  }
+}
+
+// Aviso a cada envio marcado na campanha: sem Z-API, sem grupo ou sem o
+// número do responsável, a mensagem nunca sairia — bloqueia antes do envio real.
+export async function exigirAvisoEnvioPronto(
+  admin: SupabaseClient,
+  org: string,
+  publico: Publico,
+  leadIds: string[],
+): Promise<void> {
+  const aviso = avisoEnvioCampanha(publico)
+  if (!aviso) return
+  if (!lerConfigZapi()) {
+    throw new Error('O aviso de envio no WhatsApp precisa do WhatsApp (Z-API) configurado no servidor. Desmarque o aviso ou configure a Z-API antes de iniciar.')
+  }
+  if (aviso.whatsapp.includes('grupo') && !(aviso.grupoWhatsappId || await lerGrupoComercialDaOrg(admin, org))) {
+    throw new Error('O aviso de envio no grupo está marcado, mas não há grupo: informe o grupo na campanha ou cadastre em Configurações > Distribuição.')
+  }
+  if (aviso.whatsapp.includes('responsavel')) {
+    const semNumero = await responsaveisSemWhatsapp(admin, org, publico, leadIds)
+    if (semNumero.length) {
+      throw new Error(`Aviso de envio no WhatsApp: ${semNumero.join(', ')} ainda não ${semNumero.length === 1 ? 'ligou' : 'ligaram'} o WhatsApp de avisos (Meu perfil > Avisos no WhatsApp). Peça o cadastro ou desmarque o responsável.`)
+    }
   }
 }
 

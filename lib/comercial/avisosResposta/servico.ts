@@ -15,10 +15,11 @@
 //   - falta de configuração (Z-API, grupo, número do responsável) não consome
 //     tentativa: o aviso sai quando a configuração existir (dentro da janela
 //     de reprocessamento).
-import { extrairTrecho, montarMensagemAviso } from './mensagem'
+import { extrairTrecho, montarMensagemAviso, montarMensagemAvisoEnvio } from './mensagem'
 import type { AvisoRespostaRepository } from './repository'
 import type {
-  AvisoResposta, DadosAvisoResposta, DestinoAvisoResposta, EntradaAvisoResposta, EnviadorAviso, ModoAvisoResposta,
+  AvisoResposta, DadosAvisoResposta, DestinoAvisoResposta, EntradaAvisoEnvio, EntradaAvisoResposta, EnviadorAviso,
+  ModoAvisoResposta,
 } from './types'
 
 export const MAX_TENTATIVAS_AVISO = 5
@@ -130,6 +131,49 @@ export async function avisarRespostaCliente(
   return { tipo: 'processado', resultados }
 }
 
+/**
+ * Registra (idempotente pelo envio) e tenta entregar o aviso de UM e-mail de
+ * campanha enviado. Sem anti-spam: cada envio é um evento próprio.
+ */
+export async function avisarEnvioCampanha(
+  deps: DepsAvisoResposta,
+  entrada: EntradaAvisoEnvio,
+): Promise<ResultadoAvisoResposta> {
+  const org = entrada.organizacaoId
+  const destinos = (['responsavel', 'grupo'] as const).filter((d) => entrada.destinos.includes(d))
+  if (destinos.length === 0) return { tipo: 'desligado' }
+
+  let avisos = await deps.repo.listarPorEvento(org, entrada.eventoId)
+  if (avisos.length === 0) {
+    const ctx = await deps.lerContextoLead(org, entrada.leadId)
+    if (!ctx) return { tipo: 'lead_nao_encontrado' }
+    const daCampanha = entrada.responsavelPerfil?.id ? entrada.responsavelPerfil : null
+    const dados: DadosAvisoResposta = {
+      empresa: ctx.empresa,
+      contato: ctx.contato,
+      canal: 'email',
+      classificacao: null,
+      trecho: '',
+      responsavelId: ctx.responsavel?.id ?? null,
+      responsavelPerfilId: daCampanha?.id ?? null,
+      grupoId: entrada.grupoIdCampanha?.trim() || null,
+      responsavelNome: daCampanha?.nome ?? ctx.responsavel?.nome ?? '',
+      link: deps.linkLead?.(entrada.leadId) ?? null,
+      campanhaNome: entrada.campanhaNome,
+      etapa: entrada.etapa,
+      assunto: entrada.assunto,
+    }
+    avisos = []
+    for (const destinoTipo of destinos) {
+      avisos.push(await deps.repo.registrar(org, { leadId: entrada.leadId, eventoId: entrada.eventoId, destinoTipo, dados, tipo: 'envio' }))
+    }
+  }
+
+  const resultados: ResultadoProcessamentoAviso[] = []
+  for (const a of avisos) resultados.push(await processarAvisoResposta(deps, org, a.id))
+  return { tipo: 'processado', resultados }
+}
+
 async function resolverDestino(deps: DepsAvisoResposta, a: AvisoResposta): Promise<{ destino: string } | { motivo: string }> {
   if (deps.provedorConfigurado && !deps.provedorConfigurado()) {
     return { motivo: 'Z-API não configurada no servidor (ZAPI_INSTANCE_ID, ZAPI_TOKEN, ZAPI_CLIENT_TOKEN).' }
@@ -168,7 +212,9 @@ export async function processarAvisoResposta(
   const venceu = await deps.repo.reivindicarEnvio(organizacaoId, id, a.tentativas)
   if (!venceu) return { tipo: 'concorrente' }
 
-  const mensagem = montarMensagemAviso(a.dados, a.destinoTipo)
+  const mensagem = a.tipo === 'envio'
+    ? montarMensagemAvisoEnvio(a.dados, a.destinoTipo)
+    : montarMensagemAviso(a.dados, a.destinoTipo)
   const enviar = a.destinoTipo === 'grupo' ? deps.enviarGrupo : deps.enviarIndividual
   let r
   try {

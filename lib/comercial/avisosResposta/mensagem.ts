@@ -54,3 +54,15 @@ export function montarMensagemAviso(d: DadosAvisoResposta, destino: DestinoAviso
   if (d.link) linhas.push('', `Abrir: ${d.link}`)
   return linhas.join('\n')
 }
+
+export function montarMensagemAvisoEnvio(d: DadosAvisoResposta, destino: DestinoAvisoResposta): string {
+  const campanha = ou(d.campanhaNome, 'campanha')
+  const linhas = ['E-MAIL ENVIADO — ProspectOS', '']
+  linhas.push(`Campanha: ${campanha}${d.etapa ? ` (${d.etapa})` : ''}`)
+  if (ou(d.empresa, '')) linhas.push(`Empresa: ${d.empresa.trim()}`)
+  linhas.push(`Contato: ${ou(d.contato, 'não informado')}`)
+  if (ou(d.assunto, '')) linhas.push(`Assunto: ${d.assunto!.trim()}`)
+  if (destino === 'grupo') linhas.push(`Responsável: ${ou(d.responsavelNome, 'sem responsável')}`)
+  if (d.link) linhas.push('', `Abrir: ${d.link}`)
+  return linhas.join('\n')
+}

@@ -8,7 +8,7 @@ import {
   normalizarPublicoCampanha,
   validarCampanhaGuiada,
 } from './configuracaoGuiada'
-import { exigirAvisoRetornoPronto } from './retornoWhatsappServidor'
+import { exigirAvisoEnvioPronto, exigirAvisoRetornoPronto } from './retornoWhatsappServidor'
 import { buscarPreviaPublicoCampanha } from './publicoServidor'
 import { exigirEnvioRealCampanhaDisponivel } from './opcoesServidor'
 import { inscreverLeadsNoWorkflow } from './inscricaoLeadsServidor'
@@ -143,6 +143,7 @@ export async function inscreverCampanhaReal(
   // sem e-mail a resposta tem de chegar a alguém pelo WhatsApp — não sai do
   // ensaio sem isso.
   await exigirAvisoRetornoPronto(admin, org, normalizarPublicoCampanha(campanha.publico), previa.idsElegiveis)
+  await exigirAvisoEnvioPronto(admin, org, normalizarPublicoCampanha(campanha.publico), previa.idsElegiveis)
 
   // Só sai do dry-run depois de público e workflow terem sido revalidados.
   if (campanha.dry_run !== false) {

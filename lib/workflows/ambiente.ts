@@ -17,7 +17,9 @@ import { log } from '@/lib/engine/logger'
 import type { Motor } from '@/lib/engine'
 import type { Lead } from '@/lib/engine/types'
 import { montarEmailCampanhaHtml } from '@/lib/campanhas/emailCampanha'
-import { responsavelRecebeCopiaDosEnvios } from '@/lib/campanhas/configuracaoGuiada'
+import { avisoEnvioCampanha, responsavelRecebeCopiaDosEnvios } from '@/lib/campanhas/configuracaoGuiada'
+import type { EntradaAvisoEnvio } from '@/lib/comercial/avisosResposta/types'
+import type { ResultadoAvisoResposta } from '@/lib/comercial/avisosResposta/servico'
 import { enviarEmailCampanhaComCopia, escolherResponsavelCampanha } from '@/lib/campanhas/emailComCopiaServidor'
 import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
 import {
@@ -135,12 +137,19 @@ const CAMPOS_LEAD_ESCRITA_PERMITIDOS = new Set([
 export class AmbienteSupabase implements AmbienteWorkflow {
   private motor: Motor
   private db: SupabaseClient
+  private avisarEnvio?: (entrada: EntradaAvisoEnvio) => Promise<ResultadoAvisoResposta>
   constructor(
     public readonly organizacaoId: string,
-    opts: { simular?: boolean; client?: SupabaseClient; motor?: Motor } = {},
+    opts: {
+      simular?: boolean
+      client?: SupabaseClient
+      motor?: Motor
+      avisarEnvio?: (entrada: EntradaAvisoEnvio) => Promise<ResultadoAvisoResposta>
+    } = {},
   ) {
     this.simular = opts.simular ?? false
     this.db = opts.client ?? createSupabaseAdminClient()
+    this.avisarEnvio = opts.avisarEnvio
     // Motor real da org: Store (interações/leads/templates) + EmailProvider.
     // `motor` injetável serve ao teste do caminho de envio (sem rede).
     this.motor = opts.motor ?? criarMotorReal(organizacaoId)
@@ -356,10 +365,11 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     // dry_run=true (padrão) bloqueia o envio mesmo com MODO_ENSAIO=false em prod.
     let campanhaPublico: Record<string, unknown> | null = null
     let campanhaTipo: string | null = null
+    let campanhaNome = ''
     if (campanhaId) {
       const { data: camp, error: campanhaError } = await this.db
         .from('campanhas')
-        .select('dry_run, publico, tipo, status')
+        .select('dry_run, publico, tipo, status, nome')
         .eq('id', campanhaId)
         .eq('organizacao_id', this.organizacaoId)
         .maybeSingle()
@@ -372,6 +382,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
       }
       campanhaPublico = (camp as { publico?: Record<string, unknown> | null } | null)?.publico ?? null
       campanhaTipo = (camp as { tipo?: string | null } | null)?.tipo ?? null
+      campanhaNome = (camp as { nome?: string | null }).nome ?? ''
       if (campanhaTipo === 'prospeccao' && (camp as { status?: string }).status
         && !['ativa', 'concluida'].includes(String((camp as { status?: string }).status))) {
         return { enviado: false, assunto }
@@ -602,7 +613,48 @@ export class AmbienteSupabase implements AmbienteWorkflow {
         })
       }
     }
+    if (campanhaId && chaveEnvio) {
+      const avisoEnvio = avisoEnvioCampanha(campanhaPublico)
+      if (avisoEnvio) {
+        const indiceMensagem = mensagemConfigurada ? [inicial, ...followups].indexOf(mensagemConfigurada) : -1
+        const usarDaCampanha = !(preferirResponsavelDoLead && lead.responsavel_id)
+        const responsavelPerfil = usarDaCampanha && contextoCampanha?.responsavel
+          ? { id: contextoCampanha.responsavel.id, nome: contextoCampanha.responsavel.nome }
+          : null
+        await this.avisarEnvioSemFalhar({
+          organizacaoId: this.organizacaoId,
+          leadId,
+          eventoId: `envio:${chaveEnvio}`,
+          destinos: avisoEnvio.whatsapp,
+          grupoIdCampanha: avisoEnvio.grupoWhatsappId ?? null,
+          responsavelPerfil,
+          campanhaNome,
+          etapa: indiceMensagem > 0 ? `follow-up ${indiceMensagem}` : 'mensagem inicial',
+          assunto,
+        })
+      }
+    }
     return { enviado: true, assunto }
+  }
+
+  // O e-mail já saiu: falha no aviso fica no outbox (reprocessável) ou no log,
+  // nunca desfaz nem repete o envio.
+  private async avisarEnvioSemFalhar(entrada: EntradaAvisoEnvio): Promise<void> {
+    try {
+      const avisar = this.avisarEnvio
+        ?? (await import('@/lib/comercial/avisosResposta/composicao')).montarHookAvisoEnvio(this.db)
+      const r = await avisar(entrada)
+      log.info('Aviso de envio no WhatsApp processado.', {
+        leadId: entrada.leadId,
+        resultado: r.tipo,
+        ...(r.tipo === 'processado' ? { destinos: r.resultados.map((x) => x.tipo) } : {}),
+      })
+    } catch (erro) {
+      log.aviso('Falha ao avisar o envio no WhatsApp.', {
+        leadId: entrada.leadId,
+        erro: erro instanceof Error ? erro.message : String(erro),
+      })
+    }
   }
 
   async criarTarefa(leadId: string, titulo: string, responsavelId?: string | null, chave?: string | null): Promise<void> {

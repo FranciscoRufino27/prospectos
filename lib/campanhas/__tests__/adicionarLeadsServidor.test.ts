@@ -13,7 +13,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../repository', () => ({ buscarCampanha: mocks.buscarCampanha }))
 vi.mock('../opcoesServidor', () => ({ exigirEnvioRealCampanhaDisponivel: mocks.exigirEnvioRealCampanhaDisponivel }))
-vi.mock('../retornoWhatsappServidor', () => ({ exigirAvisoRetornoPronto: mocks.exigirAvisoRetornoPronto }))
+vi.mock('../retornoWhatsappServidor', () => ({
+  exigirAvisoRetornoPronto: mocks.exigirAvisoRetornoPronto,
+  exigirAvisoEnvioPronto: mocks.exigirAvisoRetornoPronto,
+}))
 vi.mock('../carteiraServidor', () => ({
   transferirLeadImportadoParaMotor: mocks.transferirLeadImportadoParaMotor,
   restaurarLeadImportadoForaDoMotor: mocks.restaurarLeadImportadoForaDoMotor,

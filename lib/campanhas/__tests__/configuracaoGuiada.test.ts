@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   aplicarRegraPublicoPorTipo,
   campanhaEhDisparoUnico,
+  avisoEnvioCampanha,
   avisoRetornoCampanha,
   corpoComLink,
   montarDefinicaoCampanha,
@@ -271,5 +272,30 @@ describe('acompanhamento do responsável e aviso de resposta da campanha', () =>
     expect(avisoRetornoCampanha({ operacao: { resposta: { canais: 'email_whatsapp' } } })).toEqual({ email: true, whatsapp: ['responsavel'] })
     const soWhatsapp = normalizarPublicoCampanha({ operacao: { resposta: { canais: 'whatsapp' } } })
     expect(soWhatsapp.operacao?.resposta).toMatchObject({ aviso: { email: false, whatsapp: ['responsavel'] }, notificarResponsavel: false })
+  })
+})
+
+describe('aviso de envio (operacao.avisoEnvio)', () => {
+  it('preserva destinos válidos e só guarda o grupo quando o grupo está marcado', () => {
+    const p = normalizarPublicoCampanha({
+      operacao: { avisoEnvio: { whatsapp: ['grupo', 'x', 'responsavel'], grupoWhatsappId: ' 120363000000000001-group ' } },
+    })
+    expect(p.operacao?.avisoEnvio).toEqual({ whatsapp: ['responsavel', 'grupo'], grupoWhatsappId: '120363000000000001-group' })
+    const semGrupo = normalizarPublicoCampanha({
+      operacao: { avisoEnvio: { whatsapp: ['responsavel'], grupoWhatsappId: '120363000000000001-group' } },
+    })
+    expect(semGrupo.operacao?.avisoEnvio).toEqual({ whatsapp: ['responsavel'] })
+  })
+
+  it('sem destinos ou ausente = desligado', () => {
+    expect(normalizarPublicoCampanha({ operacao: { avisoEnvio: { whatsapp: [] } } }).operacao?.avisoEnvio).toBeUndefined()
+    expect(normalizarPublicoCampanha({}).operacao?.avisoEnvio).toBeUndefined()
+    expect(avisoEnvioCampanha({ operacao: { avisoEnvio: { whatsapp: ['grupo'] } } })).toEqual({ whatsapp: ['grupo'] })
+    expect(avisoEnvioCampanha(null)).toBeNull()
+  })
+
+  it('valida o formato do grupo do aviso de envio', () => {
+    const p = normalizarPublicoCampanha({ operacao: { avisoEnvio: { whatsapp: ['grupo'], grupoWhatsappId: 'grupo-errado' } } })
+    expect(validarCampanhaGuiada(p).join(' ')).toContain('O grupo do aviso de envio precisa estar no formato')
   })
 })

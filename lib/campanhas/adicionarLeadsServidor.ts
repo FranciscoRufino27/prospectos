@@ -4,7 +4,7 @@ import { buscarCampanha } from './repository'
 import { LIMITE_PUBLICO_CAMPANHA, normalizarPublicoCampanha, podeUsarTipoCampanha } from './configuracaoGuiada'
 import { chaveEmpresaPublico, classificarPublicoCampanha, type LinhaPublicoCampanha } from './publicoServidor'
 import { exigirEnvioRealCampanhaDisponivel } from './opcoesServidor'
-import { exigirAvisoRetornoPronto } from './retornoWhatsappServidor'
+import { exigirAvisoEnvioPronto, exigirAvisoRetornoPronto } from './retornoWhatsappServidor'
 import { inscreverLeadsNoWorkflow, type ResultadoInscricaoLeads } from './inscricaoLeadsServidor'
 import { ESTAGIO_LABELS, estagiosDoStatus } from '@/lib/pipeline-stages'
 import { emailValido } from '@/lib/leads/importarCsv'
@@ -281,6 +281,7 @@ export async function adicionarLeadsCampanha(
     throw new ErroAdicaoLeads('O workflow da campanha precisa estar publicado.', 409)
   }
   await exigirAvisoRetornoPronto(admin, org, normalizarPublicoCampanha(campanha.publico), idsElegiveis)
+  await exigirAvisoEnvioPronto(admin, org, normalizarPublicoCampanha(campanha.publico), idsElegiveis)
 
   const resultado = await inscreverLeadsNoWorkflow(admin, org, store, workflow.id, campanhaId, idsElegiveis)
   return { ...resultado, publico: idsElegiveis.length, workflow_id: workflow.id }

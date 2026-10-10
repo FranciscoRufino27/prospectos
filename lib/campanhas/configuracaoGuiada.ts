@@ -1,4 +1,4 @@
-import type { Publico, MensagemCampanha, FollowupCampanha, AvisoRetorno } from '@/components/automacao/tiposCampanha'
+import type { Publico, MensagemCampanha, FollowupCampanha, AvisoRetorno, AvisoEnvio } from '@/components/automacao/tiposCampanha'
 import type { CamposModeloEmail } from './modelosEmail'
 import type { DefinicaoWorkflow } from '@/lib/workflows/types'
 
@@ -289,6 +289,21 @@ export function avisoRetornoCampanha(publico: unknown): AvisoRetorno | null {
     : null
 }
 
+function lerAvisoEnvio(bruto: unknown): AvisoEnvio | null {
+  if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return null
+  const a = bruto as Record<string, unknown>
+  const destinos = Array.isArray(a.whatsapp) ? a.whatsapp : []
+  const whatsapp = (['responsavel', 'grupo'] as const).filter((d) => destinos.includes(d))
+  if (!whatsapp.length) return null
+  const grupo = whatsapp.includes('grupo') && typeof a.grupoWhatsappId === 'string' ? a.grupoWhatsappId.trim() : ''
+  return { whatsapp, ...(grupo ? { grupoWhatsappId: grupo } : {}) }
+}
+
+/** Aviso no WhatsApp a cada envio; null = desligado. */
+export function avisoEnvioCampanha(publico: unknown): AvisoEnvio | null {
+  return lerAvisoEnvio(operacaoCrua(publico).avisoEnvio)
+}
+
 export function normalizarPublicoCampanha(raw: unknown): Publico {
   const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
   const empresasRaw = obj.empresas && typeof obj.empresas === 'object' && !Array.isArray(obj.empresas)
@@ -314,6 +329,7 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
     ? respostaRaw.pararCadencia
     : typeof agendaRaw.pararAoResponder === 'boolean' ? agendaRaw.pararAoResponder : true
   const aviso = lerAvisoRetorno(respostaRaw)
+  const avisoEnvio = lerAvisoEnvio(operacaoRaw.avisoEnvio)
 
   return {
     objetivo: texto(obj.objetivo),
@@ -366,6 +382,7 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
       mensagemInicial: normalizarMensagem(operacaoRaw.mensagemInicial),
       followups: normalizarFollowups(operacaoRaw.followups),
       responsavelRecebe: operacaoRaw.responsavelRecebe === 'somente_respostas' ? 'somente_respostas' : 'envios_e_respostas',
+      ...(avisoEnvio ? { avisoEnvio } : {}),
       resposta: {
         ...(aviso ? { aviso } : {}),
         pararCadencia,
@@ -421,6 +438,10 @@ export function validarCampanhaGuiada(publico: Publico): string[] {
   }
   if (aviso?.grupoWhatsappId && !FORMATO_GRUPO_WHATSAPP.test(aviso.grupoWhatsappId)) {
     erros.push('O grupo do WhatsApp precisa estar no formato 120363019502650977-group.')
+  }
+  const avisoEnvio = op?.avisoEnvio
+  if (avisoEnvio?.grupoWhatsappId && !FORMATO_GRUPO_WHATSAPP.test(avisoEnvio.grupoWhatsappId)) {
+    erros.push('O grupo do aviso de envio precisa estar no formato 120363019502650977-group.')
   }
   if (op?.resposta?.notificarResponsavel !== false && !op?.resposta?.emailAssunto) {
     erros.push('Informe o assunto do e-mail de resposta ao responsável.')

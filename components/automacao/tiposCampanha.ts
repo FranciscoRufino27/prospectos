@@ -103,6 +103,14 @@ export interface AvisoRetorno {
   grupoWhatsappId?: string;
 }
 
+// Mensagem no WhatsApp a cada e-mail que a campanha envia (inicial e follow-ups).
+// Ausente ou sem destinos = desligado.
+export interface AvisoEnvio {
+  whatsapp: DestinoWhatsappRetorno[];
+  // Grupo do aviso de envio; ausente = grupo cadastrado em Configurações > Distribuição.
+  grupoWhatsappId?: string;
+}
+
 export interface OperacaoCampanha {
   // Comunicados gerais são disparos únicos; renovação e objetivos comerciais
   // usam a cadência versionada. O servidor recalcula este valor a partir do tipo.
@@ -116,6 +124,7 @@ export interface OperacaoCampanha {
   // enviado ao cliente; 'somente_respostas' = os e-mails saem sem cópia e ele
   // só fica sabendo quando o cliente responde.
   responsavelRecebe?: ResponsavelRecebe;
+  avisoEnvio?: AvisoEnvio;
   resposta?: {
     // Ausente = campanha anterior à escolha: e-mail conforme
     // `notificarResponsavel` e WhatsApp só pela regra da organização.
