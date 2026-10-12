@@ -391,36 +391,37 @@ export class AmbienteSupabase implements AmbienteWorkflow {
         return { enviado: false, assunto }
     }
 
-    // TRAVA DE SEGURANÇA (Prospecção + Follow-up). Escopo estrito:
-    // campanhaTipo==='prospeccao' — não altera renovação nem os demais tipos
-    // (regra explícita desta entrega; ver lib/campanhas/prospeccaoEnvio.ts).
-    // Re-checa o lead no momento do efeito (mesmo princípio de
-    // lib/engine/flows/followUp.ts): opt-out/bounce/perdido/descartado podem
-    // ter acontecido DEPOIS que esta execução foi agendada, e mesmo assim não
-    // podem receber envio.
+    // TRAVA DE SEGURANÇA: opt-out/bounce/perdido/descartado bloqueiam qualquer
+    // envio de campanha, independente do tipo. Re-checa no momento do efeito —
+    // o lead pode ter sido marcado após o enrollment (ex.: bounce do 1º envio
+    // chega antes do FUP sair). Prospecção tem verificações adicionais: bloqueia
+    // também se o lead respondeu ou se a execução foi cancelada no intervalo.
     let leadProspeccaoAntes: Lead | null = null
-    if (campanhaId && campanhaTipo === 'prospeccao') {
-      leadProspeccaoAntes = await this.motor.store.buscarLead(leadId)
-      if (leadBloqueadoParaEnvioProspeccao(leadProspeccaoAntes)) {
-        log.aviso('Envio de prospecção bloqueado (opt-out/bounce/perdido/descartado).', { leadId, campanhaId })
+    if (campanhaId) {
+      const leadAtual = await this.motor.store.buscarLead(leadId)
+      if (leadBloqueadoParaEnvioProspeccao(leadAtual)) {
+        log.aviso('Envio bloqueado (opt-out/bounce/perdido/descartado).', { leadId, campanhaId, tipo: campanhaTipo })
         return { enviado: false, assunto }
       }
-      // A resposta cancela a execução pelo monitor Gmail. Esta checagem
-      // adicional cobre a janela em que a interação já existe e o cancelamento
-      // ainda não foi persistido.
-      const { data: resposta, error: respostaErro } = await this.db.from('interacoes')
-        .select('id').eq('organizacao_id', this.organizacaoId)
-        .eq('lead_id', leadId).eq('tipo', 'resposta').limit(1)
-      if (respostaErro) throw respostaErro
-      if (resposta?.length) return { enviado: false, assunto }
-      if (chaveEnvio) {
-        const execucaoId = chaveEnvio.split(':')[0]
-        const { data: execucaoAtual, error: execucaoErro } = await this.db
-          .from('workflow_execucoes').select('status, campanha_id')
-          .eq('organizacao_id', this.organizacaoId).eq('id', execucaoId).maybeSingle()
-        if (execucaoErro) throw execucaoErro
-        if (!execucaoAtual || execucaoAtual.status === 'cancelado'
-          || execucaoAtual.campanha_id !== campanhaId) return { enviado: false, assunto }
+      if (campanhaTipo === 'prospeccao') {
+        leadProspeccaoAntes = leadAtual
+        // A resposta cancela a execução pelo monitor Gmail. Esta checagem
+        // adicional cobre a janela em que a interação já existe e o cancelamento
+        // ainda não foi persistido.
+        const { data: resposta, error: respostaErro } = await this.db.from('interacoes')
+          .select('id').eq('organizacao_id', this.organizacaoId)
+          .eq('lead_id', leadId).eq('tipo', 'resposta').limit(1)
+        if (respostaErro) throw respostaErro
+        if (resposta?.length) return { enviado: false, assunto }
+        if (chaveEnvio) {
+          const execucaoId = chaveEnvio.split(':')[0]
+          const { data: execucaoAtual, error: execucaoErro } = await this.db
+            .from('workflow_execucoes').select('status, campanha_id')
+            .eq('organizacao_id', this.organizacaoId).eq('id', execucaoId).maybeSingle()
+          if (execucaoErro) throw execucaoErro
+          if (!execucaoAtual || execucaoAtual.status === 'cancelado'
+            || execucaoAtual.campanha_id !== campanhaId) return { enviado: false, assunto }
+        }
       }
     }
 

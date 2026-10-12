@@ -268,7 +268,7 @@ describe('prospecção — efeito do envio sobre o lead', () => {
   })
 })
 
-describe('renovação — regressão obrigatória (comportamento preservado)', () => {
+describe('renovação — comportamento preservado + bloqueio de bounce', () => {
   it('envio de renovação NÃO grava estágio/followups_enviados (continua sem tocar no lead)', async () => {
     const lead = leadBase({ estagio: 'renovacao', followups_enviados: 0 })
     const { motor, enviados, interacoes, atualizacoesLead } = motorFalso(lead, [template()])
@@ -284,20 +284,21 @@ describe('renovação — regressão obrigatória (comportamento preservado)', (
     expect(atualizacoesLead).toEqual([])
   })
 
-  it('envio de renovação NÃO é bloqueado por optout/bounced/perdido (gate novo não se aplica — gap pré-existente preservado)', async () => {
-    // Este teste documenta, de propósito, que o gate de segurança adicionado
-    // nesta entrega é ESTRITO a campanhaTipo==='prospeccao'. Renovação segue
-    // com o comportamento anterior a esta entrega, inclusive esta lacuna
-    // conhecida (ver relatório da entrega) — corrigi-la é uma decisão à parte,
-    // fora do escopo autorizado aqui.
-    const lead = leadBase({ estagio: 'renovacao', optout: true, bounced: true, perdido: true })
-    const { motor, enviados } = motorFalso(lead, [template()])
+  it.each([
+    ['optout', { optout: true }],
+    ['bounced', { bounced: true }],
+    ['perdido', { perdido: true }],
+    ['descartado', { estagio: 'descartado' as const }],
+  ])('bloqueia envio de renovação quando o lead está %s (gate universal por campanha)', async (_nome, overrides) => {
+    const lead = leadBase({ estagio: 'renovacao', ...overrides })
+    const { motor, enviados, interacoes } = motorFalso(lead, [template()])
     const ambiente = new AmbienteSupabase(ORG, { client: banco({ tipo: 'renovacao' }).cliente(), motor })
 
     const r = await comEnvioReal(() => ambiente.enviarEmailTemplate(LEAD, 'renovacao_1', CAMPANHA))
 
-    expect(r.enviado).toBe(true)
-    expect(enviados).toHaveLength(1)
+    expect(r.enviado).toBe(false)
+    expect(enviados).toHaveLength(0)
+    expect(interacoes).toHaveLength(0)
   })
 
   it('envio sem campanha (workflow avulso) continua gravando nota e não toca no lead', async () => {
