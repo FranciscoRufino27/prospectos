@@ -516,8 +516,10 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     }
 
     // "Somente as respostas" na campanha: o e-mail sai sem o responsável em
-    // cópia (vale para os dois caminhos de CC abaixo).
+    // cópia (vale para os dois caminhos de CC abaixo). Suprime também quando o
+    // responsável e o remetente são a mesma conta — CC seria auto-cópia inútil.
     const copiarResponsavel = responsavelRecebeCopiaDosEnvios(campanhaPublico)
+      && responsavelAssinatura?.email?.trim().toLowerCase() !== remetenteOrg?.email?.trim().toLowerCase()
     // Envio real: usa a conta da org (emailProvider) se configurada; senão a padrão.
     try {
     if (campanhaId && ccRenovacaoAtivo) {

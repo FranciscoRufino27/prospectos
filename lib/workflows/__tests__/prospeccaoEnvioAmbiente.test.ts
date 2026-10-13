@@ -540,6 +540,34 @@ describe('cópia ao responsável nos envios da campanha (publico.operacao.respon
 
     expect(enviosGmailMock[0].cc).toBe('aline@org.com.br')
   })
+
+  it('responsável com mesmo e-mail que o remetente não recebe CC (auto-cópia suprimida)', async () => {
+    // Cenário: o remetente da org E o responsável da campanha são a mesma conta.
+    // A cópia seria enviada para o próprio endereço que mandou — inútil e confusa.
+    const lead = leadBase({ estagio: 'novos_leads', followups_enviados: 0 })
+    // Motor falso com responsável cujo email == remetente da org.
+    const motorComMesmoEmail = {
+      ...motorFalso(lead, [template()]),
+    }
+    const REMETENTE = 'prospeccao@org-a.test' // mesmo que lerCredenciaisGmail retorna para CONTA_TESTE
+    const motor = {
+      ...motorComMesmoEmail.motor,
+      store: {
+        ...motorComMesmoEmail.motor.store,
+        async buscarContextoCampanhaAtiva() {
+          return { nome: 'Campanha A', tipo: 'prospeccao', responsavel: { id: 'u1', nome: 'Aline', email: REMETENTE } }
+        },
+      },
+    } as unknown as Motor
+    const ambiente = new AmbienteSupabase(ORG, { client: banco({ tipo: 'prospeccao' }, configComRemetente).cliente(), motor })
+
+    const r = await comEnvioReal(() => ambiente.enviarEmailTemplate(LEAD, 'abordagem_1', CAMPANHA))
+
+    expect(r.enviado).toBe(true)
+    expect(enviosGmailMock).toHaveLength(1)
+    // CC suprimido: responsável == remetente, não faz sentido auto-copiar.
+    expect(enviosGmailMock[0].cc).toBeUndefined()
+  })
 })
 
 describe('aviso de envio no WhatsApp (publico.operacao.avisoEnvio)', () => {
