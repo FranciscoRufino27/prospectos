@@ -278,7 +278,7 @@ function operacaoCrua(publico: unknown): Record<string, unknown> {
 
 /** false = os e-mails da campanha saem sem o responsável em cópia (CC). */
 export function responsavelRecebeCopiaDosEnvios(publico: unknown): boolean {
-  return operacaoCrua(publico).responsavelRecebe !== 'somente_respostas'
+  return operacaoCrua(publico).responsavelRecebe === 'envios_e_respostas'
 }
 
 /** Aviso de resposta escolhido na campanha; null = campanha antiga. */
@@ -381,7 +381,7 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
       remetenteEmail: texto(operacaoRaw.remetenteEmail),
       mensagemInicial: normalizarMensagem(operacaoRaw.mensagemInicial),
       followups: normalizarFollowups(operacaoRaw.followups),
-      responsavelRecebe: operacaoRaw.responsavelRecebe === 'somente_respostas' ? 'somente_respostas' : 'envios_e_respostas',
+      responsavelRecebe: operacaoRaw.responsavelRecebe === 'envios_e_respostas' ? 'envios_e_respostas' : 'somente_respostas',
       ...(avisoEnvio ? { avisoEnvio } : {}),
       resposta: {
         ...(aviso ? { aviso } : {}),

@@ -500,7 +500,7 @@ describe('gates de resposta e cancelamento no envio de prospecção', () => {
 })
 
 describe('cópia ao responsável nos envios da campanha (publico.operacao.responsavelRecebe)', () => {
-  it('campanha sem a opção (anterior a ela): o responsável vai em cópia, como sempre', async () => {
+  it('campanha sem configuração de cópia: default é somente_respostas, sem CC nos envios', async () => {
     const lead = leadBase({ estagio: 'novos_leads', followups_enviados: 0 })
     const { motor } = motorFalso(lead, [template()])
     const ambiente = new AmbienteSupabase(ORG, { client: banco({ tipo: 'prospeccao' }, configComRemetente).cliente(), motor })
@@ -509,7 +509,7 @@ describe('cópia ao responsável nos envios da campanha (publico.operacao.respon
 
     expect(r.enviado).toBe(true)
     expect(enviosGmailMock).toHaveLength(1)
-    expect(enviosGmailMock[0].cc).toBe('aline@org.com.br')
+    expect(enviosGmailMock[0].cc).toBeUndefined()
   })
 
   it('"somente as respostas": o e-mail sai sem cópia e segue assinado pelo responsável', async () => {
