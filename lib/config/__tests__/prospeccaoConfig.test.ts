@@ -10,7 +10,7 @@ describe('workspaceConfig.prospeccao (perfil de busca)', () => {
   it('blob v4 sem perfil migra para a versão atual sem inventar perfil', () => {
     const r = parseWorkspaceConfig({ _schema_version: 4, roi: { custoMensal: 10 } })
     expect(r._schema_version).toBe(WORKSPACE_CONFIG_SCHEMA_VERSION)
-    expect(WORKSPACE_CONFIG_SCHEMA_VERSION).toBe(9)
+    expect(WORKSPACE_CONFIG_SCHEMA_VERSION).toBe(10)
     expect(r.prospeccao).toBeUndefined()
     expect(r.roi).toEqual({ custoMensal: 10 })
   })
@@ -69,5 +69,43 @@ describe('workspaceConfig.prospeccao (perfil de busca)', () => {
 
     expect(mesclarWorkspaceConfig(trocado, {}).prospeccao).toEqual({ cnaes: ['5510802'] })
     expect(mesclarWorkspaceConfig(trocado, { prospeccao: null }).prospeccao).toBeUndefined()
+  })
+})
+
+describe('workspaceConfig.prospeccaoNichos (nichos da organização)', () => {
+  const nicho = (id: string, nome: string, cnaes: string[]) => ({ id, nome, cnaes, criadoEm: '2026-10-13T00:00:00Z' })
+
+  it('blob v9 migra sem inventar nichos', () => {
+    const r = parseWorkspaceConfig({ _schema_version: 9, prospeccao: { cnaes: ['5510801'] } })
+    expect(r._schema_version).toBe(10)
+    expect(r.prospeccaoNichos).toBeUndefined()
+  })
+
+  it('descarta nicho sem nome, sem CNAE válido, id ou nome repetido', () => {
+    const r = parseWorkspaceConfig({
+      prospeccaoNichos: [
+        nicho('a', ' Academias ', ['9313100', 'xx', '9313100']),
+        nicho('b', '', ['8630504']),
+        nicho('c', 'Sem atividade', ['123']),
+        nicho('a', 'Id repetido', ['8630504']),
+        nicho('d', 'ACADEMIAS', ['8630504']),
+      ],
+    })
+    expect(r.prospeccaoNichos).toEqual([nicho('a', 'Academias', ['9313100'])])
+  })
+
+  it('uma atividade fica em um só nicho (o primeiro que a usou)', () => {
+    const r = parseWorkspaceConfig({
+      prospeccaoNichos: [nicho('a', 'Academias', ['9313100']), nicho('b', 'Esportes', ['9313100', '9319101'])],
+    })
+    expect(r.prospeccaoNichos?.map((n) => n.cnaes)).toEqual([['9313100'], ['9319101']])
+  })
+
+  it('mescla substitui a lista, null limpa e não toca no perfil', () => {
+    const base = parseWorkspaceConfig({ prospeccao: { cnaes: ['5510801'] } })
+    const com = mesclarWorkspaceConfig(base, { prospeccaoNichos: [nicho('a', 'Academias', ['9313100'])] })
+    expect(com.prospeccaoNichos).toHaveLength(1)
+    expect(com.prospeccao).toEqual({ cnaes: ['5510801'] })
+    expect(mesclarWorkspaceConfig(com, { prospeccaoNichos: null }).prospeccaoNichos).toBeUndefined()
   })
 })

@@ -37,6 +37,7 @@ import type { ClienteControleVencimento, SituacaoRenovacao } from '@/lib/operaca
 import type { ObjetivoOperacional } from '@/lib/config/workspaceConfig'
 import VencimentosRenovacoes from '@/components/dashboard/renewals/VencimentosRenovacoes'
 import styles from './ProspeccaoDashboard.module.css'
+import { NumeroAnimado } from '@/components/ui/NumeroAnimado'
 
 interface ComunicacaoRenovacao {
   id: string
@@ -219,7 +220,7 @@ function Kpi({ label, valor, Icon, cor, detalhe }: {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
       <div className="flex items-center gap-2 text-xs text-slate-500"><Icon size={14} className={cor} /> {label}</div>
-      <div className={`mt-2 text-2xl font-bold tabular-nums ${cor}`}>{valor.toLocaleString('pt-BR')}</div>
+      <div className={`mt-2 text-2xl font-bold tabular-nums ${cor}`}><NumeroAnimado valor={valor} /></div>
       {detalhe && <p className="mt-1 text-xs text-slate-600">{detalhe}</p>}
     </div>
   )
@@ -233,7 +234,7 @@ function MetaCard({ label, atual, meta, cor }: { label: string; atual: number; m
         <div>
           <p className="text-xs text-slate-500">{label}</p>
           <p className="mt-1 text-lg font-bold text-slate-100">
-            {atual.toLocaleString('pt-BR')}{meta ? <span className="text-sm font-normal text-slate-500"> / {meta.toLocaleString('pt-BR')}</span> : null}
+            <NumeroAnimado valor={atual} />{meta ? <span className="text-sm font-normal text-slate-500"> / {meta.toLocaleString('pt-BR')}</span> : null}
           </p>
         </div>
         <span className={`text-xs font-semibold ${meta ? cor : 'text-slate-600'}`}>{meta ? `${percentual}%` : 'Sem meta'}</span>
@@ -404,7 +405,7 @@ function KpiProspeccao({
         <span className={styles.kpiIcon}><Icon size={25} strokeWidth={1.8} aria-hidden="true" /></span>
         <div className={styles.kpiIdentity}>
           <span className={styles.kpiLabel}>{titulo}</span>
-          <strong>{indicador.atual.toLocaleString('pt-BR')}</strong>
+          <strong><NumeroAnimado valor={indicador.atual} /></strong>
         </div>
         <ChevronRight className={styles.kpiArrow} size={22} aria-hidden="true" />
       </div>
@@ -514,12 +515,12 @@ function PainelProspeccao({
             <article className={styles.followMetric}>
               <Users size={23} aria-hidden="true" />
               <span>Clientes em FUP</span>
-              <div><strong>{followUps.clientes.toLocaleString('pt-BR')}</strong><Tendencia valor={variacaoVisual(followUps.clientes, followUps.clientesAnteriores)} legenda="vs. mês anterior" /></div>
+              <div><strong><NumeroAnimado valor={followUps.clientes} /></strong><Tendencia valor={variacaoVisual(followUps.clientes, followUps.clientesAnteriores)} legenda="vs. mês anterior" /></div>
             </article>
             <article className={styles.followMetric}>
               <Clock3 size={23} aria-hidden="true" />
               <span>Retornos de FUP</span>
-              <div><strong>{followUps.retornos.toLocaleString('pt-BR')}</strong><Tendencia valor={variacaoVisual(followUps.retornos, followUps.retornosAnteriores)} legenda="vs. mês anterior" /></div>
+              <div><strong><NumeroAnimado valor={followUps.retornos} /></strong><Tendencia valor={variacaoVisual(followUps.retornos, followUps.retornosAnteriores)} legenda="vs. mês anterior" /></div>
             </article>
           </div>
           <p className={styles.chartTitle}>Evolução de follow-ups (últimos 30 dias)</p>
@@ -539,7 +540,7 @@ function PainelProspeccao({
                     <Icon size={20} aria-hidden="true" />
                     <span title={item.nome}>{formatarNomeAgrupamento(item.nome)}</span>
                     <div className={styles.barTrack}><i style={{ width: `${item.percentual}%` }} /></div>
-                    <strong>{item.quantidade.toLocaleString('pt-BR')}</strong>
+                    <strong><NumeroAnimado valor={item.quantidade} /></strong>
                     <small>{item.percentual}%</small>
                   </div>
                 )
@@ -558,7 +559,7 @@ function PainelProspeccao({
                 <div className={styles.responseRow} key={item.nome}>
                   <span title={item.nome}>{formatarNomeAgrupamento(item.nome)}</span>
                   <div className={styles.responseTrack}><i style={{ width: `${item.percentual}%` }} /></div>
-                  <strong>{item.quantidade.toLocaleString('pt-BR')}</strong>
+                  <strong><NumeroAnimado valor={item.quantidade} /></strong>
                   <small>{item.percentual}%</small>
                 </div>
               ))}
@@ -566,7 +567,7 @@ function PainelProspeccao({
           )}
           <div className={styles.responseTotal}>
             <BarChart3 size={23} aria-hidden="true" />
-            <div><span>Total de respostas recebidas</span><strong>{dados.prospeccao.respostas.toLocaleString('pt-BR')}</strong></div>
+            <div><span>Total de respostas recebidas</span><strong><NumeroAnimado valor={dados.prospeccao.respostas} /></strong></div>
             <Tendencia valor={indicadores.respostas.variacao} />
           </div>
         </section>
@@ -653,7 +654,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
           <button key={item.id} type="button" onClick={() => setFiltroSituacao((atual) => atual === item.id ? 'todas' : item.id)}
             aria-pressed={filtroSituacao === item.id}
             className={`rounded-xl border p-3 text-left transition-colors ${filtroSituacao === item.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--t-bg-card-hover,#202638)]'}`}>
-            <span className={`block text-xl font-bold tabular-nums ${item.cor}`}>{item.valor.toLocaleString('pt-BR')}</span>
+            <span className={`block text-xl font-bold tabular-nums ${item.cor}`}><NumeroAnimado valor={item.valor} /></span>
             <span className="mt-0.5 block text-[11px] text-slate-500">{item.label}</span>
           </button>
         ))}

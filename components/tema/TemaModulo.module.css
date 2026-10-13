@@ -259,7 +259,7 @@
   inset: 0;
   background: var(--m-overlay, rgba(2, 8, 18, 0.62));
   backdrop-filter: blur(2px);
-  animation: gavetaFundoIn 180ms ease-out;
+  animation: gavetaFundoIn 220ms ease-out;
 }
 .gaveta {
   border-left: 1px solid var(--m-border, #1b68a8);
@@ -267,11 +267,11 @@
     radial-gradient(circle at 20% -10%, rgba(37, 99, 235, 0.16), transparent 40%),
     linear-gradient(160deg, #06213d, #04152a));
   box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45);
-  animation: gavetaIn 180ms ease-out;
+  animation: gavetaIn 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes gavetaIn {
-  from { transform: translateX(24px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from { transform: translateX(56px); opacity: 0; }
+  to { transform: none; opacity: 1; }
 }
 @keyframes gavetaFundoIn {
   from { opacity: 0; }
@@ -419,4 +419,19 @@
   background: rgba(15, 124, 174, 0.13);
   color: #047ca4;
   box-shadow: inset 0 0 0 1px rgba(11, 123, 173, 0.18);
+}
+
+/* Entrada dos cards de indicadores: sobem e aparecem um após o outro (como a
+   saudação e os painéis), e o número conta até o valor (NumeroAnimado). */
+@keyframes kpiEntrada {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kpiGrid > .kpiCard, .kpiGrid5 > .kpiCard { animation: kpiEntrada 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.kpiGrid > .kpiCard:nth-child(2), .kpiGrid5 > .kpiCard:nth-child(2) { animation-delay: 0.07s; }
+.kpiGrid > .kpiCard:nth-child(3), .kpiGrid5 > .kpiCard:nth-child(3) { animation-delay: 0.14s; }
+.kpiGrid > .kpiCard:nth-child(4), .kpiGrid5 > .kpiCard:nth-child(4) { animation-delay: 0.21s; }
+.kpiGrid > .kpiCard:nth-child(5), .kpiGrid5 > .kpiCard:nth-child(5) { animation-delay: 0.28s; }
+@media (prefers-reduced-motion: reduce) {
+  .kpiGrid > .kpiCard, .kpiGrid5 > .kpiCard { animation: none; }
 }

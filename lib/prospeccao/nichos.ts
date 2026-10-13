@@ -2,7 +2,11 @@
 // catálogo da Receita só traz o código; o nome e o agrupamento vêm daqui.
 // Puro — usado no cliente (filtro da tela, perfil de busca) e nos testes.
 //
-// Um CNAE do perfil fora destes grupos continua buscável: cai em "Outras
+// A organização pode criar os próprios nichos (configuracoes.prospeccaoNichos,
+// rota /api/prospeccao/nichos); eles chegam às funções abaixo como `extras`,
+// depois dos pré-definidos. Uma atividade pertence a um só nicho.
+//
+// Um CNAE do perfil fora de todos os grupos continua buscável: cai em "Outras
 // atividades", identificado só pelo código.
 
 export interface AtividadeNicho {
@@ -14,6 +18,8 @@ export interface Nicho {
   id: string
   nome: string
   atividades: AtividadeNicho[]
+  /** Criado pela organização (não é um dos pré-definidos). */
+  personalizado?: boolean
 }
 
 export const NICHOS: readonly Nicho[] = [
@@ -87,18 +93,43 @@ export const NICHOS: readonly Nicho[] = [
 
 export const ID_OUTRAS = 'outras'
 
-const POR_CODIGO = new Map<string, { nicho: Nicho; nome: string }>(
-  NICHOS.flatMap((n) => n.atividades.map((a) => [a.codigo, { nicho: n, nome: a.nome }] as const)),
-)
+type IndiceNichos = Map<string, { nicho: Nicho; nome: string }>
+
+function indexar(nichos: readonly Nicho[]): IndiceNichos {
+  const indice: IndiceNichos = new Map()
+  for (const n of nichos) {
+    for (const a of n.atividades) if (!indice.has(a.codigo)) indice.set(a.codigo, { nicho: n, nome: a.nome })
+  }
+  return indice
+}
+
+const POR_CODIGO = indexar(NICHOS)
+// Índice dos extras: a lista da organização muda pouco e chega sempre pela
+// mesma referência (estado da tela), então um cache de uma posição basta.
+let ultimoExtras: readonly Nicho[] | null = null
+let ultimoIndice: IndiceNichos = POR_CODIGO
+function indice(extras: readonly Nicho[]): IndiceNichos {
+  if (!extras.length) return POR_CODIGO
+  if (extras !== ultimoExtras) {
+    ultimoExtras = extras
+    ultimoIndice = indexar([...NICHOS, ...extras])
+  }
+  return ultimoIndice
+}
+
+/** Pré-definidos seguidos dos nichos da organização. */
+export function todosNichos(extras: readonly Nicho[] = []): readonly Nicho[] {
+  return extras.length ? [...NICHOS, ...extras] : NICHOS
+}
 
 /** Nome da atividade ('5510801' → 'Hotéis'); null se não está em nenhum nicho. */
-export function nomeAtividade(codigo: string): string | null {
-  return POR_CODIGO.get(codigo)?.nome ?? null
+export function nomeAtividade(codigo: string, extras: readonly Nicho[] = []): string | null {
+  return indice(extras).get(codigo)?.nome ?? null
 }
 
 /** Nicho a que o CNAE pertence; null se não está em nenhum. */
-export function nichoDaAtividade(codigo: string): Nicho | null {
-  return POR_CODIGO.get(codigo)?.nicho ?? null
+export function nichoDaAtividade(codigo: string, extras: readonly Nicho[] = []): Nicho | null {
+  return indice(extras).get(codigo)?.nicho ?? null
 }
 
 export interface GrupoNicho {
@@ -112,17 +143,17 @@ export interface GrupoNicho {
  * para "Outras atividades" (sempre por último). Nicho sem CNAE no perfil não
  * aparece: o filtro só oferece o que o catálogo da organização pode ter.
  */
-export function gruposDoPerfil(cnaesPerfil: readonly string[]): GrupoNicho[] {
+export function gruposDoPerfil(cnaesPerfil: readonly string[], extras: readonly Nicho[] = []): GrupoNicho[] {
   const grupos = new Map<string, GrupoNicho>()
   const outras: string[] = []
   for (const c of cnaesPerfil) {
-    const nicho = nichoDaAtividade(c)
+    const nicho = nichoDaAtividade(c, extras)
     if (!nicho) { outras.push(c); continue }
     const g = grupos.get(nicho.id) ?? { id: nicho.id, nome: nicho.nome, cnaes: [] }
     g.cnaes.push(c)
     grupos.set(nicho.id, g)
   }
-  const ordenados = NICHOS.flatMap((n) => (grupos.has(n.id) ? [grupos.get(n.id)!] : []))
+  const ordenados = todosNichos(extras).flatMap((n) => (grupos.has(n.id) ? [grupos.get(n.id)!] : []))
   return outras.length ? [...ordenados, { id: ID_OUTRAS, nome: 'Outras atividades', cnaes: outras }] : ordenados
 }
 
@@ -135,8 +166,8 @@ export type ResultadoAlternarNicho =
  * todo; senão, entram as atividades que faltam — desde que caibam no limite do
  * perfil (nunca corta em silêncio: devolve quantas vagas faltam).
  */
-export function alternarNicho(cnaes: readonly string[], nichoId: string, limite: number): ResultadoAlternarNicho {
-  const nicho = NICHOS.find((n) => n.id === nichoId)
+export function alternarNicho(cnaes: readonly string[], nichoId: string, limite: number, extras: readonly Nicho[] = []): ResultadoAlternarNicho {
+  const nicho = todosNichos(extras).find((n) => n.id === nichoId)
   if (!nicho) return { ok: true, cnaes: [...cnaes] }
   const codigos = nicho.atividades.map((a) => a.codigo)
   if (codigos.every((c) => cnaes.includes(c))) {

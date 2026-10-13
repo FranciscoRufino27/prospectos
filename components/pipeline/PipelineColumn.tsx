@@ -70,6 +70,13 @@ export default function PipelineColumn({
   const parentRef = useRef<HTMLDivElement>(null)
   const [alvo, setAlvo] = useState(false)
   const contadorAlvo = useRef(0)
+  // Animação ao mover (ver .kanban-* em globals.css): card que aparece numa
+  // recarga já com a coluna carregada = chegou agora (lead movido) e entra
+  // animado; os vizinhos deslizam. Na primeira carga nada anima.
+  const [novos, setNovos] = useState<ReadonlySet<string>>(() => new Set())
+  const [animarLinhas, setAnimarLinhas] = useState(false)
+  const idsAnteriores = useRef<Set<string> | null>(null)
+  const [arrastandoId, setArrastandoId] = useState<string | null>(null)
 
   // Busca local da etapa OU busca global (a que estiver preenchida).
   const buscaEfetiva = busca.trim() || filtros.search.trim()
@@ -113,6 +120,35 @@ export default function PipelineColumn({
     const t = setTimeout(() => carregar(true), 250)
     return () => clearTimeout(t)
   }, [carregar, reloadKey])
+
+  // Só a recarga pedida por uma mudança no board (reloadKey: lead movido,
+  // editado ou criado) anima quem chegou; filtro, busca e scroll trocam a
+  // lista sem efeito.
+  const recargaPorMudanca = useRef(false)
+  const primeiroReload = useRef(true)
+  useEffect(() => {
+    if (primeiroReload.current) { primeiroReload.current = false; return }
+    recargaPorMudanca.current = true
+  }, [reloadKey])
+
+  useEffect(() => {
+    const atuais = new Set(data.map((l) => l.id))
+    const anteriores = idsAnteriores.current
+    idsAnteriores.current = atuais
+    // As linhas só passam a deslizar depois da primeira carga medida.
+    if (!animarLinhas && data.length) {
+      const t = setTimeout(() => setAnimarLinhas(true), 400)
+      return () => clearTimeout(t)
+    }
+    if (!recargaPorMudanca.current || !anteriores) return
+    recargaPorMudanca.current = false
+    const chegaram = data.filter((l) => !anteriores.has(l.id)).map((l) => l.id)
+    // Um movimento traz um card (ou poucos); muitos de uma vez não é movimento.
+    if (!chegaram.length || chegaram.length > 3) return
+    setNovos(new Set(chegaram))
+    const t = setTimeout(() => setNovos(new Set()), 1600)
+    return () => clearTimeout(t)
+  }, [data, animarLinhas])
 
   const virtualizer = useVirtualizer({
     count: data.length,
@@ -215,16 +251,21 @@ export default function PipelineColumn({
                       const payload: LeadArrastado = { id: lead.id, empresa: lead.empresa ?? 'Lead', estagio: lead.estagio, coluna: stage.id }
                       e.dataTransfer.setData(TIPO_ARRASTE, JSON.stringify(payload))
                       e.dataTransfer.effectAllowed = 'move'
+                      setArrastandoId(lead.id)
                     } : undefined}
-                    className={onSoltar ? 'cursor-grab active:cursor-grabbing' : undefined}
+                    onDragEnd={onSoltar ? () => setArrastandoId(null) : undefined}
+                    className={`${onSoltar ? 'cursor-grab active:cursor-grabbing' : ''} ${animarLinhas ? 'kanban-linha-animada' : ''}`}
                   >
-                    <LeadCardCompact
-                      lead={lead}
-                      respostaPendente={!chipKind && temRespostaPendente(lead)}
-                      statusChip={chipKind ? CHIP_MAP[chipKind] : undefined}
-                      selected={selectedId === lead.id}
-                      onClick={() => onSelect(lead.id)}
-                    />
+                    {/* A animação fica num filho: o transform da linha é a posição dela. */}
+                    <div className={`${novos.has(lead.id) ? 'kanban-entrada' : ''} ${arrastandoId === lead.id ? 'kanban-arrastando' : ''}`}>
+                      <LeadCardCompact
+                        lead={lead}
+                        respostaPendente={!chipKind && temRespostaPendente(lead)}
+                        statusChip={chipKind ? CHIP_MAP[chipKind] : undefined}
+                        selected={selectedId === lead.id}
+                        onClick={() => onSelect(lead.id)}
+                      />
+                    </div>
                   </div>
                 )
               })}

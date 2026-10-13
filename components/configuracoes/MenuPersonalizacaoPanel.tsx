@@ -5,6 +5,7 @@ import { AlertCircle, Check, Eye, EyeOff, Info, Loader2, Lock, PanelLeft, Rotate
 import { agruparMenu, EVENTO_MENU_ATUALIZADO, ITENS_MENU, itemVisivel, modulosComMenu } from '@/lib/navegacao/menu';
 import { ICONE_MENU } from '@/components/layout/iconesMenu';
 import { estilosModulo as m, TituloSecao } from '@/components/tema/Modulo';
+import { EsqueletoLinhas } from '@/components/ui/Esqueleto';
 
 // Personalização > Menu: o que aparece no menu lateral da organização. Grava
 // organizacoes.configuracoes.modulos pelo PUT do workspace (workspace.configure).
@@ -76,7 +77,7 @@ export default function MenuPersonalizacaoPanel() {
     }
   }
 
-  if (carregando) return <p className="text-sm text-slate-400">Carregando…</p>;
+  if (carregando) return <EsqueletoLinhas linhas={6} />;
 
   return (
     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">

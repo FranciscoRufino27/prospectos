@@ -170,21 +170,21 @@ function Analises() {
       {/* KPIs */}
       <section className={`${estilosModulo.kpiGrid} ${estilosModulo.kpiGrid5}`}>
         <IndicadorModulo tom="violet" icone={Send} rotulo="Leads prospectados"
-          valor={loading ? '—' : kpis.prospectados.toLocaleString('pt-BR')}
+          valor={loading ? '—' : kpis.prospectados}
           detalhe={loading ? 'Carregando…' : 'no recorte dos filtros'} />
         <IndicadorModulo tom="emerald" icone={MessageSquare} rotulo="Responderam"
-          valor={loading ? '—' : kpis.responderam.toLocaleString('pt-BR')}
+          valor={loading ? '—' : kpis.responderam}
           detalhe={loading ? 'Carregando…' : kpis.prospectados
             ? `${Math.round((kpis.responderam / kpis.prospectados) * 100)}% dos prospectados`
             : 'sem prospectados no recorte'} />
         <IndicadorModulo tom="amber" icone={CalendarCheck} rotulo="Reuniões agendadas"
-          valor={loading ? '—' : kpis.reunioes.toLocaleString('pt-BR')}
+          valor={loading ? '—' : kpis.reunioes}
           detalhe={loading ? 'Carregando…' : 'leads no estágio de reunião'} />
         <IndicadorModulo tom="cyan" icone={TrendingUp} rotulo="Conversão geral"
           valor={loading ? '—' : `${kpis.conversao.toLocaleString('pt-BR')}%`}
           detalhe={loading ? 'Carregando…' : 'ganhos ÷ prospectados'} />
         <IndicadorModulo tom="blue" icone={Repeat} rotulo="Follow-ups realizados"
-          valor={loading ? '—' : kpis.followups.toLocaleString('pt-BR')}
+          valor={loading ? '—' : kpis.followups}
           detalhe={loading ? 'Carregando…' : 'enviados aos leads do recorte'} />
       </section>
 

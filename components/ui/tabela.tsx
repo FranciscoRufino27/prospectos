@@ -1,24 +1,19 @@
 'use client'
 
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { EsqueletoLinhas } from './Esqueleto'
 
 // Peças compartilhadas das tabelas paginadas de leads (Base de Leads e
 // Pipeline > Tabela). Fonte única do rodapé de paginação e das linhas de
 // estado (carregando / vazio) — antes duplicadas nas duas páginas.
 
-// Linha única de estado do <tbody>: spinner enquanto carrega sem dados, ou
+// Linha única de estado do <tbody>: esqueleto enquanto carrega sem dados, ou
 // mensagem de vazio. Renderizar só quando data.length === 0.
 export function EstadoTabela({ colSpan, loading }: { colSpan: number; loading: boolean }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="py-16 text-center text-slate-500 text-sm">
-        {loading ? (
-          <>
-            <Loader2 size={18} className="animate-spin inline mr-2" /> Carregando...
-          </>
-        ) : (
-          'Nenhum lead encontrado com esses filtros.'
-        )}
+      <td colSpan={colSpan} className={loading ? 'px-5 py-5' : 'py-16 text-center text-slate-500 text-sm'}>
+        {loading ? <EsqueletoLinhas linhas={8} /> : 'Nenhum lead encontrado com esses filtros.'}
       </td>
     </tr>
   )

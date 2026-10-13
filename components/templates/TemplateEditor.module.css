@@ -10,7 +10,7 @@
   padding: 16px;
   background: var(--m-surface-inset, rgba(2, 8, 18, 0.66));
   backdrop-filter: blur(2px);
-  animation: fundoIn 160ms ease-out;
+  animation: fundoIn 200ms ease-out;
 }
 
 .modal {
@@ -25,12 +25,12 @@
     radial-gradient(circle at 15% -10%, rgba(37, 99, 235, 0.16), transparent 40%),
     var(--m-kpi-bg, linear-gradient(160deg, #06213d, #04152a));
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
-  animation: modalIn 180ms ease-out;
+  animation: modalIn 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @keyframes fundoIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {

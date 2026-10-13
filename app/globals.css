@@ -275,6 +275,81 @@ body {
 .stagger-9 { --anim-delay: 0.61s; }
 .stagger-10 { --anim-delay: 0.68s; }
 
+/* Troca de aba do menu (app/template.tsx): a página nova sobe e aparece.
+   Termina em transform: none — um transform que sobrasse viraria a referência
+   dos modais com position: fixed dentro da página. */
+@keyframes pagina-entrada {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.pagina-entrada {
+  animation: pagina-entrada 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Kanban do Pipeline (PipelineColumn): o card que chega numa coluna (lead
+   movido) entra descendo e aparecendo, com um brilho que some; os vizinhos
+   deslizam para abrir/fechar o espaço (transição do transform da linha). */
+@keyframes kanban-entrada {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kanban-brilho {
+  0%, 35% { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.85), 0 0 18px rgba(99, 102, 241, 0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0), 0 0 0 rgba(99, 102, 241, 0); }
+}
+.kanban-entrada {
+  border-radius: 0.5rem;
+  animation:
+    kanban-entrada 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+    kanban-brilho 1.4s ease-out 0.1s both;
+}
+.kanban-linha-animada {
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.kanban-arrastando {
+  opacity: 0.4;
+  transform: scale(0.98);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Modais: todos seguem o padrão "fundo fixed inset-0 bg-black/… + caixa
+   dentro". A regra pega esse padrão (inclusive em modais novos), sem classe
+   em cada arquivo: o fundo escurece suave e a caixa sobe e cresce um pouco.
+   Termina em transform: none para não virar referência de position: fixed. */
+@keyframes modal-fundo-entrada {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-caixa-entrada {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+div.fixed.inset-0[class*="bg-black/"] {
+  animation: modal-fundo-entrada 0.2s ease-out both;
+}
+div.fixed.inset-0[class*="bg-black/"] > :first-child {
+  animation: modal-caixa-entrada 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Esqueleto de carregamento (components/ui/Esqueleto.tsx): blocos no
+   formato da tela, com um brilho que atravessa da esquerda para a direita. */
+@keyframes esqueleto-brilho {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.esqueleto {
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg,
+    rgba(148, 163, 184, 0.08) 25%, rgba(148, 163, 184, 0.18) 37%, rgba(148, 163, 184, 0.08) 63%);
+  background-size: 400% 100%;
+  animation: esqueleto-brilho 1.4s ease-in-out infinite;
+}
+[data-tema='claro'] .esqueleto {
+  background: linear-gradient(90deg,
+    rgba(15, 23, 42, 0.06) 25%, rgba(15, 23, 42, 0.11) 37%, rgba(15, 23, 42, 0.06) 63%);
+  background-size: 400% 100%;
+}
+
 /* Barras de progresso que crescem até a largura definida inline */
 @keyframes bar-grow {
   from { width: 0; }
@@ -304,11 +379,17 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-in,
+  .pagina-entrada,
+  .kanban-entrada,
+  .esqueleto,
+  div.fixed.inset-0[class*="bg-black/"],
+  div.fixed.inset-0[class*="bg-black/"] > :first-child,
   .bar-grow {
     animation: none;
   }
   .card-hover,
-  .hover-pop {
+  .hover-pop,
+  .kanban-linha-animada {
     transition: none;
   }
   .card-hover:hover,

@@ -9,7 +9,7 @@ import {
 import { cnpjDoTexto, filtrosDoPerfil, LIMITE_BUSCA_ESPECIFICA, OPCOES_ANOS_MINIMOS, OPCOES_CAPITAL_MINIMO, type FiltroTelefone, type FiltrosBusca } from '@/lib/prospeccao/filtros';
 import type { ResultadoCatalogo, StatusCatalogo } from '@/lib/prospeccao/buscaServidor';
 import { formatarCnae, iniciais, nomeLegivel, nomeSemSufixo, rotuloPorte, ROTULO_PORTE } from '@/lib/prospeccao/rotulos';
-import { gruposDoPerfil, nichoDaAtividade, nomeAtividade } from '@/lib/prospeccao/nichos';
+import { gruposDoPerfil, nichoDaAtividade, nomeAtividade, type Nicho } from '@/lib/prospeccao/nichos';
 import { nomeSugerido } from '@/lib/prospeccao/pesquisas';
 import { formatarCnpj } from '@/lib/empresas/cnpj';
 import {
@@ -26,6 +26,8 @@ import DecisorCelula from '@/components/prospeccao/DecisorCelula';
 import ImportarProspeccaoModal from '@/components/prospeccao/ImportarProspeccaoModal';
 import CaixaSelecao from '@/components/prospeccao/CaixaSelecao';
 import PerfilBuscaPainel, { type DestinoBusca } from '@/components/prospeccao/PerfilBuscaPainel';
+import CargaCatalogoAviso from '@/components/prospeccao/CargaCatalogoAviso';
+import { useNichosOrg } from '@/components/prospeccao/useNichosOrg';
 import { ProvedorSeloReceita } from '@/components/prospeccao/SeloReceita';
 import PesquisasSalvas, { SalvarPesquisa } from '@/components/prospeccao/PesquisasSalvas';
 import { iconeDoNicho } from '@/components/prospeccao/iconesNicho';
@@ -64,8 +66,8 @@ function mesRfLegivel(mes: string): string {
 }
 
 /** 'Hotéis · 5510-8/01', ou só o código quando a atividade não tem nome. */
-function rotuloAtividade(codigo: string): string {
-  const nome = nomeAtividade(codigo);
+function rotuloAtividade(codigo: string, extras: readonly Nicho[]): string {
+  const nome = nomeAtividade(codigo, extras);
   return nome ? `${nome} · ${formatarCnae(codigo)}` : formatarCnae(codigo);
 }
 
@@ -298,6 +300,13 @@ export default function ProspeccaoPage() {
     }
   }, []);
 
+  // Nichos criados pela organização + carga deles no catálogo ("Buscando").
+  // Quando uma carga termina, reconta com os filtros atuais.
+  const filtrosRef = useRef<FiltrosBusca | null>(null);
+  useEffect(() => { filtrosRef.current = filtros; }, [filtros]);
+  const recontarAposCarga = useCallback(() => { void carregarContagem(filtrosRef.current); }, [carregarContagem]);
+  const nichosOrg = useNichosOrg(recontarAposCarga);
+
   // 1ª carga: sem filtros → o servidor aplica o perfil e devolve os filtros efetivos.
   useEffect(() => { carregarContagem(null); }, [carregarContagem]);
 
@@ -446,6 +455,39 @@ export default function ProspeccaoPage() {
   }
 
   // Interrompe a busca em andamento: o que já completou fica na lista.
+  // "Limpar pesquisa": volta a tela ao ponto de partida (lista vazia, filtros
+  // do perfil) sem sair dela. Interrompe a busca em andamento; não grava nada.
+  function limparPesquisa() {
+    buscaAtual.current++;
+    setBuscando(false);
+    setProgresso(null);
+    setMetaDaBusca(null);
+    setResumoBusca(null);
+    setBuscaEspecifica(null);
+    setCrustdataBrasil(null);
+    setErro(null);
+    setAberto(null);
+    setItens([]);
+    setPulados([]);
+    setMotivosSemDecisor({});
+    setSelecionados(new Map());
+    setConfirmandoDescarte(false);
+    setCandidatosVistos(0);
+    setDescartadosSessao(0);
+    setFiltroResultadoTexto('');
+    setFiltroResultadoEmail('todos');
+    setFiltroResultadoNicho('');
+    setFiltroResultadoPorte('');
+    setFiltroResultadoUf('');
+    setFiltroResultadoDecisor('todos');
+    setOcultarJaNaBase(false);
+    setNicho('');
+    setPesquisaAtiva(null);
+    definirQuantidade(null);
+    if (perfil) setFiltros({ ...perfil });
+  }
+  const temPesquisa = buscando || metaDaBusca !== null || itens.length > 0 || pulados.length > 0 || !!buscaEspecifica || !!crustdataBrasil;
+
   function pararBusca() {
     buscaAtual.current++;
     setBuscando(false);
@@ -600,7 +642,7 @@ export default function ProspeccaoPage() {
     return r.erro;
   }
 
-  const grupos = useMemo(() => gruposDoPerfil(perfil?.cnaes ?? []), [perfil]);
+  const grupos = useMemo(() => gruposDoPerfil(perfil?.cnaes ?? [], nichosOrg.nichos), [perfil, nichosOrg.nichos]);
   const grupoAtivo = grupos.find((g) => g.id === nicho) ?? null;
   // Atividades oferecidas no seletor: as do nicho escolhido, ou todas do perfil.
   const atividadesBase = grupoAtivo?.cnaes ?? perfil?.cnaes ?? [];
@@ -693,11 +735,11 @@ export default function ProspeccaoPage() {
   const nichosPresentes = useMemo(() => {
     const vistos = new Map<string, string>();
     for (const i of itens) {
-      const nicho = nichoDaAtividade(i.cnae_principal);
+      const nicho = nichoDaAtividade(i.cnae_principal, nichosOrg.nichos);
       if (nicho) vistos.set(nicho.id, nicho.nome);
     }
     return [...vistos.entries()].map(([id, nome]) => ({ id, nome }));
-  }, [itens]);
+  }, [itens, nichosOrg.nichos]);
   const portesPresentes = useMemo(() => [...new Set(itens.map((i) => i.porte).filter((p): p is string => !!p))], [itens]);
   const ufsPresentes = useMemo(() => [...new Set(itens.map((i) => i.uf).filter((u): u is string => !!u))].sort(), [itens]);
 
@@ -707,7 +749,7 @@ export default function ProspeccaoPage() {
       const temEmailDecisor = !!emailDoDecisor(enriquecimentos[i.cnpj], decisores[i.cnpj]?.nome);
       if (filtroResultadoEmail === 'com_email' && !temEmailDecisor) return false;
       if (filtroResultadoEmail === 'sem_email' && temEmailDecisor) return false;
-      if (filtroResultadoNicho && nichoDaAtividade(i.cnae_principal)?.id !== filtroResultadoNicho) return false;
+      if (filtroResultadoNicho && nichoDaAtividade(i.cnae_principal, nichosOrg.nichos)?.id !== filtroResultadoNicho) return false;
       if (filtroResultadoPorte && i.porte !== filtroResultadoPorte) return false;
       if (filtroResultadoUf && i.uf !== filtroResultadoUf) return false;
       if (ocultarJaNaBase && i.ja_na_base) return false;
@@ -715,10 +757,10 @@ export default function ProspeccaoPage() {
       if (!termo) return true;
       const nome = (i.nome_fantasia ?? i.razao_social ?? '').toLocaleLowerCase('pt-BR');
       const cidade = `${i.municipio ?? ''} ${i.municipio_nome ?? ''}`.toLocaleLowerCase('pt-BR');
-      const nicho = (nomeAtividade(i.cnae_principal) ?? '').toLocaleLowerCase('pt-BR');
+      const nicho = (nomeAtividade(i.cnae_principal, nichosOrg.nichos) ?? '').toLocaleLowerCase('pt-BR');
       return nome.includes(termo) || cidade.includes(termo) || nicho.includes(termo) || i.cnpj.includes(termo.replace(/\D/g, ''));
     });
-  }, [itens, filtroResultadoTexto, filtroResultadoEmail, filtroResultadoNicho, filtroResultadoPorte, filtroResultadoUf, ocultarJaNaBase, filtroResultadoDecisor, decisores, consultas, enriquecimentos]);
+  }, [itens, filtroResultadoTexto, filtroResultadoEmail, filtroResultadoNicho, filtroResultadoPorte, filtroResultadoUf, ocultarJaNaBase, filtroResultadoDecisor, decisores, consultas, enriquecimentos, nichosOrg.nichos]);
 
   const haFiltroResultadoAtivo = !!filtroResultadoTexto || filtroResultadoEmail !== 'todos' || !!filtroResultadoNicho || !!filtroResultadoPorte || !!filtroResultadoUf || ocultarJaNaBase || filtroResultadoDecisor !== 'todos';
 
@@ -925,9 +967,11 @@ export default function ProspeccaoPage() {
             </section>
           ) : (
             <>
+              <CargaCatalogoAviso cnaes={filtros?.cnaes ?? perfil?.cnaes ?? []} nichosOrg={nichosOrg} />
+
               {/* Filtros */}
               {filtros && perfil && (
-                <section className={`${s.panel} ${s.panelBody}`}>
+                <section className={`${s.panel} ${s.panelBody} animate-in stagger-1`}>
                   <div className={s.panelHeader}>
                     <CabecalhoBloco icone={Filter} titulo="Filtros" subtitulo="Partem do perfil de busca; ajuste à vontade nesta pesquisa." />
                     <div className="flex items-center gap-4">
@@ -975,7 +1019,7 @@ export default function ProspeccaoPage() {
                         <option value="">
                           {grupoAtivo ? `Todas de ${grupoAtivo.nome} (${atividadesBase.length})` : `Todas do perfil (${atividadesBase.length})`}
                         </option>
-                        {atividadesBase.map((c) => <option key={c} value={c}>{rotuloAtividade(c)}</option>)}
+                        {atividadesBase.map((c) => <option key={c} value={c}>{rotuloAtividade(c, nichosOrg.nichos)}</option>)}
                       </Selecao>
                     </Campo>
 
@@ -1044,7 +1088,7 @@ export default function ProspeccaoPage() {
                     tom="cyan"
                     icone={Target}
                     rotulo="Meta"
-                    valor={metaDaBusca === null ? '—' : metaDaBusca.toLocaleString('pt-BR')}
+                    valor={metaDaBusca === null ? '—' : metaDaBusca}
                     detalhe={metaDaBusca === null
                       ? 'aparece ao buscar'
                       : buscaEspecifica ? 'resultados da busca pelo nome' : decisorObrigatorio ? 'empresas com decisor e e-mail dele' : 'empresas (decisor não obrigatório)'}
@@ -1053,14 +1097,14 @@ export default function ProspeccaoPage() {
                     tom="violet"
                     icone={Building2}
                     rotulo="Empresas avaliadas"
-                    valor={metaDaBusca === null ? '—' : avaliadasNaBusca.toLocaleString('pt-BR')}
+                    valor={metaDaBusca === null ? '—' : avaliadasNaBusca}
                     detalhe={metaDaBusca === null ? 'aparece ao buscar' : buscando ? 'avaliando…' : 'nesta busca'}
                   />
                   <Indicador
                     tom="emerald"
                     icone={Mail}
                     rotulo="Com decisor e e-mail"
-                    valor={metaDaBusca === null ? '—' : comDecisorNaBusca.toLocaleString('pt-BR')}
+                    valor={metaDaBusca === null ? '—' : comDecisorNaBusca}
                     proporcao={metaDaBusca === null ? null : comDecisorNaBusca / Math.max(1, metaDaBusca)}
                     detalhe={metaDaBusca === null ? 'aparece ao buscar' : `${comDecisorNaBusca} de ${metaDaBusca} da meta`}
                   />
@@ -1068,7 +1112,7 @@ export default function ProspeccaoPage() {
                     tom="amber"
                     icone={Ban}
                     rotulo="Descartadas"
-                    valor={metaDaBusca === null ? '—' : descartadasNaBusca.toLocaleString('pt-BR')}
+                    valor={metaDaBusca === null ? '—' : descartadasNaBusca}
                     detalhe={metaDaBusca === null ? 'aparece ao buscar' : 'fora da lista ou descartadas manualmente nesta busca'}
                   />
                 </section>
@@ -1090,7 +1134,7 @@ export default function ProspeccaoPage() {
               )}
 
               {/* Resultados */}
-              <section className={`${s.panel} overflow-hidden`}>
+              <section className={`${s.panel} overflow-hidden animate-in stagger-4`}>
                 <div className={`${s.panelHeader} ${s.panelHeaderBar}`}>
                   <CabecalhoBloco
                     icone={Radar}
@@ -1111,6 +1155,11 @@ export default function ProspeccaoPage() {
                         </button>
                       </>
                     ) : null}
+                    {temPesquisa && (
+                      <button type="button" onClick={limparPesquisa} className={`${s.outlineButton} focus-ring`} title="Limpa a lista e volta os filtros ao perfil, para pesquisar de novo">
+                        <RotateCcw size={13} /> Limpar pesquisa
+                      </button>
+                    )}
                     <span className="text-xs text-slate-400">
                       <span className="font-semibold tabular-nums text-slate-200">{selecionados.size}</span> selecionada{selecionados.size === 1 ? '' : 's'}
                     </span>
@@ -1252,7 +1301,7 @@ export default function ProspeccaoPage() {
                         const decisor = decisores[i.cnpj];
                         const emailDecisor = emailDoDecisor(enriquecimentos[i.cnpj], decisor?.nome);
                         const nome = nomeSemSufixo(nomeLegivel(i.nome_fantasia ?? i.razao_social)) || formatarCnpj(i.cnpj);
-                        const atividade = nomeAtividade(i.cnae_principal);
+                        const atividade = nomeAtividade(i.cnae_principal, nichosOrg.nichos);
                         return (
                           <Fragment key={i.cnpj}>
                             <tr
@@ -1384,6 +1433,7 @@ export default function ProspeccaoPage() {
       {perfilAberto && (
       <PerfilBuscaPainel
         catalogoCnaes={catalogo?.cnaes ?? null}
+        nichosOrg={nichosOrg}
         modo={modo}
         quantidadeTexto={quantidadeTexto}
         soComEmail={filtros?.soComEmail ?? false}

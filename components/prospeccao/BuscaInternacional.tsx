@@ -228,14 +228,14 @@ export default function BuscaInternacional({ pedido, nichos = [], paisesPerfil =
       </>)}
 
       <section className={s.kpiGrid}>
-        <Indicador tom="cyan" icone={Target} rotulo="Meta" valor={buscou ? metaAtual.toLocaleString('pt-BR') : '—'}
+        <Indicador tom="cyan" icone={Target} rotulo="Meta" valor={buscou ? metaAtual : '—'}
           detalhe={!buscou ? 'aparece ao buscar' : buscaFeita?.nome ? 'resultados da busca pelo nome' : decisorObrigatorio ? 'empresas com decisor e e-mail dele' : 'empresas (decisor não obrigatório)'} />
-        <Indicador tom="violet" icone={Building2} rotulo="Empresas na Crustdata" valor={total === null ? '—' : total.toLocaleString('pt-BR')}
+        <Indicador tom="violet" icone={Building2} rotulo="Empresas na Crustdata" valor={total === null ? '—' : total}
           detalhe={total === null ? 'aparece ao buscar' : buscaFeita?.nome ? 'com esse nome e local' : 'com os nichos e países do perfil'} />
-        <Indicador tom="emerald" icone={Mail} rotulo="Com decisor e e-mail" valor={buscou ? comDecisor.toLocaleString('pt-BR') : '—'}
+        <Indicador tom="emerald" icone={Mail} rotulo="Com decisor e e-mail" valor={buscou ? comDecisor : '—'}
           proporcao={buscou ? comDecisor / Math.max(1, metaAtual) : null}
           detalhe={buscou ? `${comDecisor} de ${metaAtual} da meta` : 'aparece ao buscar'} />
-        <Indicador tom="amber" icone={Radar} rotulo="Analisadas" valor={analisadas === null ? '—' : analisadas.toLocaleString('pt-BR')}
+        <Indicador tom="amber" icone={Radar} rotulo="Analisadas" valor={analisadas === null ? '—' : analisadas}
           detalhe={!buscou ? 'aparece ao buscar' : `limite de ${buscaFeita?.nome ? LIMITE_BUSCA_ESPECIFICA : TETO_TENTATIVAS_DECISOR} por busca${pulados.length ? ` · ${pulados.length} fora da lista` : ''}`} />
       </section>
 

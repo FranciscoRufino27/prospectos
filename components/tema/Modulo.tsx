@@ -2,6 +2,7 @@
 
 import { ChevronRight, type LucideIcon } from 'lucide-react';
 import s from './TemaModulo.module.css';
+import { NumeroAnimado } from '@/components/ui/NumeroAnimado';
 
 // Peças do tema dos módulos: a página (wrapper que aplica a paleta), o
 // cabeçalho com trilha, as abas segmentadas, os indicadores e o título de
@@ -71,7 +72,7 @@ export function AbasModulo<T extends string>({ abas, ativa, onChange, rotulo }: 
 const TOM = { cyan: s.kpiCyan, violet: s.kpiViolet, emerald: s.kpiEmerald, amber: s.kpiAmber, blue: s.kpiBlue };
 
 export function IndicadorModulo({ icone: Icone, rotulo, valor, detalhe, tom }: {
-  icone: LucideIcon; rotulo: string; valor: string; detalhe: string; tom: keyof typeof TOM;
+  icone: LucideIcon; rotulo: string; valor: string | number; detalhe: string; tom: keyof typeof TOM;
 }) {
   return (
     <article className={`${s.kpiCard} ${TOM[tom]}`}>
@@ -79,7 +80,7 @@ export function IndicadorModulo({ icone: Icone, rotulo, valor, detalhe, tom }: {
         <span className={s.kpiIcon}><Icone size={19} strokeWidth={1.8} aria-hidden="true" /></span>
         <div className={s.kpiIdentity}>
           <span className={s.kpiLabel}>{rotulo}</span>
-          <strong>{valor}</strong>
+          <strong>{typeof valor === 'number' ? <NumeroAnimado valor={valor} /> : valor}</strong>
         </div>
       </div>
       <span className={s.kpiSubtitle}>{detalhe}</span>

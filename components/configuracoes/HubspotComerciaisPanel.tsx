@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, Check, Save, Users } from 'lucide-react'
+import { EsqueletoLinhas } from '@/components/ui/Esqueleto'
 
 // Mapeamento hubspot_owner_id → usuário ProspectOS. A sugestão por e-mail é
 // só exibida; nada é gravado até clicar em Salvar. Sem mapeamento = "Não
@@ -117,7 +118,7 @@ export default function HubspotComerciaisPanel() {
       )}
 
       {carregando ? (
-        <p className="text-sm text-slate-500">Carregando…</p>
+        <EsqueletoLinhas linhas={4} />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

@@ -17,7 +17,7 @@
 import { PAISES_INTERNACIONAL, type CodigoPais } from '@/lib/prospeccao/crustdata'
 
 // Suba este número ao mudar o formato do blob, e adicione o passo em `migrar()`.
-export const WORKSPACE_CONFIG_SCHEMA_VERSION = 9
+export const WORKSPACE_CONFIG_SCHEMA_VERSION = 10
 
 // Objetivos que o produto já consegue medir de ponta a ponta. Novos objetivos
 // só entram nesta allowlist quando houver dado operacional real para dashboard,
@@ -301,10 +301,45 @@ export function parsePesquisasSalvas(bruto: unknown): PesquisaSalva[] | undefine
   return lista.length ? lista : undefined
 }
 
+// Nichos criados pela organização (além dos pré-definidos em
+// lib/prospeccao/nichos.ts): nome + atividades (CNAE subclasse). Ficam fora do
+// perfil pelo mesmo motivo das pesquisas: limpar o perfil não apaga os nichos.
+export const NICHOS_PERSONALIZADOS_LIMITES = { total: 30, nome: 40, cnaes: PROSPECCAO_LIMITES.cnaes } as const
+
+export interface NichoPersonalizado {
+  id: string
+  nome: string
+  cnaes: string[]
+  criadoEm: string
+}
+
+export function parseNichosPersonalizados(bruto: unknown): NichoPersonalizado[] | undefined {
+  if (!Array.isArray(bruto)) return undefined
+  const ids = new Set<string>()
+  const nomes = new Set<string>()
+  const usados = new Set<string>()
+  const lista: NichoPersonalizado[] = []
+  for (const item of bruto) {
+    if (!ehObjeto(item) || typeof item.id !== 'string' || !item.id || ids.has(item.id)) continue
+    const nome = typeof item.nome === 'string' ? item.nome.trim().slice(0, NICHOS_PERSONALIZADOS_LIMITES.nome) : ''
+    const chaveNome = nome.toLocaleLowerCase('pt-BR')
+    // Cada atividade pertence a um só nicho: o agrupamento da tela é por CNAE.
+    const cnaes = listaUnica(item.cnaes, (c) => /^\d{7}$/.test(c) && !usados.has(c), NICHOS_PERSONALIZADOS_LIMITES.cnaes)
+    if (!nome || nomes.has(chaveNome) || !cnaes?.length) continue
+    ids.add(item.id)
+    nomes.add(chaveNome)
+    for (const c of cnaes) usados.add(c)
+    lista.push({ id: item.id, nome, cnaes, criadoEm: typeof item.criadoEm === 'string' ? item.criadoEm : '' })
+    if (lista.length >= NICHOS_PERSONALIZADOS_LIMITES.total) break
+  }
+  return lista.length ? lista : undefined
+}
+
 export interface WorkspaceConfig {
   _schema_version: number
   prospeccao?: ProspeccaoConfig
   prospeccaoPesquisas?: PesquisaSalva[]
+  prospeccaoNichos?: NichoPersonalizado[]
   // Chaves das preferências. Todas OPCIONAIS — ausência = padrão do produto.
   // Crescem nas fases seguintes (dashboard, Configurações > Processo comercial).
   dashboardWidgets?: string[]
@@ -364,6 +399,8 @@ function migrar(bruto: Record<string, unknown>): Record<string, unknown> {
   if (v < 8) cfg = { ...cfg, _schema_version: 8 }
   // v8 -> v9: adiciona prospeccao.paises (busca internacional). Ausência = nenhum país-alvo.
   if (v < 9) cfg = { ...cfg, _schema_version: 9 }
+  // v9 -> v10: adiciona prospeccaoNichos (nichos criados pela org). Ausência = nenhum.
+  if (v < 10) cfg = { ...cfg, _schema_version: 10 }
   return cfg
 }
 
@@ -469,6 +506,8 @@ export function parseWorkspaceConfig(bruto: unknown): WorkspaceConfig {
   if (prospeccao) out.prospeccao = prospeccao
   const pesquisas = parsePesquisasSalvas(obj.prospeccaoPesquisas)
   if (pesquisas) out.prospeccaoPesquisas = pesquisas
+  const nichos = parseNichosPersonalizados(obj.prospeccaoNichos)
+  if (nichos) out.prospeccaoNichos = nichos
   return out
 }
 
@@ -523,6 +562,8 @@ export interface WorkspaceConfigEditavel {
   prospeccao?: ProspeccaoConfig | null
   // Pesquisas salvas. Substitui a lista inteira; lista vazia/null LIMPA.
   prospeccaoPesquisas?: PesquisaSalva[] | null
+  // Nichos personalizados. Substitui a lista inteira; lista vazia/null LIMPA.
+  prospeccaoNichos?: NichoPersonalizado[] | null
 }
 
 export function mesclarWorkspaceConfig(atual: WorkspaceConfig, patch: WorkspaceConfigEditavel): WorkspaceConfig {
@@ -572,6 +613,11 @@ export function mesclarWorkspaceConfig(atual: WorkspaceConfig, patch: WorkspaceC
     const lista = patch.prospeccaoPesquisas === null ? undefined : parsePesquisasSalvas(patch.prospeccaoPesquisas)
     if (lista) next.prospeccaoPesquisas = lista
     else delete next.prospeccaoPesquisas
+  }
+  if (patch.prospeccaoNichos !== undefined) {
+    const lista = patch.prospeccaoNichos === null ? undefined : parseNichosPersonalizados(patch.prospeccaoNichos)
+    if (lista) next.prospeccaoNichos = lista
+    else delete next.prospeccaoNichos
   }
   return serializeWorkspaceConfig(next)
 }

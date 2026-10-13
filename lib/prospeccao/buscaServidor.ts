@@ -56,16 +56,21 @@ export interface RespostaBusca {
   catalogo: StatusCatalogo | null
 }
 
+// Mês/data vêm da carga concluída mais recente; as atividades são a união de
+// todas as concluídas — a carga de um nicho novo (catalogo_rf_pedidos) traz só
+// as atividades dele, e as carregadas antes continuam no catálogo.
 export async function statusCatalogo(admin: SupabaseClient): Promise<StatusCatalogo | null> {
   const { data, error } = await admin
     .from('catalogo_rf_cargas')
     .select('mes_rf, concluida_em, cnaes')
     .eq('status', 'concluida')
     .order('concluida_em', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(500)
   if (error) throw new Error(`Falha ao ler status do catálogo: ${error.message}`)
-  return data ? { mesRf: data.mes_rf, concluidaEm: data.concluida_em, cnaes: data.cnaes ?? [] } : null
+  const cargas = (data ?? []) as { mes_rf: string; concluida_em: string | null; cnaes: string[] | null }[]
+  if (!cargas.length) return null
+  const cnaes = [...new Set(cargas.flatMap((c) => c.cnaes ?? []))]
+  return { mesRf: cargas[0].mes_rf, concluidaEm: cargas[0].concluida_em, cnaes }
 }
 
 export async function buscarProspeccao(

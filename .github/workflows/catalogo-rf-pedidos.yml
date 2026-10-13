@@ -1,0 +1,39 @@
+# Atende os pedidos de carga do catálogo RF (nicho novo na tela de Prospecção).
+# Acordado pela tela (repository_dispatch, via GITHUB_DISPATCH_TOKEN na Vercel)
+# e, como rede de segurança, a cada 6 horas. Sem pedido pendente, termina em
+# segundos. Segredos do repositório necessários:
+#   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (do mesmo projeto da Vercel)
+name: Catálogo RF — pedidos de carga
+
+on:
+  repository_dispatch:
+    types: [catalogo-rf-pedido]
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+# Uma carga por vez; disparos durante uma carga esperam na fila e pegam os
+# pedidos que chegaram enquanto isso.
+concurrency:
+  group: catalogo-rf-pedidos
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  atender:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Atender pedidos
+        run: npx tsx scripts/catalogo-rf-pedidos.ts --confirmar
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

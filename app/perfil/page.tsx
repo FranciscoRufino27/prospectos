@@ -7,6 +7,7 @@ import SeletorTema from '@/components/tema/SeletorTema';
 import AvisosWhatsapp from '@/components/perfil/AvisosWhatsapp';
 // (Lock também usado no campo de nicho travado para usuário comum — item 1.)
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { EsqueletoLinhas } from '@/components/ui/Esqueleto';
 
 const NICHOS = [
   'Hotelaria', 'Óticas', 'Agronegócio', 'Indústria', 'Logística',
@@ -114,7 +115,7 @@ export default function PerfilPage() {
   const fotoExibida = avatarPreview || avatarUrl(nome || null, email);
 
   if (carregando) {
-    return <div className="p-6 text-sm text-slate-500">Carregando...</div>;
+    return <EsqueletoLinhas linhas={4} className="p-6" />;
   }
 
   return (

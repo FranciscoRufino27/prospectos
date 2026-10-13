@@ -881,3 +881,18 @@
 :global([data-tema='claro']) .responseTotal {
   color: #047ea9;
 }
+
+/* Entrada dos cards de indicadores: sobem e aparecem um após o outro, e o
+   número conta até o valor (NumeroAnimado). */
+@keyframes kpiEntrada {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kpiGrid > .kpiCard { animation: kpiEntrada 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.kpiGrid > .kpiCard:nth-child(2) { animation-delay: 0.07s; }
+.kpiGrid > .kpiCard:nth-child(3) { animation-delay: 0.14s; }
+.kpiGrid > .kpiCard:nth-child(4) { animation-delay: 0.21s; }
+.kpiGrid > .kpiCard:nth-child(5) { animation-delay: 0.28s; }
+@media (prefers-reduced-motion: reduce) {
+  .kpiGrid > .kpiCard { animation: none; }
+}

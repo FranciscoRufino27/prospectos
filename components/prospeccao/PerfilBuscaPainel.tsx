@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import SeletorLocalizacao from './SeletorLocalizacao';
 import BuscaEmpresaEspecifica, { type PedidoEmpresa } from './BuscaEmpresaEspecifica';
+import type { NichosOrg } from './useNichosOrg';
 import SeletorNichos from './SeletorNichos';
 import SeletorOpcoesPerfil, { type OpcaoPerfil } from './SeletorOpcoesPerfil';
 import {
@@ -47,6 +48,7 @@ const ATIVIDADES = NICHOS.flatMap((nicho) => nicho.atividades.map((atividade) =>
 
 export default function PerfilBuscaPainel({
   catalogoCnaes,
+  nichosOrg,
   modo = 'brasil',
   quantidadeTexto,
   soComEmail,
@@ -62,6 +64,8 @@ export default function PerfilBuscaPainel({
   onBuscarEmpresa,
 }: {
   catalogoCnaes: string[] | null;
+  /** Nichos criados pela organização (useNichosOrg da tela). */
+  nichosOrg?: NichosOrg;
   /** Aba ativa: o botão dela fica em destaque no rodapé. */
   modo?: DestinoBusca;
   quantidadeTexto: string;
@@ -121,10 +125,11 @@ export default function PerfilBuscaPainel({
   const areasAlvo = perfil.areasAlvo ?? [];
   const paises = perfil.paises ?? [];
   // Nichos do perfil sem tradução para setor do LinkedIn (ex.: CNAE solto).
-  const gruposPerfil = gruposDoPerfil(cnaes);
+  const extras = nichosOrg?.nichos ?? [];
+  const gruposPerfil = gruposDoPerfil(cnaes, extras);
   const nichosSemSetor = gruposPerfil.filter((g) => !SETORES_DO_NICHO[g.id]).map((g) => g.nome);
   const nichosComSetor = gruposPerfil.length - nichosSemSetor.length;
-  const outras = cnaes.filter((codigo) => !nichoDaAtividade(codigo));
+  const outras = cnaes.filter((codigo) => !nichoDaAtividade(codigo, extras));
   const foraDoCatalogo = catalogoCnaes ? cnaes.filter((codigo) => !catalogoCnaes.includes(codigo)) : [];
   const quantidadeInvalida = quantidadeTexto.trim() !== '' && quantidadeValida(Number(quantidadeTexto)) === null;
 
@@ -265,7 +270,7 @@ export default function PerfilBuscaPainel({
 
           <section className={s.profileSection}>
             <span className={s.profileLabel}>Nichos de interesse <Info size={12} aria-hidden="true" /></span>
-            <SeletorNichos cnaes={cnaes} desabilitado={!podeEditar} onChange={definirCnaes} onAviso={setAviso} />
+            <SeletorNichos cnaes={cnaes} desabilitado={!podeEditar} onChange={definirCnaes} onAviso={setAviso} nichosOrg={nichosOrg} />
           </section>
 
 

@@ -156,9 +156,10 @@ describe('validação do lote de importação', () => {
 
 function adminFake(respostas: Record<string, { data: unknown; error: unknown }>) {
   const rpc = vi.fn(async (nome: string) => respostas[nome] ?? { data: null, error: null })
+  // catalogo_rf_cargas: lista das cargas concluídas (statusCatalogo une as atividades).
   const consulta = {
-    select: () => consulta, eq: () => consulta, order: () => consulta, limit: () => consulta,
-    maybeSingle: async () => ({ data: { mes_rf: '2026-09', concluida_em: '2026-09-23T15:00:00Z', cnaes: ['5510801'] }, error: null }),
+    select: () => consulta, eq: () => consulta, order: () => consulta,
+    limit: async () => ({ data: [{ mes_rf: '2026-09', concluida_em: '2026-09-23T15:00:00Z', cnaes: ['5510801'] }], error: null }),
   }
   const admin = { rpc, from: vi.fn(() => consulta) } as unknown as SupabaseClient
   return { admin, rpc }
@@ -236,9 +237,9 @@ describe('buscarProspeccao', () => {
           : contagens(nome, params as { p_so_com_email: boolean })
       )),
       from: () => ({
-        select: () => ({ eq: () => ({ order: () => ({ limit: () => ({
-          maybeSingle: async () => ({ data: { mes_rf: '2026-09', concluida_em: null, cnaes: ['5510801'] }, error: null }),
-        }) }) }) }),
+        select: () => ({ eq: () => ({ order: () => ({
+          limit: async () => ({ data: [{ mes_rf: '2026-09', concluida_em: null, cnaes: ['5510801'] }], error: null }),
+        }) }) }),
       }),
     } as unknown as SupabaseClient
     const r = await buscarProspeccao(admin, 'org-a', normalizarFiltros({ soComEmail: false }, PERFIL), null, { contar: true })
@@ -283,5 +284,23 @@ describe('nomes legíveis', () => {
     expect(iniciais('Hotel das Flores LTDA')).toBe('HF')
     expect(iniciais('Cordilheira')).toBe('C')
     expect(iniciais('')).toBe('?')
+  })
+})
+
+describe('statusCatalogo', () => {
+  it('une as atividades de todas as cargas concluídas; mês e data da mais recente', async () => {
+    const { statusCatalogo } = await import('@/lib/prospeccao/buscaServidor')
+    const consulta = {
+      select: () => consulta, eq: () => consulta, order: () => consulta,
+      limit: async () => ({
+        data: [
+          { mes_rf: '2026-10', concluida_em: '2026-10-13T15:00:00Z', cnaes: ['9313100'] },
+          { mes_rf: '2026-09', concluida_em: '2026-09-23T15:00:00Z', cnaes: ['5510801', '9313100'] },
+        ],
+        error: null,
+      }),
+    }
+    const admin = { from: () => consulta } as unknown as SupabaseClient
+    expect(await statusCatalogo(admin)).toEqual({ mesRf: '2026-10', concluidaEm: '2026-10-13T15:00:00Z', cnaes: ['9313100', '5510801'] })
   })
 })

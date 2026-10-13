@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, Users, Shield, Briefcase, BarChart2, Search, CheckCircle, Clock, Pencil, MoreVertical, Trash2, X } from 'lucide-react';
 import { estilosModulo, IndicadorModulo, PaginaModulo } from '@/components/tema/Modulo';
+import { EsqueletoLinhas } from '@/components/ui/Esqueleto';
 
 interface Membro {
   id: string;
@@ -267,10 +268,10 @@ export default function EquipePage() {
       }
     >
       <section className={estilosModulo.kpiGrid}>
-        <IndicadorModulo tom="violet" icone={Shield} rotulo="Administradores" valor={String(admins.length)} detalhe="Acesso total à plataforma" />
-        <IndicadorModulo tom="emerald" icone={Users} rotulo="Usuários" valor={String(usuarios.length)} detalhe="Acesso ao nicho definido" />
-        <IndicadorModulo tom="amber" icone={Briefcase} rotulo="Nichos ativos" valor={String(nichosAtivos)} detalhe="Segmentos de atuação" />
-        <IndicadorModulo tom="cyan" icone={BarChart2} rotulo="Leads distribuídos" valor={totalLeads.toLocaleString('pt-BR')} detalhe="Entre toda a equipe" />
+        <IndicadorModulo tom="violet" icone={Shield} rotulo="Administradores" valor={admins.length} detalhe="Acesso total à plataforma" />
+        <IndicadorModulo tom="emerald" icone={Users} rotulo="Usuários" valor={usuarios.length} detalhe="Acesso ao nicho definido" />
+        <IndicadorModulo tom="amber" icone={Briefcase} rotulo="Nichos ativos" valor={nichosAtivos} detalhe="Segmentos de atuação" />
+        <IndicadorModulo tom="cyan" icone={BarChart2} rotulo="Leads distribuídos" valor={totalLeads} detalhe="Entre toda a equipe" />
       </section>
 
       {/* Formulário de convite (colapsável) */}
@@ -348,7 +349,7 @@ export default function EquipePage() {
         </div>
 
         {buscando ? (
-          <div className="p-10 text-center text-slate-500 text-sm">Carregando...</div>
+          <EsqueletoLinhas linhas={5} className="p-6" />
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-[var(--bg-base)] border-b border-[var(--border)]">

@@ -1,6 +1,7 @@
 'use client';
 
 import type { Building2 } from 'lucide-react';
+import { NumeroAnimado } from '@/components/ui/NumeroAnimado';
 import s from './Prospeccao.module.css';
 
 // Peças visuais comuns às abas Brasil e Internacional da Prospecção.
@@ -9,8 +10,9 @@ const TOM_KPI = { cyan: s.kpiCyan, violet: s.kpiViolet, emerald: s.kpiEmerald, a
 
 // Indicador no padrão do Dashboard. `proporcao` (0–1) desenha a barra; sem ela,
 // o card fica só com o número — nada de barra decorativa sem dado por trás.
+// `valor` número conta até o valor (NumeroAnimado); texto ("—") fica parado.
 export function Indicador({ icone: Icone, rotulo, valor, detalhe, tom, proporcao }: {
-  icone: typeof Building2; rotulo: string; valor: string; detalhe: string;
+  icone: typeof Building2; rotulo: string; valor: string | number; detalhe: string;
   tom: keyof typeof TOM_KPI; proporcao?: number | null;
 }) {
   return (
@@ -19,7 +21,7 @@ export function Indicador({ icone: Icone, rotulo, valor, detalhe, tom, proporcao
         <span className={s.kpiIcon}><Icone size={19} strokeWidth={1.8} aria-hidden="true" /></span>
         <div className={s.kpiIdentity}>
           <span className={s.kpiLabel}>{rotulo}</span>
-          <strong>{valor}</strong>
+          <strong>{typeof valor === 'number' ? <NumeroAnimado valor={valor} /> : valor}</strong>
         </div>
       </div>
       {proporcao != null && (

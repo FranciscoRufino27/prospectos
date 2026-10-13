@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { MotionConfig, motion } from 'framer-motion';
 import { LayoutDashboard, Settings, Zap, LogOut } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { agruparMenu, EVENTO_MENU_ATUALIZADO, itensVisiveis } from '@/lib/navegacao/menu';
@@ -79,12 +80,24 @@ export default function Sidebar() {
     router.refresh();
   }
 
+  // O fundo da aba ativa é UM elemento (layoutId) que desliza até a aba nova
+  // ao trocar de página; o texto troca de cor junto. Com "reduzir movimento"
+  // do sistema, ele só muda de lugar (MotionConfig reducedMotion="user").
   const navItemClasses = (active: boolean) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border-l-[3px] ${
+    `relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
       active
-        ? 'bg-[var(--sb-active)] text-[var(--sb-text-strong)] border-indigo-400'
-        : 'text-indigo-200 border-transparent hover:bg-[var(--sb-hover)] hover:text-[var(--sb-text-strong)]'
+        ? 'text-[var(--sb-text-strong)]'
+        : 'text-indigo-200 hover:bg-[var(--sb-hover)] hover:text-[var(--sb-text-strong)]'
     }`;
+  const destaqueAtivo = (active: boolean) =>
+    active ? (
+      <motion.span
+        layoutId="menu-aba-ativa"
+        aria-hidden="true"
+        className="absolute inset-0 rounded-lg border-l-[3px] border-indigo-400 bg-[var(--sb-active)]"
+        transition={{ type: 'tween', duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+      />
+    ) : null;
 
   return (
     <aside className="flex flex-col w-60 min-h-screen shrink-0 bg-[var(--sb-bg)] border-r border-[var(--sb-edge)]">
@@ -100,6 +113,7 @@ export default function Sidebar() {
 
       {/* Main Navigation — em grupos; grupo vazio some. Administração fica
           enquanto houver Configurações para mostrar. */}
+      <MotionConfig reducedMotion="user">
       <nav className="flex-1 px-3 py-4 space-y-4">
         {modulos !== null && agruparMenu(itensVisiveis(modulos), podeConfigurar ? ['administracao'] : []).map((grupo) => (
           <div key={grupo.id} role="group" aria-labelledby={`menu-grupo-${grupo.id}`}>
@@ -114,21 +128,24 @@ export default function Sidebar() {
                 const Icon = ICONE_MENU[id] ?? LayoutDashboard;
                 return (
                   <Link key={href} href={href} className={navItemClasses(isActive(href))}>
-                    <Icon size={18} strokeWidth={1.8} />
-                    {label}
+                    {destaqueAtivo(isActive(href))}
+                    <Icon size={18} strokeWidth={1.8} className="relative" />
+                    <span className="relative">{label}</span>
                   </Link>
                 );
               })}
               {grupo.id === 'administracao' && podeConfigurar && (
                 <Link href="/configuracoes" className={navItemClasses(isActive('/configuracoes'))}>
-                  <Settings size={18} strokeWidth={1.8} />
-                  Configurações
+                  {destaqueAtivo(isActive('/configuracoes'))}
+                  <Settings size={18} strokeWidth={1.8} className="relative" />
+                  <span className="relative">Configurações</span>
                 </Link>
               )}
             </div>
           </div>
         ))}
       </nav>
+      </MotionConfig>
 
       {/* Sair */}
       <div className="px-3 pb-2 border-t border-[var(--sb-line)] pt-3">

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Clock, Bell, Building2, ListTodo, Activity, Workflow } from 'lucide-react';
+import { EsqueletoLinhas } from '@/components/ui/Esqueleto';
 
 // Painel de Execuções — dentro de Automação. As TAREFAS deixaram de ser item de
 // sidebar e passam a aparecer contextualmente aqui (geradas por workflows,
@@ -115,7 +116,7 @@ export default function ExecucoesPanel() {
           {!carregandoExec && <span className="text-xs font-normal text-slate-500">· {execucoes.length}</span>}
         </div>
         {carregandoExec ? (
-          <div className="p-8 text-center text-slate-500 text-sm">Carregando…</div>
+          <EsqueletoLinhas linhas={4} className="p-6" />
         ) : execucoes.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm">Nenhuma execução de workflow ainda.</div>
         ) : (
@@ -158,7 +159,7 @@ export default function ExecucoesPanel() {
           </div>
         </div>
         {carregando ? (
-          <div className="p-10 text-center text-slate-500 text-sm">Carregando…</div>
+          <EsqueletoLinhas linhas={5} className="p-6" />
         ) : tarefas.length === 0 ? (
           <div className="p-10 text-center text-slate-500 text-sm">Nenhuma tarefa.</div>
         ) : (
