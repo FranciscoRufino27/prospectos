@@ -8,7 +8,8 @@
 // servidor (/api/equipe/** e /api/plataforma/**); aqui só se evita oferecer o
 // que o backend recusaria (o próprio bloqueio, usuário sem organização).
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Ban, Building2, Check, Copy, Globe, KeyRound, LockOpen, Search, Shield, ShieldCheck, Users, UserX } from 'lucide-react';
+import { Ban, Building2, Check, Copy, Globe, KeyRound, LockOpen, Search, Shield, ShieldCheck, UserPlus, Users, UserX } from 'lucide-react';
+import NovoUsuarioModal from '@/components/perfil/NovoUsuarioModal';
 import { estilosModulo as m, IndicadorModulo, TituloSecao } from '@/components/tema/Modulo';
 import { EsqueletoLinhas } from '@/components/ui/Esqueleto';
 
@@ -77,6 +78,9 @@ export default function UsuariosPlataforma({ emailProprio, donoPlataforma, ehAdm
   const [executando, setExecutando] = useState(false);
   const [retorno, setRetorno] = useState<(Retorno & { membroId: string }) | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
+  // Só na visão da plataforma: todas as orgs (inclusive sem usuário).
+  const [organizacoes, setOrganizacoes] = useState<{ id: string; nome: string }[]>([]);
+  const [criando, setCriando] = useState(false);
 
   // `ignorar` evita que a resposta de um escopo antigo sobrescreva a do atual.
   async function carregar(alvo: Escopo, ignorar: () => boolean = () => false) {
@@ -87,6 +91,7 @@ export default function UsuariosPlataforma({ emailProprio, donoPlataforma, ehAdm
       if (ignorar()) return;
       if (!res.ok) throw new Error(data.erro || 'Não foi possível carregar os usuários.');
       setMembros((alvo === 'plataforma' ? data.usuarios : data.membros) ?? []);
+      setOrganizacoes(alvo === 'plataforma' ? (data.organizacoes ?? []) : []);
     } catch (e) {
       if (ignorar()) return;
       setErroLista(e instanceof Error ? e.message : 'Não foi possível carregar os usuários.');
@@ -104,12 +109,6 @@ export default function UsuariosPlataforma({ emailProprio, donoPlataforma, ehAdm
     carregar(escopo, () => cancelado);
     return () => { cancelado = true; };
   }, [escopo]);
-
-  const organizacoes = useMemo(() => {
-    const mapa = new Map<string, string>();
-    for (const x of membros) if (x.organizacao_id) mapa.set(x.organizacao_id, x.organizacao_nome || 'Sem nome');
-    return [...mapa.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
-  }, [membros]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -245,6 +244,9 @@ export default function UsuariosPlataforma({ emailProprio, donoPlataforma, ehAdm
               : 'Quem acessa esta organização. Senhas não são visíveis: use a redefinição.'}
           />
           <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <button type="button" onClick={() => setCriando(true)} className={`${m.primaryButton} focus-ring`}>
+            <UserPlus size={15} aria-hidden="true" />Novo usuário
+          </button>
           {plataforma && (
             <select
               value={filtroOrg} onChange={(e) => setFiltroOrg(e.target.value)}
@@ -252,7 +254,7 @@ export default function UsuariosPlataforma({ emailProprio, donoPlataforma, ehAdm
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-56"
             >
               <option value="">Todas as organizações ({organizacoes.length})</option>
-              {organizacoes.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+              {organizacoes.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
               {membros.some((x) => !x.organizacao_id) && <option value="sem">Sem organização</option>}
             </select>
           )}
@@ -386,6 +388,16 @@ export default function UsuariosPlataforma({ emailProprio, donoPlataforma, ehAdm
           </div>
         )}
       </section>
+
+      {criando && (
+        <NovoUsuarioModal
+          plataforma={plataforma}
+          organizacoes={organizacoes}
+          orgInicial={plataforma && filtroOrg && filtroOrg !== 'sem' ? filtroOrg : ''}
+          onFechar={() => setCriando(false)}
+          onCriado={() => { setCarregando(true); carregar(escopo); }}
+        />
+      )}
 
       {confirmando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !executando && setConfirmando(null)}>

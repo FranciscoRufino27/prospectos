@@ -23,7 +23,11 @@ export async function GET() {
     if (eP || eO) return NextResponse.json({ erro: (eP ?? eO)!.message }, { status: 400 });
 
     const usuarios = montarUsuariosPlataforma(todos.usuarios, perfis ?? [], orgs ?? []);
-    return NextResponse.json({ usuarios });
+    // Todas as orgs (inclusive sem usuário), para o filtro e o convite.
+    const organizacoes = (orgs ?? [])
+      .map((o) => ({ id: o.id as string, nome: (o.nome as string | null) || 'Sem nome' }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return NextResponse.json({ usuarios, organizacoes });
   } catch (err) {
     console.error('[plataforma/usuarios] erro interno:', err);
     return NextResponse.json({ erro: 'Erro interno' }, { status: 500 });

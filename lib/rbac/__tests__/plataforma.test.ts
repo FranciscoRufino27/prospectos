@@ -55,6 +55,7 @@ import { ehDonoPlataforma, exigirDonoPlataforma } from '../plataforma'
 import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { GET as listarPlataforma } from '@/app/api/plataforma/usuarios/route'
 import { POST as acessoPlataforma } from '@/app/api/plataforma/usuarios/[id]/acesso/route'
+import { POST as convidarPlataforma } from '@/app/api/plataforma/usuarios/convidar/route'
 
 function req(corpo: unknown) {
   return new Request('http://localhost/api', { method: 'POST', body: JSON.stringify(corpo) }) as never
@@ -122,6 +123,27 @@ describe('rotas /api/plataforma/** recusam quem não é dono', () => {
     const res = await acessoPlataforma(req({ acao: 'apagar' }), { params: Promise.resolve({ id: 'x' }) })
     expect(res.status).toBe(400)
     expect(mocks.updateUserById).not.toHaveBeenCalled()
+  })
+
+  it('convite: 403 para admin de organização, sem criar login', async () => {
+    mocks.user = { id: 'admin-org' }
+    const res = await convidarPlataforma(req({ email: 'novo@x.com', organizacao_id: 'org-b' }))
+    expect(res.status).toBe(403)
+    expect(mocks.generateLink).not.toHaveBeenCalled()
+  })
+
+  it('convite: dono sem organização escolhida → 400', async () => {
+    mocks.user = { id: 'dono-1' }
+    const res = await convidarPlataforma(req({ email: 'novo@x.com' }))
+    expect(res.status).toBe(400)
+    expect(mocks.generateLink).not.toHaveBeenCalled()
+  })
+
+  it('convite: organização inexistente → 404, sem criar login', async () => {
+    mocks.user = { id: 'dono-1' }
+    const res = await convidarPlataforma(req({ email: 'novo@x.com', organizacao_id: 'org-fantasma' }))
+    expect(res.status).toBe(404)
+    expect(mocks.generateLink).not.toHaveBeenCalled()
   })
 
   it('ação de acesso: alvo sem organização → 404, nada alterado', async () => {
