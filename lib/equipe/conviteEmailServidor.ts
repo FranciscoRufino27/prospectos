@@ -17,6 +17,9 @@ import { buscarRemetenteCampanha } from '@/lib/campanhas/opcoesServidor'
 //
 // Falha aqui nunca desfaz o convite: o usuário já existe e a rota devolve o
 // link para repasse manual.
+//
+// O mesmo envio serve à redefinição de senha pedida por um admin
+// (`tipo: 'redefinicao'`, rota /api/equipe/[id]/acesso): muda só o texto.
 
 export type ResultadoEmailConvite =
   | { emailEnviado: true; simulado: false; remetente: string }
@@ -31,7 +34,7 @@ export type ResultadoEmailConvite =
 export async function enviarEmailConvite(
   admin: SupabaseClient,
   org: string,
-  entrada: { email: string; actionLink: string | null },
+  entrada: { email: string; actionLink: string | null; tipo?: 'convite' | 'redefinicao' },
 ): Promise<ResultadoEmailConvite> {
   if (!entrada.actionLink) {
     return { emailEnviado: false, simulado: false, motivo: 'sem_link', remetente: null }
@@ -71,18 +74,29 @@ export async function enviarEmailConvite(
   }
 
   const link = entrada.actionLink
-  const corpoTexto = `Você foi convidado para acessar a plataforma ${nomeServico}.\n\nAcesse o link abaixo para definir sua senha e ativar seu acesso:\n${link}\n\nSe você não esperava este convite, ignore este e-mail.`
+  const redefinicao = entrada.tipo === 'redefinicao'
+  const assunto = redefinicao ? `Redefinição de senha — ${nomeServico}` : `Convite para acessar ${nomeServico}`
+  const abertura = redefinicao
+    ? 'Um administrador pediu a redefinição da sua senha na plataforma'
+    : 'Você foi convidado para acessar a plataforma'
+  const instrucao = redefinicao ? 'criar uma senha nova' : 'definir sua senha e ativar seu acesso'
+  const rotuloBotao = redefinicao ? 'Criar senha nova' : 'Definir senha e acessar'
+  const rodape = redefinicao
+    ? 'Se você não esperava esta mensagem, avise o administrador da sua equipe.'
+    : 'Se você não esperava este convite, ignore este e-mail.'
+
+  const corpoTexto = `${abertura} ${nomeServico}.\n\nAcesse o link abaixo para ${instrucao}:\n${link}\n\n${rodape}`
   const htmlPersonalizado = `
-      <p>Você foi convidado para acessar a plataforma <strong>${nomeServico}</strong>.</p>
-      <p>Clique no botão abaixo para definir sua senha e ativar seu acesso:</p>
-      <p><a href="${link}" style="display:inline-block;background:#4f46e5;color:#ffffff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Definir senha e acessar</a></p>
+      <p>${abertura} <strong>${nomeServico}</strong>.</p>
+      <p>Clique no botão abaixo para ${instrucao}:</p>
+      <p><a href="${link}" style="display:inline-block;background:#4f46e5;color:#ffffff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">${rotuloBotao}</a></p>
       <p style="color:#64748b;font-size:12px;">Se o botão não funcionar, copie e cole este link no navegador:<br>${link}</p>
-      <p style="color:#64748b;font-size:12px;">Se você não esperava este convite, ignore este e-mail.</p>
+      <p style="color:#64748b;font-size:12px;">${rodape}</p>
     `
   const html = montarEmailCampanhaHtml(corpoTexto, { nomeServico }, htmlPersonalizado)
 
   try {
-    await new GmailProvider(credenciais).enviar(entrada.email, `Convite para acessar ${nomeServico}`, corpoTexto, html)
+    await new GmailProvider(credenciais).enviar(entrada.email, assunto, corpoTexto, html)
   } catch (e) {
     console.error('[equipe/convidar] falha ao enviar e-mail de convite:', e)
     return { emailEnviado: false, simulado: false, motivo: 'falha_envio', remetente: remetente.email }

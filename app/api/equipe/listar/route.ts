@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import type { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabase-admin';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { estaBloqueado } from '@/lib/equipe/acesso';
 
 export async function GET() {
   try {
@@ -17,8 +19,16 @@ export async function GET() {
     const org = convidante?.organizacao_id as string | undefined;
     if (!org) return NextResponse.json({ erro: 'Usuário sem organização' }, { status: 400 });
 
-    const { data: authData, error } = await supabaseAdmin.auth.admin.listUsers();
-    if (error) return NextResponse.json({ erro: error.message }, { status: 400 });
+    // listUsers é paginado sobre TODAS as organizações (padrão: 50 por página).
+    // Sem percorrer as páginas, membros desta org além do 50º login da
+    // plataforma sumiam da lista.
+    const usuariosAuth: User[] = [];
+    for (let page = 1; ; page++) {
+      const { data: pagina, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error) return NextResponse.json({ erro: error.message }, { status: 400 });
+      usuariosAuth.push(...pagina.users);
+      if (pagina.users.length < 1000) break;
+    }
 
     const { data: perfis } = await supabaseAdmin
       .from('perfis').select('id, nome, role, nicho, avatar_url').eq('organizacao_id', org);
@@ -53,7 +63,7 @@ export async function GET() {
       leadsPorUsuario.set(usr.id, (leadsPorUsuario.get(usr.id) ?? 0) + 1);
     }
 
-    const membros = authData.users.filter(u => idsDaOrg.has(u.id)).map(u => {
+    const membros = usuariosAuth.filter(u => idsDaOrg.has(u.id)).map(u => {
       const perfil = perfis?.find(p => p.id === u.id);
       // Membro auth -> SDR de `usuarios`: por e-mail igual quando bate, senão
       // pelo mesmo padrão de prefixo (usuarios.nome curto como prefixo do
@@ -81,6 +91,7 @@ export async function GET() {
         created_at: u.created_at,
         total_leads: totalLeads,
         avatar_url: perfil?.avatar_url || null,
+        bloqueado: estaBloqueado(u.banned_until),
       };
     });
 

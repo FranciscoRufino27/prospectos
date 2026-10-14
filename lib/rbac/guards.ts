@@ -36,3 +36,25 @@ export function podeRemoverMembro(r: {
   }
   return { ok: true }
 }
+
+// Bloquear o login de um membro (sem apagar a conta). Bloqueia o auto-bloqueio
+// e o bloqueio do último admin ATIVO — admin já bloqueado não conta, senão a
+// organização ficaria sem ninguém que consiga entrar para desbloquear.
+export function podeBloquearMembro(r: {
+  alvoId: string
+  alvoRole: string
+  chamadorId: string
+  adminsAtivos: number
+}): ResultadoRegra {
+  if (r.alvoId === r.chamadorId) {
+    return { ok: false, status: 400, erro: 'Você não pode bloquear o seu próprio acesso.' }
+  }
+  if (r.alvoRole === 'admin' && r.adminsAtivos <= 1) {
+    return {
+      ok: false,
+      status: 400,
+      erro: 'Não é possível bloquear o último administrador ativo da organização. Promova ou desbloqueie outro admin antes.',
+    }
+  }
+  return { ok: true }
+}

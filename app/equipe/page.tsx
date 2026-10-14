@@ -16,6 +16,7 @@ interface Membro {
   created_at: string;
   total_leads: number;
   avatar_url: string | null;
+  bloqueado?: boolean;
 }
 
 const NICHOS = [
@@ -428,7 +429,12 @@ export default function EquipePage() {
                     </td>
                     {/* Status */}
                     <td className="px-5 py-3">
-                      {m.confirmed_at ? (
+                      {m.bloqueado ? (
+                        <span className="flex items-center gap-1.5 text-xs text-red-400">
+                          <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                          Bloqueado
+                        </span>
+                      ) : m.confirmed_at ? (
                         <span className="flex items-center gap-1.5 text-xs text-green-400">
                           <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
                           Ativo

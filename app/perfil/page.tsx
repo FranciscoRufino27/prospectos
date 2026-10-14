@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Camera, Save, Lock, User, Palette } from 'lucide-react';
-import { estilosModulo as m, PaginaModulo, TituloSecao } from '@/components/tema/Modulo';
+import { Camera, Save, Lock, User, Palette, ShieldCheck } from 'lucide-react';
+import { estilosModulo as m, AbasModulo, PaginaModulo, TituloSecao } from '@/components/tema/Modulo';
+import UsuariosPlataforma from '@/components/perfil/UsuariosPlataforma';
 import SeletorTema from '@/components/tema/SeletorTema';
 import AvisosWhatsapp from '@/components/perfil/AvisosWhatsapp';
 // (Lock também usado no campo de nicho travado para usuário comum — item 1.)
@@ -40,6 +41,10 @@ export default function PerfilPage() {
   const [feedbackSenha, setFeedbackSenha] = useState<{ tipo: 'sucesso' | 'erro'; msg: string } | null>(null);
 
   const [carregando, setCarregando] = useState(true);
+
+  // Aba "Usuários da plataforma": só admin vê (as rotas também exigem
+  // workspace.configure — esconder aqui não é a proteção).
+  const [aba, setAba] = useState<'perfil' | 'usuarios'>('perfil');
 
   useEffect(() => {
     fetch('/api/perfil')
@@ -119,7 +124,27 @@ export default function PerfilPage() {
   }
 
   return (
-    <PaginaModulo grupo="Conta" titulo="Meu perfil" subtitulo="Gerencie suas informações e credenciais de acesso.">
+    <PaginaModulo
+      grupo="Conta"
+      titulo="Meu perfil"
+      subtitulo={role === 'admin'
+        ? 'Gerencie suas informações e o acesso dos usuários da plataforma.'
+        : 'Gerencie suas informações e credenciais de acesso.'}
+      abas={role === 'admin' ? (
+        <AbasModulo
+          rotulo="Seções do perfil"
+          ativa={aba}
+          onChange={setAba}
+          abas={[
+            { id: 'perfil', label: 'Meu perfil', Icon: User },
+            { id: 'usuarios', label: 'Usuários da plataforma', Icon: ShieldCheck },
+          ]}
+        />
+      ) : undefined}
+    >
+    {role === 'admin' && aba === 'usuarios' ? (
+      <UsuariosPlataforma emailProprio={email} />
+    ) : (
     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
 
       {/* Foto e dados */}
@@ -285,6 +310,7 @@ export default function PerfilPage() {
       </section>
       </div>
     </div>
+    )}
     </PaginaModulo>
   );
 }

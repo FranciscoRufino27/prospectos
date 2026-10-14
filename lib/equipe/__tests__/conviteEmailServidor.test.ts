@@ -103,6 +103,22 @@ describe('e-mail de convite da equipe', () => {
     expect(html).toContain('Laudo de Brinquedos')
   })
 
+  it('redefinição de senha usa a mesma conta do workspace, com assunto e texto próprios', async () => {
+    const r = await enviarEmailConvite(adminStub(), 'org-laudo', {
+      email: 'membro@cliente.com', actionLink: LINK, tipo: 'redefinicao',
+    })
+
+    expect(r).toEqual({ emailEnviado: true, simulado: false, remetente: 'laudos@gmail.com' })
+    expect(mocks.credUsada).toEqual([CREDENCIAIS.LAUDO])
+    const [para, assunto, corpo, html] = mocks.enviar.mock.calls[0]
+    expect(para).toBe('membro@cliente.com')
+    expect(assunto).toBe('Redefinição de senha — Laudo de Brinquedos')
+    expect(corpo).toContain('redefinição da sua senha')
+    expect(corpo).not.toContain('convidado')
+    expect(corpo).toContain(LINK)
+    expect(html).toContain('Criar senha nova')
+  })
+
   it('cada organização usa a própria conta (sem cruzar remetentes)', async () => {
     await enviarEmailConvite(adminStub(), 'org-inova', { email: 'a@inovacode.com.br', actionLink: LINK })
     await enviarEmailConvite(adminStub(), 'org-laudo', { email: 'b@cliente.com', actionLink: LINK })

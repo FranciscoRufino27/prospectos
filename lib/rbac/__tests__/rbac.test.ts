@@ -6,7 +6,7 @@ import {
   temPermissao,
   isPermissao,
 } from '../permissoes'
-import { podeAlterarRole, podeRemoverMembro } from '../guards'
+import { podeAlterarRole, podeBloquearMembro, podeRemoverMembro } from '../guards'
 
 describe('permissoes — efetivas e padrão por role', () => {
   it('admin recebe TODAS as permissões no padrão do role', () => {
@@ -127,6 +127,30 @@ describe('guards — trava do último administrador', () => {
   it('permite remover um usuario comum', () => {
     expect(
       podeRemoverMembro({ alvoId: 'u9', alvoRole: 'usuario', chamadorId: 'a1', totalAdmins: 1 }).ok,
+    ).toBe(true)
+  })
+})
+
+describe('guards — bloquear acesso de membro', () => {
+  it('bloqueia o auto-bloqueio', () => {
+    const r = podeBloquearMembro({ alvoId: 'a1', alvoRole: 'admin', chamadorId: 'a1', adminsAtivos: 3 })
+    expect(r.ok).toBe(false)
+  })
+
+  it('bloqueia bloquear o último admin ativo', () => {
+    const r = podeBloquearMembro({ alvoId: 'a1', alvoRole: 'admin', chamadorId: 'u2', adminsAtivos: 1 })
+    expect(r.ok).toBe(false)
+  })
+
+  it('permite bloquear um admin quando há outro ativo', () => {
+    expect(
+      podeBloquearMembro({ alvoId: 'a1', alvoRole: 'admin', chamadorId: 'a2', adminsAtivos: 2 }).ok,
+    ).toBe(true)
+  })
+
+  it('permite bloquear um usuario comum', () => {
+    expect(
+      podeBloquearMembro({ alvoId: 'u9', alvoRole: 'usuario', chamadorId: 'a1', adminsAtivos: 1 }).ok,
     ).toBe(true)
   })
 })
