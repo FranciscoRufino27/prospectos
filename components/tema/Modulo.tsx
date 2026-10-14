@@ -40,7 +40,8 @@ export function PaginaModulo({
         </div>
         {abas}
       </header>
-      <div className={s.content}>{children}</div>
+      {/* surgir-cascata (globals.css): os blocos da página entram em sequência. */}
+      <div className={`${s.content} surgir-cascata`}>{children}</div>
     </div>
   );
 }

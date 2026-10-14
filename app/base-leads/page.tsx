@@ -256,7 +256,7 @@ export default function BaseLeadsPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="surgir-cascata">
                 {data.length === 0 ? (
                   <EstadoTabela colSpan={10} loading={loading} />
                 ) : (

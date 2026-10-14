@@ -187,10 +187,11 @@ function PipelineInner() {
           /* Visão KANBAN: só quem já respondeu, tem interesse ou virou
              oportunidade (COLUNAS_KANBAN) — Novos Leads/Em Prospecção ficam
              só na Lista, que aguenta o volume. */
-          <div className="h-full flex gap-4 overflow-x-auto px-6 pb-4">
-            {COLUNAS_KANBAN.map(col => (
+          <div className="surgir-cascata h-full flex gap-4 overflow-x-auto px-6 pb-4">
+            {COLUNAS_KANBAN.map((col, i) => (
               <PipelineColumn
                 key={col.id}
+                ordem={i}
                 stage={col}
                 filtros={filtros}
                 selectedId={selectedId}

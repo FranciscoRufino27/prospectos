@@ -475,7 +475,7 @@ function PainelProspeccao({
   const followUps = dados.prospeccao.followUps
 
   return (
-    <div className={styles.dashboardContent}>
+    <div className={`${styles.dashboardContent} surgir-cascata`}>
       <section className={styles.kpiGrid} aria-label="Indicadores de prospecção">
         <KpiProspeccao titulo="Novos leads" subtitulo="Últimos 30 dias" indicador={indicadores.novos} Icon={Users} tom="cyan" />
         <KpiProspeccao titulo="Mensagens enviadas" subtitulo="Abordagens e follow-ups" indicador={indicadores.mensagens} Icon={Mail} tom="violet" grafico="barras" />
@@ -491,7 +491,7 @@ function PainelProspeccao({
         {dados.prospeccao.atividades.length === 0 ? (
           <div className={styles.emptyState}>Nenhuma atividade registrada nos últimos 30 dias.</div>
         ) : (
-          <div className={styles.activityList}>
+          <div className={`${styles.activityList} surgir-cascata`}>
             {dados.prospeccao.atividades.slice(0, 2).map((atividade) => {
               const visual = ROTULO_ATIVIDADE[atividade.tipo] ?? { label: 'Atividade registrada', cls: styles.activityBadgeDefault }
               return (
@@ -508,7 +508,7 @@ function PainelProspeccao({
         )}
       </section>
 
-      <div className={styles.insightsGrid}>
+      <div className={`${styles.insightsGrid} surgir-cascata`}>
         <section className={styles.insightCard}>
           <CabecalhoBloco Icon={RefreshCw} titulo="Follow-ups" subtitulo="Situação operacional da carteira ativa." />
           <div className={styles.followSummary}>
@@ -636,7 +636,7 @@ function PainelRenovacoes({ dados }: { dados: ResumoDashboard }) {
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 surgir-cascata">
       <div>
         <h2 className="text-lg font-semibold text-slate-100">Dashboard de vencimentos e renovações</h2>
         <p className="mt-0.5 text-sm text-slate-500">Empresas únicas classificadas pela validade mais urgente dos seus laudos.</p>

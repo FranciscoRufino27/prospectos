@@ -300,7 +300,7 @@ export default function ListaView({
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="surgir-cascata">
               {!usingSupabase ? (
                 <tr>
                   <td colSpan={COLUNAS_LISTA.length} className={styles.estadoLinha}>

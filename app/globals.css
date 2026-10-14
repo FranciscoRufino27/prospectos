@@ -275,6 +275,32 @@ body {
 .stagger-9 { --anim-delay: 0.61s; }
 .stagger-10 { --anim-delay: 0.68s; }
 
+/* Blocos que surgem ao carregar (site todo). `.surgir` anima um elemento, com
+   atraso opcional em --surgir-atraso. `.surgir-cascata` anima os filhos diretos
+   em sequência; se o container tiver um único filho (um embrulho), a cascata
+   atravessa para os filhos dele. Termina em transform: none (ver a nota de
+   .pagina-entrada sobre position: fixed). */
+@keyframes surgir {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.surgir,
+.surgir-cascata > :not(:only-child),
+.surgir-cascata > :only-child > * {
+  animation: surgir 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.surgir { animation-delay: var(--surgir-atraso, 0ms); }
+.surgir-cascata > :nth-child(2), .surgir-cascata > :only-child > :nth-child(2) { animation-delay: 60ms; }
+.surgir-cascata > :nth-child(3), .surgir-cascata > :only-child > :nth-child(3) { animation-delay: 120ms; }
+.surgir-cascata > :nth-child(4), .surgir-cascata > :only-child > :nth-child(4) { animation-delay: 180ms; }
+.surgir-cascata > :nth-child(5), .surgir-cascata > :only-child > :nth-child(5) { animation-delay: 240ms; }
+.surgir-cascata > :nth-child(6), .surgir-cascata > :only-child > :nth-child(6) { animation-delay: 300ms; }
+.surgir-cascata > :nth-child(7), .surgir-cascata > :only-child > :nth-child(7) { animation-delay: 360ms; }
+.surgir-cascata > :nth-child(8), .surgir-cascata > :only-child > :nth-child(8) { animation-delay: 420ms; }
+.surgir-cascata > :nth-child(9), .surgir-cascata > :only-child > :nth-child(9) { animation-delay: 480ms; }
+.surgir-cascata > :nth-child(10), .surgir-cascata > :only-child > :nth-child(10) { animation-delay: 540ms; }
+.surgir-cascata > :nth-child(n+11), .surgir-cascata > :only-child > :nth-child(n+11) { animation-delay: 600ms; }
+
 /* Troca de aba do menu (app/template.tsx): a página nova sobe e aparece.
    Termina em transform: none — um transform que sobrasse viraria a referência
    dos modais com position: fixed dentro da página. */
@@ -377,7 +403,60 @@ div.fixed.inset-0[class*="bg-black/"] > :first-child {
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
+/* Splash do login (components/login/SplashEntrando.tsx): entra em fade. */
+@keyframes login-splash-entrada {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.login-splash {
+  animation: login-splash-entrada 0.3s ease-out both;
+}
+/* Clarão da explosão da bola: acende rápido perto do fim e apaga devagar. */
+@keyframes login-splash-clarao {
+  0% { opacity: 0; transform: scale(0.6); }
+  55% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+.login-splash-clarao {
+  animation: login-splash-clarao 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.75s both;
+}
+/* Tela de login sugada para dentro da bola (app/login/page.tsx, ao entrar):
+   encolhe para o centro, gira de leve e some. A duração vem inline
+   (SUCCAO_MS de components/login/SplashEntrando.tsx). */
+/* Só transform e opacity (compostos na GPU): um filter: blur animado na tela
+   inteira refazia o desfoque a cada quadro e engasgava a sucção. Pelo mesmo
+   motivo o vidro do cartão (backdrop-filter) é desligado enquanto encolhe. */
+@keyframes login-sugado {
+  to { transform: scale(0.04) rotate(-12deg); opacity: 0; }
+}
+.login-sugado {
+  transform-origin: 50% 50vh;
+  will-change: transform, opacity;
+  animation: login-sugado 0.9s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+  pointer-events: none;
+}
+.login-sugado [class*='backdrop-blur'] {
+  backdrop-filter: none;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* Logo e textos surgem depois que a bola estoura. */
+@keyframes login-splash-conteudo {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+.login-splash-conteudo {
+  animation: login-splash-conteudo 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .surgir,
+  .surgir-cascata > :not(:only-child),
+  .surgir-cascata > :only-child > *,
+  .login-splash,
+  .login-splash-clarao,
+  .login-sugado,
+  .login-splash-conteudo,
   .animate-in,
   .pagina-entrada,
   .kanban-entrada,

@@ -48,6 +48,7 @@ export default function PipelineColumn({
   comFiltroData = false,
   chipKind,
   onSoltar,
+  ordem = 0,
 }: {
   stage: { id: string; label: string; color: string; estagios: string[]; followups?: number | { gte: number } }
   filtros: GlobalFilterState
@@ -59,6 +60,9 @@ export default function PipelineColumn({
   chipKind?: ChipCadencia
   // Kanban: presente = cartões arrastáveis e coluna que recebe lead de outra.
   onSoltar?: (lead: LeadArrastado) => void
+  // Posição da coluna no board: atrasa a entrada dos cards (onda da esquerda
+  // para a direita).
+  ordem?: number
 }) {
   const [dias, setDias] = useState(30)
   const [busca, setBusca] = useState('')
@@ -77,6 +81,15 @@ export default function PipelineColumn({
   const [animarLinhas, setAnimarLinhas] = useState(false)
   const idsAnteriores = useRef<Set<string> | null>(null)
   const [arrastandoId, setArrastandoId] = useState<string | null>(null)
+  // Entrada da tela (.surgir, globals.css): só os cards da PRIMEIRA carga
+  // descem em sequência. Depois desliga, senão a virtualização animaria cada
+  // card que entra na rolagem.
+  const [entradaInicial, setEntradaInicial] = useState(true)
+  useEffect(() => {
+    if (!entradaInicial || !data.length) return
+    const t = setTimeout(() => setEntradaInicial(false), 1400)
+    return () => clearTimeout(t)
+  }, [data, entradaInicial])
 
   // Busca local da etapa OU busca global (a que estiver preenchida).
   const buscaEfetiva = busca.trim() || filtros.search.trim()
@@ -257,7 +270,10 @@ export default function PipelineColumn({
                     className={`${onSoltar ? 'cursor-grab active:cursor-grabbing' : ''} ${animarLinhas ? 'kanban-linha-animada' : ''}`}
                   >
                     {/* A animação fica num filho: o transform da linha é a posição dela. */}
-                    <div className={`${novos.has(lead.id) ? 'kanban-entrada' : ''} ${arrastandoId === lead.id ? 'kanban-arrastando' : ''}`}>
+                    <div
+                      className={`${novos.has(lead.id) ? 'kanban-entrada' : ''} ${arrastandoId === lead.id ? 'kanban-arrastando' : ''} ${entradaInicial ? 'surgir' : ''}`}
+                      style={entradaInicial ? ({ '--surgir-atraso': `${ordem * 70 + Math.min(vi.index, 10) * 45}ms` } as React.CSSProperties) : undefined}
+                    >
                       <LeadCardCompact
                         lead={lead}
                         respostaPendente={!chipKind && temRespostaPendente(lead)}

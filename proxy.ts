@@ -44,6 +44,7 @@ export const config = {
   matcher: [
     // Arquivos estáticos de public/ (logos, ícones) precisam abrir sem sessão:
     // e-mail de cliente e navegador deslogado também os carregam.
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|api/|definir-senha|criar-organizacao|.*\\.(?:svg|png|jpe?g|gif|webp|ico)$).*)',
+    // auth/callback chega sem sessão (é ele que a cria no login com Google).
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|api/|auth/callback|definir-senha|criar-organizacao|.*\\.(?:svg|png|jpe?g|gif|webp|ico)$).*)',
   ],
 };

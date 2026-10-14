@@ -257,7 +257,7 @@ function CadenciaColumn({ stage, leads, hoje, buscaGlobal, selectedId, onSelect 
             {buscandoAqui || buscaGlobal ? 'Nenhum contato encontrado.' : 'Nenhum contato nesta etapa.'}
           </div>
         ) : (
-          <div className={styles.cardList}>
+          <div className={`${styles.cardList} surgir-cascata`}>
             {visiveis.map((lead) => (
               <CadenciaLeadCard
                 key={lead.id}
@@ -463,7 +463,9 @@ export default function CadenciaView({
         ) : !usingSupabase ? (
           <div className={styles.pageState}>Não foi possível carregar os dados da Pipeline.</div>
         ) : (
-          <div className={`${styles.board} ${visibleStages.length === 1 ? styles.boardSingle : ''}`}>
+          // surgir-cascata (globals.css): as colunas entram da esquerda para a
+          // direita e, em cada uma, os cards descem em sequência.
+          <div className={`surgir-cascata ${styles.board} ${visibleStages.length === 1 ? styles.boardSingle : ''}`}>
             {visibleStages.map((stage) => (
               <CadenciaColumn
                 key={stage.id}

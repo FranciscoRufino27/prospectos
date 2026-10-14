@@ -83,6 +83,19 @@ function BotaoEmBreve({ Icon, children }: { Icon: typeof Save; children: React.R
   );
 }
 
+// Animação de entrada dos gráficos: começa depois que o cartão terminou de
+// surgir (senão a linha "percorria" com o cartão ainda transparente e ninguém
+// via) e cada série entra um pouco depois da anterior. Na área, o Recharts
+// revela a linha da esquerda para a direita; nas barras, cada uma cresce.
+const ATRASO_GRAFICO_MS = 500;
+const ENTRE_SERIES_MS = 250;
+const animacaoSerie = (ordem: number) => ({
+  isAnimationActive: true,
+  animationBegin: ATRASO_GRAFICO_MS + ordem * ENTRE_SERIES_MS,
+  animationDuration: 1600,
+  animationEasing: 'ease-out' as const,
+});
+
 const CANAL_CORES: Record<string, string> = {
   email: '#6366f1', whatsapp: '#22c55e', linkedin: '#3b82f6', telefone: '#a855f7',
 };
@@ -217,9 +230,9 @@ function Analises() {
             <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
             <Tooltip content={<ChartTooltip />} />
             <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 11, color: '#64748b' }}>{v}</span>} />
-            <Area type="monotone" dataKey="prospectados" stroke="#6366f1" strokeWidth={2} fill="url(#icProsp)" name="Prospectados" dot={false} isAnimationActive animationDuration={800} />
-            <Area type="monotone" dataKey="respostas" stroke="#22c55e" strokeWidth={2} fill="url(#icResp)" name="Respostas" dot={false} isAnimationActive animationDuration={800} />
-            <Area type="monotone" dataKey="reunioes" stroke="#f59e0b" strokeWidth={2} fill="url(#icReun)" name="Reuniões" dot={false} isAnimationActive animationDuration={800} />
+            <Area type="monotone" dataKey="prospectados" stroke="#6366f1" strokeWidth={2} fill="url(#icProsp)" name="Prospectados" dot={false} {...animacaoSerie(0)} />
+            <Area type="monotone" dataKey="respostas" stroke="#22c55e" strokeWidth={2} fill="url(#icResp)" name="Respostas" dot={false} {...animacaoSerie(1)} />
+            <Area type="monotone" dataKey="reunioes" stroke="#f59e0b" strokeWidth={2} fill="url(#icReun)" name="Reuniões" dot={false} {...animacaoSerie(2)} />
           </AreaChart>
         </ResponsiveContainer>
       </ChartContainer>
@@ -281,7 +294,7 @@ function Analises() {
               <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
               <Tooltip cursor={{ fill: 'rgba(99,102,241,0.08)' }}
                 content={<ChartTooltip formatter={(i) => `${i.value} resposta${Number(i.value) === 1 ? '' : 's'}`} />} />
-              <Bar dataKey="respostas" fill="#22c55e" name="Respostas" radius={[3, 3, 0, 0]} isAnimationActive animationDuration={800} />
+              <Bar dataKey="respostas" fill="#22c55e" name="Respostas" radius={[3, 3, 0, 0]} {...animacaoSerie(0)} />
             </BarChart>
           </ResponsiveContainer>
         </ChartContainer>
