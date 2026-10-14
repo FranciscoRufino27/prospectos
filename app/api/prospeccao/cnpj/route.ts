@@ -3,7 +3,7 @@
 // Só consulta; nada é gravado.
 import { NextRequest, NextResponse } from 'next/server'
 import { resolverAcesso } from '@/lib/rbac/servidor'
-import { consultarOpenCnpj } from '@/lib/integracoes/hubspot/enriquecimento/opencnpj'
+import { consultarOpenCnpjComCache } from '@/lib/prospeccao/inteligencia'
 
 export const runtime = 'nodejs'
 
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const cnpj = (req.nextUrl.searchParams.get('cnpj') ?? '').replace(/\D/g, '')
   if (!/^\d{14}$/.test(cnpj)) return NextResponse.json({ erro: 'CNPJ inválido.' }, { status: 400 })
 
-  const r = await consultarOpenCnpj(cnpj)
+  const r = await consultarOpenCnpjComCache({ admin: acc.acesso.admin, organizacaoId: acc.acesso.org }, cnpj)
   if (r.status === 'nao_encontrado') return NextResponse.json({ erro: 'CNPJ não encontrado na Receita.' }, { status: 404 })
   if (r.status === 'falha') {
     console.error('[prospeccao/cnpj] OpenCNPJ falhou:', r.motivo)

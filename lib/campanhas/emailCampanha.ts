@@ -1,6 +1,7 @@
 // HTML client-safe para mensagens de campanha. O texto continua sendo a fonte
 // do conteúdo; o HTML apenas preserva a leitura e acrescenta a identificação
-// real do responsável ao final.
+// real do responsável ao final — exceto num documento HTML completo, que já
+// traz layout e assinatura próprios (ver montarDocumentoHtmlCompleto).
 
 export function escaparHtmlEmail(valor: string): string {
   return valor
@@ -60,7 +61,8 @@ export function sanitizarHtmlEmail(valor: string): string {
   let html = valor
     .replace(/<!doctype[^>]*>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(script|iframe|object|embed|form|svg|math)[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    // <title> sai com o conteúdo: é metadado do arquivo, não texto do e-mail.
+    .replace(/<(script|iframe|object|embed|form|svg|math|title)[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
     .replace(/<\/?(?:script|iframe|object|embed|form|input|button|textarea|select|option|base|meta|link|svg|math)\b[^>]*>/gi, '')
     .replace(/@import[^;]+;?/gi, '')
 
@@ -123,11 +125,49 @@ export function documentoPreviewHtml(html: string): string {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">${sanitizarHtmlEmail(html)}</body></html>`
 }
 
+const ESTILO_EMBUTIDO = /<style\b[^>]*>[\s\S]*?<\/style\s*>/gi
+
+// Documento HTML completo (doctype, <html> ou <body>): o autor já definiu o
+// layout e a assinatura. Sai como foi feito — sem o cartão do sistema e sem a
+// assinatura automática, que duplicariam o que o próprio HTML já traz. Os
+// <style> voltam para o <head> (media queries) e o estilo do <body> do autor é
+// reaplicado ao <body> e a uma <div> sem visual próprio, porque o Gmail e a
+// prévia (documentoPreviewHtml) descartam o <body>.
+function ehDocumentoHtmlCompleto(html: string): boolean {
+  return /<!doctype\s+html|<(?:html|body)\b/i.test(html)
+}
+
+function montarDocumentoHtmlCompleto(html: string): string {
+  const conteudo = sanitizarHtmlEmail(html)
+  const estilos = conteudo.match(ESTILO_EMBUTIDO) ?? []
+  const atributosBruto = html.match(/<body\b([^>]*)>/i)?.[1] ?? ''
+  // Mesma allowlist do conteúdo: `<div atributos>` sanitizada vira só os
+  // atributos permitidos (style, bgcolor…), sem eventos nem estilo perigoso.
+  const atributosBody = sanitizarHtmlEmail(`<div${atributosBruto}>`).replace(/^<div|>$/g, '')
+
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${estilos.join('\n')}
+</head>
+<body${atributosBody}>
+<div${atributosBody}>
+${conteudo.replace(ESTILO_EMBUTIDO, '').trim()}
+</div>
+</body>
+</html>`
+}
+
 export function montarEmailCampanhaHtml(
   corpo: string,
   dados: { responsavelNome?: string | null; nomeServico?: string | null },
   htmlPersonalizado?: string | null,
 ): string {
+  if (htmlPersonalizado?.trim() && ehDocumentoHtmlCompleto(htmlPersonalizado)) {
+    return montarDocumentoHtmlCompleto(htmlPersonalizado)
+  }
   const conteudo = htmlPersonalizado?.trim()
     ? sanitizarHtmlEmail(htmlPersonalizado)
     : escaparHtmlEmail(corpo).replace(/\r?\n/g, '<br>')

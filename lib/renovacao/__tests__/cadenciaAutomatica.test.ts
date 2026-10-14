@@ -94,6 +94,7 @@ describe('cadência automática de renovação', () => {
     expect(agenda.agendadas).toBe(1)
     expect(mocks.agendarExecucoesCampanha).toHaveBeenCalledWith(
       expect.anything(), 'org-1', 'campanha-1', ['execucao-1'],
+      { janela: null },
     )
   })
 
@@ -131,6 +132,7 @@ describe('cadência automática de renovação', () => {
 
     expect(mocks.agendarExecucoesCampanha).toHaveBeenCalledWith(
       expect.anything(), 'org-1', 'campanha-1', ['execucao-1', 'execucao-2'],
+      { janela: { diasSemana: ['qui'], horarioInicio: undefined, horarioFim: undefined } },
     )
   })
 

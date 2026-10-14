@@ -1,6 +1,7 @@
 // Composição do motor: monta store + provedor de e-mail + fila (com handlers)
 // e orquestra a cadência diária. Os endpoints em app/api/engine/* usam isto.
 import { createSupabaseAdminClient } from '@/lib/supabase-admin'
+import { remetenteDedicado } from '@/lib/email/remetenteOrganizacao'
 import { engineConfig, getEngineConfig, ORG_PADRAO_ID } from './config'
 import { log } from './logger'
 import { Queue } from './queue'
@@ -190,23 +191,13 @@ export async function cadenciaDiaria(motor: Motor, opts?: { forcar?: boolean }) 
 }
 
 // Resolve o provedor de e-mail de ENTRADA (IMAP) para uma org.
-// O workflow envia via email_conta_key (ex: 'LAUDO'); bounces e respostas
-// chegam nessa mesma conta. detectarResposta precisa ler ela, não a genérica.
+// O workflow envia pela conta da organização (conectada em Configurações ou
+// chave legada); bounces e respostas chegam nessa mesma conta.
+// detectarResposta precisa ler ela, não a genérica.
 async function resolverEmailProviderOrg(orgId: string): Promise<EmailProvider> {
   try {
-    const db = createSupabaseAdminClient()
-    const { data } = await db
-      .from('organizacoes')
-      .select('configuracoes')
-      .eq('id', orgId)
-      .maybeSingle()
-    const cfg = data?.configuracoes as Record<string, unknown> | null
-    const nomenc = cfg?.nomenclaturas as Record<string, string> | undefined
-    const emailKey = nomenc?.email_conta_key
-    if (emailKey) {
-      const cred = lerCredenciaisGmail(emailKey)
-      if (cred && !engineConfig.modoEnsaio) return new GmailProvider(cred)
-    }
+    const remetente = await remetenteDedicado(createSupabaseAdminClient(), orgId)
+    if (remetente && !engineConfig.modoEnsaio) return new GmailProvider(remetente.credenciais)
   } catch {
     // sem break — cai no padrão abaixo
   }

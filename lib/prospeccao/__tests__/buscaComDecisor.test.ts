@@ -39,6 +39,33 @@ const completo = async (): Promise<Desfecho<string>> => ({ tipo: 'completo', dad
 const semEmail = async (): Promise<Desfecho<string>> => ({ tipo: 'pulado', motivo: 'sem_email' })
 
 describe('buscarComDecisor', () => {
+  it('fonte paga bloqueada não para o lote: segue e o resumo conta prontas, sem e-mail e bloqueadas, com o motivo', async () => {
+    const itens = Array.from({ length: 8 }, (_, n) => item(n))
+    const resolver = async (i: Item): Promise<Desfecho<string>> => {
+      const n = Number(i.cnpj)
+      if (n % 4 === 0) return { tipo: 'pulado', motivo: 'bloqueado_anymail', erro: 'Anymail: enriquecimento pago desligado para esta organização.' }
+      if (n % 4 === 1) return { tipo: 'pulado', motivo: 'bloqueado_crustdata', erro: 'Crustdata: orçamento do enriquecimento pago esgotado.' }
+      if (n % 4 === 2) return { tipo: 'pulado', motivo: 'sem_email' }
+      return completo()
+    }
+    const r = await rodar(itens, resolver, { meta: 10, concorrencia: 1 })
+    expect(r.resolvidos).toHaveLength(8) // ninguém ficou sem tentar
+    expect(r.resumo).toMatchObject({
+      parada: 'fim', erro: null, prontas: 2,
+      porMotivo: { bloqueado_anymail: 2, bloqueado_crustdata: 2, sem_email: 2 },
+      bloqueios: {
+        anymail: 'Anymail: enriquecimento pago desligado para esta organização.',
+        crustdata: 'Crustdata: orçamento do enriquecimento pago esgotado.',
+      },
+    })
+  })
+
+  it('falha técnica fatal (ex.: 429) continua parando a busca', async () => {
+    const r = await rodar(Array.from({ length: 6 }, (_, n) => item(n)), async () => ({ tipo: 'falha', erro: 'limite', fatal: true }), { meta: 5, concorrencia: 1 })
+    expect(r.resumo).toMatchObject({ parada: 'falha', erro: 'limite', prontas: 0 })
+    expect(r.resolvidos).toHaveLength(1)
+  })
+
   it('para na meta sem resolver empresa a mais', async () => {
     const r = await rodar(Array.from({ length: 20 }, (_, n) => item(n)), completo, { meta: 5 })
     expect(r.resumo).toMatchObject({ completos: 5, tentativas: 5, parada: 'meta', erro: null })

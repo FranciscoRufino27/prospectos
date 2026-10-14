@@ -7,6 +7,7 @@ import { buscarEmailAnymail, MENSAGEM_FALHA_ENRIQUECIMENTO } from '@/lib/prospec
 import { contextoDaEmpresa } from '@/lib/prospeccao/enriquecimentoServidor'
 import { lerEnriquecimentoSalvo, salvarEnriquecimento } from '@/lib/prospeccao/decisoresServidor'
 import { soLetras } from '@/lib/prospeccao/emailNominal'
+import { buscarEmailComCache } from '@/lib/prospeccao/inteligencia'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -14,7 +15,7 @@ export const maxDuration = 60
 export async function POST(req: Request) {
   const acc = await resolverAcesso()
   if ('erro' in acc) return acc.erro
-  const { admin, org } = acc.acesso
+  const { admin, org, user } = acc.acesso
 
   const corpo = (await req.json().catch(() => ({}))) as { cnpj?: unknown; nome?: unknown }
   const cnpj = typeof corpo.cnpj === 'string' ? corpo.cnpj.replace(/\D/g, '') : ''
@@ -28,17 +29,19 @@ export async function POST(req: Request) {
 
   try {
     const salvo = await lerEnriquecimentoSalvo(admin, org, cnpj).catch(() => null)
-    // "Não encontrado" não foi cobrado: pode tentar de novo.
+    // "Não encontrado" salvo pela org passa pelo cache de inteligência, que
+    // guarda o "não achou" por 60 dias (e o que outra org já pagou).
     const anterior = salvo?.anymail
     if (anterior && anterior.status !== 'nao_encontrado' && anterior.dominio === ctx.dominio && soLetras(anterior.nome) === soLetras(nome)) {
       return NextResponse.json({ ...anterior, reaproveitado: true })
     }
 
-    const r = await buscarEmailAnymail(nome, ctx.dominio, process.env.ANYMAILFINDER_API_KEY)
+    const r = await buscarEmailComCache({ admin, organizacaoId: org, travas: ctx.travas, usuarioId: user.id }, nome, ctx.dominio,
+      () => buscarEmailAnymail(nome, ctx.dominio, process.env.ANYMAILFINDER_API_KEY))
     if (!r.ok) {
       console.error('[prospeccao/email-decisor] falha:', r.motivo)
       const { texto, status } = MENSAGEM_FALHA_ENRIQUECIMENTO[r.motivo]
-      return NextResponse.json({ erro: `Anymail: ${texto}` }, { status })
+      return NextResponse.json({ erro: `Anymail: ${texto}${r.detalhe ? ` (${r.detalhe})` : ''}` }, { status })
     }
     await salvarEnriquecimento(admin, org, cnpj, { anymail: r.resultado }).catch((e) => console.error('[prospeccao/email-decisor] não salvou:', e))
     return NextResponse.json({ ...r.resultado, reaproveitado: false })

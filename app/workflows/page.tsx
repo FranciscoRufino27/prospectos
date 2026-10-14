@@ -3,5 +3,5 @@
 import { redirect } from 'next/navigation';
 
 export default function Page() {
-  redirect('/automacao?tab=workflows');
+  redirect('/campanhas?tab=workflows');
 }

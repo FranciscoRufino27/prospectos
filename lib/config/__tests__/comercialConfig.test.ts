@@ -29,6 +29,48 @@ describe('workspaceConfig.comercial', () => {
   })
 })
 
+// Grupos do WhatsApp salvos com nome (escolha pelo nome na tela).
+describe('workspaceConfig.comercial.gruposWhatsapp', () => {
+  const A = { id: '120363430808664972-group', nome: 'Teste' }
+  const B = { id: '120363428777776420-group', nome: 'Laudos iA' }
+
+  it('lê id no formato da Z-API com nome; descarta inválido, sem nome e id repetido', () => {
+    const r = parseWorkspaceConfig({ comercial: { gruposWhatsapp: [
+      { id: ` ${A.id} `, nome: '  Teste  ' },
+      { id: A.id, nome: 'Duplicado' },
+      { id: '5511999990000', nome: 'Pessoa' },
+      { id: B.id, nome: '   ' },
+      'lixo',
+      B,
+    ] } })
+    expect(r.comercial?.gruposWhatsapp).toEqual([A, B])
+    expect(parseWorkspaceConfig({ comercial: { gruposWhatsapp: 'x' } }).comercial).toBeUndefined()
+  })
+
+  it('nome com no máximo 80 caracteres e no máximo 30 grupos', () => {
+    const muitos = Array.from({ length: 35 }, (_, i) => ({ id: `1203634${String(i).padStart(11, '0')}-group`, nome: `G${i}` }))
+    expect(parseWorkspaceConfig({ comercial: { gruposWhatsapp: muitos } }).comercial?.gruposWhatsapp).toHaveLength(30)
+    expect(parseWorkspaceConfig({ comercial: { gruposWhatsapp: [{ id: A.id, nome: 'x'.repeat(120) }] } }).comercial?.gruposWhatsapp?.[0].nome).toHaveLength(80)
+  })
+
+  it('mesclar substitui a lista, preserva o grupo de avisos e limpa com null/vazio', () => {
+    const base = mesclarWorkspaceConfig(parseWorkspaceConfig({}), { comercialGrupoWhatsappId: A.id })
+    const comGrupos = mesclarWorkspaceConfig(base, { comercialGruposWhatsapp: [A, B] })
+    expect(comGrupos.comercial).toEqual({ grupoWhatsappId: A.id, gruposWhatsapp: [A, B] })
+    expect(mesclarWorkspaceConfig(comGrupos, { comercialGruposWhatsapp: [B] }).comercial?.gruposWhatsapp).toEqual([B])
+    expect(mesclarWorkspaceConfig(comGrupos, { comercialGruposWhatsapp: null }).comercial).toEqual({ grupoWhatsappId: A.id })
+    expect(mesclarWorkspaceConfig(comGrupos, { comercialGruposWhatsapp: [] }).comercial).toEqual({ grupoWhatsappId: A.id })
+    // Mudar outro campo não mexe nos grupos.
+    expect(mesclarWorkspaceConfig(comGrupos, { comercialGrupoWhatsappId: B.id }).comercial?.gruposWhatsapp).toEqual([A, B])
+  })
+
+  it('blob v8 (sem grupos salvos) migra para a versão atual sem inventar grupos', () => {
+    const r = parseWorkspaceConfig({ _schema_version: 8, comercial: { grupoWhatsappId: A.id } })
+    expect(r._schema_version).toBe(WORKSPACE_CONFIG_SCHEMA_VERSION)
+    expect(r.comercial).toEqual({ grupoWhatsappId: A.id })
+  })
+})
+
 // Fase 3: janela do check-in (minutos), padrão 7 dias.
 import { HANDOFF_REVISAO_MINUTOS_PADRAO, handoffRevisaoMinutosEfetivo } from '../workspaceConfig'
 

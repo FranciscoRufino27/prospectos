@@ -32,6 +32,7 @@ import {
   mensagemCampanhaVazia,
   type Campanha,
   type AvisoRetorno,
+  type AvisoEnvio,
   type DestinoWhatsappRetorno,
   type FollowupCampanha,
   type MensagemCampanha,
@@ -46,9 +47,11 @@ import {
   GRUPOS_STATUS_PUBLICO,
   labelTipoCampanha,
   LIMITE_CONFIRMACAO_CAMPANHA,
+  LIMITE_FOLLOWUPS_CAMPANHA,
   modeloEmailRespostaCampanha,
   normalizarPublicoCampanha,
   regraPublicoCampanha,
+  podeAdicionarFollowup,
   podeUsarTipoCampanha,
   tiposCampanhaDisponiveis,
   VARIAVEIS_EMAIL_RESPOSTA,
@@ -83,6 +86,8 @@ interface WhatsappRetornoOpcoes {
   perfisComNumero: string[] | null
   // Grupo cadastrado em Configurações > Distribuição (null = nenhum).
   grupoConta: string | null
+  // Grupos salvos com nome (Configurações > Distribuição); vazio = escolher pelo id.
+  grupos?: Array<{ id: string; nome: string }>
 }
 
 interface PreviaPublico {
@@ -303,6 +308,8 @@ export default function CampanhaWizardPage({
   const querGrupo = aviso.whatsapp.includes('grupo')
   const querResponsavelWhatsapp = aviso.whatsapp.includes('responsavel')
   const grupoEfetivo = aviso.grupoWhatsappId?.trim() || whatsappRetorno?.grupoConta || null
+  const gruposSalvos = whatsappRetorno?.grupos ?? []
+  const nomeDoGrupo = (id: string) => gruposSalvos.find((g) => g.id === id)?.nome ?? null
   const responsavelTemWhatsapp = whatsappRetorno?.perfisComNumero && publico.responsavel_id
     ? whatsappRetorno.perfisComNumero.includes(publico.responsavel_id)
     : null
@@ -313,7 +320,7 @@ export default function CampanhaWizardPage({
   const alertasAviso: string[] = []
   if (!aviso.email && !querWhatsapp) bloqueiosAviso.push('Marque ao menos um canal (e-mail ou WhatsApp).')
   if (querGrupo && whatsappRetorno && !grupoEfetivo) {
-    bloqueiosAviso.push('Nenhum grupo: informe o grupo abaixo ou cadastre em Configurações > Processo comercial > Distribuição.')
+    bloqueiosAviso.push('Nenhum grupo: informe o grupo abaixo ou cadastre em Configurações > Distribuição.')
   }
   if (aviso.grupoWhatsappId?.trim() && !FORMATO_GRUPO_WHATSAPP.test(aviso.grupoWhatsappId.trim())) {
     bloqueiosAviso.push('O grupo precisa estar no formato 120363019502650977-group.')
@@ -331,6 +338,26 @@ export default function CampanhaWizardPage({
       // Sem e-mail e sem grupo, ninguém ficaria sabendo da resposta.
       if (!aviso.email && !querGrupo) bloqueiosAviso.push(texto)
       else alertasAviso.push(`${texto} Até lá, ele não recebe no WhatsApp.`)
+    }
+  }
+  // Aviso a cada envio: mesmas travas do servidor (exigirAvisoEnvioPronto).
+  const avisoEnvio: AvisoEnvio | undefined = publico.operacao?.avisoEnvio
+  const destinosEnvio = avisoEnvio?.whatsapp ?? []
+  const querAvisoEnvio = destinosEnvio.length > 0
+  const grupoEnvioEfetivo = avisoEnvio?.grupoWhatsappId?.trim() || whatsappRetorno?.grupoConta || null
+  const bloqueiosAvisoEnvio: string[] = []
+  if (querAvisoEnvio && whatsappRetorno) {
+    if (!whatsappRetorno.provedorConfigurado) {
+      bloqueiosAvisoEnvio.push('O aviso de envio precisa do WhatsApp (Z-API) configurado no servidor.')
+    }
+    if (destinosEnvio.includes('grupo') && !grupoEnvioEfetivo) {
+      bloqueiosAvisoEnvio.push('Nenhum grupo para o aviso de envio: escolha o grupo ou cadastre em Configurações > Distribuição.')
+    }
+    if (avisoEnvio?.grupoWhatsappId?.trim() && !FORMATO_GRUPO_WHATSAPP.test(avisoEnvio.grupoWhatsappId.trim())) {
+      bloqueiosAvisoEnvio.push('O grupo do aviso de envio precisa estar no formato 120363019502650977-group.')
+    }
+    if (destinosEnvio.includes('responsavel') && !retornoPorCarteira && responsavelTemWhatsapp === false) {
+      bloqueiosAvisoEnvio.push(`${nomeMembro(responsavel)} ainda não ligou o WhatsApp de avisos (Meu perfil > Avisos no WhatsApp).`)
     }
   }
   const mensagemInicial = publico.operacao?.mensagemInicial ?? mensagemVazia()
@@ -505,6 +532,31 @@ export default function CampanhaWizardPage({
     atualizarAviso({ whatsapp: proximos })
   }
 
+  function atualizarAvisoEnvio(proximo: AvisoEnvio | undefined) {
+    setPublico((atual) => ({
+      ...atual,
+      operacao: {
+        ...atual.operacao,
+        mensagemInicial: atual.operacao?.mensagemInicial ?? mensagemVazia(),
+        avisoEnvio: proximo,
+      },
+    }))
+  }
+
+  // Ao ligar, começa pelo grupo (registro da equipe) e herda o grupo da resposta.
+  function alternarAvisoEnvio() {
+    const grupoResposta = aviso.grupoWhatsappId?.trim()
+    atualizarAvisoEnvio(querAvisoEnvio ? undefined : { whatsapp: ['grupo'], ...(grupoResposta ? { grupoWhatsappId: grupoResposta } : {}) })
+  }
+
+  function alternarDestinoEnvio(destino: DestinoWhatsappRetorno) {
+    const proximos = destinosEnvio.includes(destino)
+      ? destinosEnvio.filter((d) => d !== destino)
+      : [...destinosEnvio, destino]
+    if (!proximos.length) return
+    atualizarAvisoEnvio({ ...avisoEnvio, whatsapp: proximos })
+  }
+
   function alterarTipo(novoTipo: string) {
     const modeloAnterior = modeloEmailRespostaCampanha(tipo)
     const novoModelo = modeloEmailRespostaCampanha(novoTipo)
@@ -593,7 +645,7 @@ export default function CampanhaWizardPage({
   }
 
   function adicionarFollowup() {
-    if (followups.length >= 4) return
+    if (!podeAdicionarFollowup(followups.length)) return
     const ultimoDia = followups.at(-1)?.diasApos ?? 0
     setPublico((atual) => ({
       ...atual,
@@ -668,7 +720,7 @@ export default function CampanhaWizardPage({
     if (!id) throw new Error('A campanha foi salva sem um identificador.')
     if (!campanhaId) {
       setCampanhaId(id)
-      window.history.replaceState(null, '', `/automacao/campanhas/${id}/editar`)
+      window.history.replaceState(null, '', `/campanhas/${id}/editar`)
     }
     return id
   }
@@ -700,7 +752,7 @@ export default function CampanhaWizardPage({
       })
       const dados = await res.json()
       if (!res.ok) throw new Error(dados.erro || 'Não foi possível ativar a campanha.')
-      router.push(`/automacao/campanhas/${id}`)
+      router.push(`/campanhas/${id}`)
       router.refresh()
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao ativar.')
@@ -722,7 +774,7 @@ export default function CampanhaWizardPage({
       })
       const dados = await res.json()
       if (!res.ok) throw new Error(dados.erro || 'Não foi possível iniciar a campanha.')
-      router.push(`/automacao/campanhas/${id}`)
+      router.push(`/campanhas/${id}`)
       router.refresh()
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao iniciar a campanha.')
@@ -781,6 +833,7 @@ export default function CampanhaWizardPage({
       erros.push('O envio real está indisponível. Confirme MODO_ENSAIO=false e a conta Gmail no Vercel.')
     }
     if (bloqueiosAviso.length) erros.push(`Aviso de resposta: ${bloqueiosAviso.join(' ')}`)
+    if (bloqueiosAvisoEnvio.length) erros.push(`Aviso de envio: ${bloqueiosAvisoEnvio.join(' ')}`)
     if (!quantidade) erros.push('O público precisa ter ao menos um contato elegível.')
     if (erros.length) {
       setErro(erros.join(' '))
@@ -811,7 +864,7 @@ export default function CampanhaWizardPage({
     <div className="mx-auto max-w-[1500px] p-4 font-sans sm:p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link href={campanhaId ? `/automacao/campanhas/${campanhaId}` : '/automacao?tab=campanhas'} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
+          <Link href={campanhaId ? `/campanhas/${campanhaId}` : '/campanhas?tab=campanhas'} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
             <ArrowLeft size={15} /> Campanhas
           </Link>
           <h1 className="text-2xl font-semibold text-slate-100">{campanhaId ? 'Editar campanha' : 'Nova campanha'}</h1>
@@ -1023,16 +1076,36 @@ export default function CampanhaWizardPage({
                       {querGrupo && (
                         <div className="mt-3">
                           <label className={label}>Grupo do WhatsApp</label>
-                          <input
-                            className={input}
-                            value={aviso.grupoWhatsappId ?? ''}
-                            onChange={(e) => atualizarAviso({ grupoWhatsappId: e.target.value })}
-                            placeholder={whatsappRetorno?.grupoConta ?? '120363019502650977-group'}
-                          />
+                          {gruposSalvos.length > 0 ? (
+                            <select
+                              className={input}
+                              value={aviso.grupoWhatsappId ?? ''}
+                              onChange={(e) => atualizarAviso({ grupoWhatsappId: e.target.value })}
+                            >
+                              <option value="">
+                                {whatsappRetorno?.grupoConta
+                                  ? `Grupo da conta (${nomeDoGrupo(whatsappRetorno.grupoConta) ?? whatsappRetorno.grupoConta})`
+                                  : 'Escolha o grupo…'}
+                              </option>
+                              {aviso.grupoWhatsappId?.trim() && !nomeDoGrupo(aviso.grupoWhatsappId.trim()) && (
+                                <option value={aviso.grupoWhatsappId}>{aviso.grupoWhatsappId} (sem nome salvo)</option>
+                              )}
+                              {gruposSalvos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                            </select>
+                          ) : (
+                            <input
+                              className={input}
+                              value={aviso.grupoWhatsappId ?? ''}
+                              onChange={(e) => atualizarAviso({ grupoWhatsappId: e.target.value })}
+                              placeholder={whatsappRetorno?.grupoConta ?? '120363019502650977-group'}
+                            />
+                          )}
                           <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
-                            {whatsappRetorno?.grupoConta
-                              ? <>Vazio = grupo da conta (<code className="text-slate-400">{whatsappRetorno.grupoConta}</code>, de Configurações &gt; Distribuição). Preencha só para usar outro grupo nesta campanha.</>
-                              : 'A conta não tem grupo cadastrado: informe aqui o id do grupo (formato 120363019502650977-group) ou cadastre em Configurações > Processo comercial > Distribuição.'}
+                            {gruposSalvos.length > 0
+                              ? 'Grupos salvos em Configurações > Distribuição.'
+                              : whatsappRetorno?.grupoConta
+                                ? <>Vazio = grupo da conta (<code className="text-slate-400">{whatsappRetorno.grupoConta}</code>, de Configurações &gt; Distribuição). Preencha só para usar outro grupo nesta campanha.</>
+                                : 'A conta não tem grupo cadastrado: informe aqui o id do grupo (formato 120363019502650977-group) ou salve os grupos com nome em Configurações > Distribuição.'}
                           </p>
                         </div>
                       )}
@@ -1051,6 +1124,78 @@ export default function CampanhaWizardPage({
                       ))}
                     </>
                   )}
+
+                  <h4 className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Aviso de envio</h4>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">Registro no WhatsApp de cada e-mail que a campanha enviar (mensagem inicial e follow-ups).</p>
+                  <div className="mt-2 grid gap-2">
+                    <CartaoOpcao
+                      multipla
+                      ativa={querAvisoEnvio}
+                      titulo="Avisar cada envio no WhatsApp"
+                      descricao="Uma mensagem por e-mail enviado, com campanha, etapa, empresa, contato e assunto."
+                      Icone={MessageCircle}
+                      onClick={alternarAvisoEnvio}
+                    />
+                  </div>
+                  {querAvisoEnvio && (
+                    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-base)] p-3">
+                      <div className="text-xs font-medium text-slate-400">Enviar o aviso para</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(['grupo', 'responsavel'] as const).map((destino) => {
+                          const marcado = destinosEnvio.includes(destino)
+                          return (
+                            <button
+                              key={destino}
+                              type="button"
+                              role="checkbox"
+                              aria-checked={marcado}
+                              onClick={() => alternarDestinoEnvio(destino)}
+                              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${marcado ? 'border-indigo-400 bg-indigo-500/15 text-indigo-100' : 'border-[var(--border-strong)] text-slate-400 hover:text-slate-200'}`}
+                            >
+                              <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${marcado ? 'border-indigo-300 bg-indigo-500 text-white' : 'border-slate-500'}`}>
+                                {marcado && <Check size={10} />}
+                              </span>
+                              {destino === 'responsavel'
+                                ? (retornoPorCarteira ? 'Responsável de cada lead' : `Responsável (${nomeMembro(responsavel)})`)
+                                : 'Grupo'}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {destinosEnvio.includes('grupo') && (
+                        <div className="mt-3">
+                          <label className={label}>Grupo do aviso de envio</label>
+                          {gruposSalvos.length > 0 ? (
+                            <select
+                              className={input}
+                              value={avisoEnvio?.grupoWhatsappId ?? ''}
+                              onChange={(e) => atualizarAvisoEnvio({ whatsapp: destinosEnvio, grupoWhatsappId: e.target.value })}
+                            >
+                              <option value="">
+                                {whatsappRetorno?.grupoConta
+                                  ? `Grupo da conta (${nomeDoGrupo(whatsappRetorno.grupoConta) ?? whatsappRetorno.grupoConta})`
+                                  : 'Escolha o grupo…'}
+                              </option>
+                              {avisoEnvio?.grupoWhatsappId?.trim() && !nomeDoGrupo(avisoEnvio.grupoWhatsappId.trim()) && (
+                                <option value={avisoEnvio.grupoWhatsappId}>{avisoEnvio.grupoWhatsappId} (sem nome salvo)</option>
+                              )}
+                              {gruposSalvos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                            </select>
+                          ) : (
+                            <input
+                              className={input}
+                              value={avisoEnvio?.grupoWhatsappId ?? ''}
+                              onChange={(e) => atualizarAvisoEnvio({ whatsapp: destinosEnvio, grupoWhatsappId: e.target.value })}
+                              placeholder={whatsappRetorno?.grupoConta ?? '120363019502650977-group'}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {querAvisoEnvio && whatsappRetorno && bloqueiosAvisoEnvio.map((texto) => (
+                    <p key={texto} className="mt-2 text-[11px] leading-4 text-red-300">A campanha não inicia assim: {texto}</p>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1354,7 +1499,7 @@ export default function CampanhaWizardPage({
                 <h2 className="font-semibold text-slate-100">Cadência de acompanhamento</h2>
                 <p className="mt-1 text-sm text-slate-500">Os intervalos viram esperas persistentes no workflow versionado.</p>
               </div>
-              <button type="button" onClick={adicionarFollowup} disabled={followups.length >= 4} className="rounded-lg border border-indigo-500/40 px-3 py-2 text-xs text-indigo-300 hover:bg-indigo-500/10 disabled:opacity-40">Adicionar follow-up</button>
+              <button type="button" onClick={adicionarFollowup} disabled={!podeAdicionarFollowup(followups.length)} title={podeAdicionarFollowup(followups.length) ? undefined : `Máximo de ${LIMITE_FOLLOWUPS_CAMPANHA} follow-ups`} className="rounded-lg border border-indigo-500/40 px-3 py-2 text-xs text-indigo-300 hover:bg-indigo-500/10 disabled:opacity-40">Adicionar follow-up</button>
             </div>
             {!followups.length && <div className="rounded-lg border border-dashed border-[var(--border-strong)] p-6 text-center text-sm text-slate-500">Nenhum follow-up configurado. A campanha terá somente a mensagem inicial.</div>}
             <div className="space-y-4">

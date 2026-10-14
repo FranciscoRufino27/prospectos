@@ -177,7 +177,7 @@ describe('rotas de enriquecimento', () => {
       perfis: [{ id: USUARIO_A, organizacao_id: ORG_A, role: 'usuario' }],
       perfil_permissoes: [],
       organizacoes: [
-        { id: ORG_A, configuracoes: { _schema_version: 6, prospeccao: { cnaes: ['5510801'], cargosAlvo: ['diretor'] } } },
+        { id: ORG_A, configuracoes: { _schema_version: 6, prospeccao: { cnaes: ['5510801'], cargosAlvo: ['diretor'] }, enriquecimentoPago: { ativo: true, orcamentoMensal: { crustdata: 100, anymail: 100 } } } },
         { id: ORG_B, configuracoes: {} },
       ],
       catalogo_estabelecimentos: [
@@ -239,25 +239,47 @@ describe('rotas de enriquecimento', () => {
     expect(f).not.toHaveBeenCalled()
   })
 
-  it('Anymail: salva sem apagar a Crustdata; válido não é pago de novo; não encontrado pode repetir', async () => {
+  it('Anymail: salva sem apagar a Crustdata; "não achou" fica guardado; válido não é pago de novo', async () => {
     globalThis.fetch = vi.fn(async () => resposta(200, { profiles: [PESSOA] })) as unknown as typeof fetch
     await decisor({ cnpj: CNPJ })
 
     globalThis.fetch = vi.fn(async () => resposta(200, { email: null, email_status: 'not_found' })) as unknown as typeof fetch
     expect((await (await email({ cnpj: CNPJ, nome: 'Ana Souza' })).json()).status).toBe('nao_encontrado')
 
-    const achou = vi.fn(async () => resposta(200, { email: 'ana@hotelmar.com.br', email_status: 'valid' }))
+    // Cache de inteligência: o "não achou" da mesma pessoa vale 60 dias, sem nova consulta.
+    const repete = vi.fn(async () => resposta(200, { email: 'ana@hotelmar.com.br', email_status: 'valid' }))
+    globalThis.fetch = repete as unknown as typeof fetch
+    expect((await (await email({ cnpj: CNPJ, nome: 'Ana Souza' })).json()).status).toBe('nao_encontrado')
+    expect(repete).not.toHaveBeenCalled()
+
+    const achou = vi.fn(async () => resposta(200, { email: 'bruno@hotelmar.com.br', email_status: 'valid' }))
     globalThis.fetch = achou as unknown as typeof fetch
-    expect((await (await email({ cnpj: CNPJ, nome: 'Ana Souza' })).json()).email).toBe('ana@hotelmar.com.br')
+    expect((await (await email({ cnpj: CNPJ, nome: 'Bruno Lima' })).json()).email).toBe('bruno@hotelmar.com.br')
     expect(achou).toHaveBeenCalledTimes(1)
 
     const salvo = linhaDa(ORG_A)?.enriquecimento as Enriquecimento
     expect(salvo.crustdata?.candidatos).toHaveLength(1)
-    expect(salvo.anymail?.email).toBe('ana@hotelmar.com.br')
+    expect(salvo.anymail?.email).toBe('bruno@hotelmar.com.br')
 
     const f = vi.fn()
     globalThis.fetch = f as unknown as typeof fetch
-    expect((await (await email({ cnpj: CNPJ, nome: 'ana souza' })).json()).reaproveitado).toBe(true)
+    expect((await (await email({ cnpj: CNPJ, nome: 'bruno lima' })).json()).reaproveitado).toBe(true)
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('ação paga manual com a fonte bloqueada PARA com 503/402 (hard stop), sem chamar a API', async () => {
+    const banco = estado.banco as BancoFalso
+    const f = vi.fn()
+    globalThis.fetch = f as unknown as typeof fetch
+    banco.linhas('organizacoes').find((o) => o.id === ORG_A)!.configuracoes = { prospeccao: { cnaes: ['5510801'] } }
+    const desligado = await email({ cnpj: CNPJ, nome: 'Ana Souza' })
+    expect(desligado.status).toBe(503)
+    expect((await desligado.json()).erro).toMatch(/desligado/)
+
+    banco.linhas('organizacoes').find((o) => o.id === ORG_A)!.configuracoes = { enriquecimentoPago: { ativo: true, orcamentoMensal: { anymail: 5 } } }
+    const semOrcamento = await decisor({ cnpj: CNPJ })
+    expect(semOrcamento.status).toBe(402)
+    expect((await semOrcamento.json()).erro).toMatch(/sem orçamento mensal definido para Crustdata/)
     expect(f).not.toHaveBeenCalled()
   })
 

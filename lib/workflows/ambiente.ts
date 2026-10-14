@@ -10,13 +10,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createSupabaseAdminClient } from '@/lib/supabase-admin'
 import { criarMotorReal } from '@/lib/engine/scheduler'
 import { normalizarNicho, preencher, indiceVariante } from '@/lib/engine/mensagem'
-import { GmailProvider, lerCredenciaisGmail } from '@/lib/engine/email/gmailProvider'
+import { GmailProvider } from '@/lib/engine/email/gmailProvider'
+import { situacaoRemetenteOrganizacao } from '@/lib/email/remetenteOrganizacao'
 import { engineConfig } from '@/lib/engine/config'
 import { log } from '@/lib/engine/logger'
 import type { Motor } from '@/lib/engine'
 import type { Lead } from '@/lib/engine/types'
 import { montarEmailCampanhaHtml } from '@/lib/campanhas/emailCampanha'
-import { responsavelRecebeCopiaDosEnvios } from '@/lib/campanhas/configuracaoGuiada'
+import { avisoEnvioCampanha, responsavelRecebeCopiaDosEnvios } from '@/lib/campanhas/configuracaoGuiada'
+import type { EntradaAvisoEnvio } from '@/lib/comercial/avisosResposta/types'
+import type { ResultadoAvisoResposta } from '@/lib/comercial/avisosResposta/servico'
 import { enviarEmailCampanhaComCopia, escolherResponsavelCampanha } from '@/lib/campanhas/emailComCopiaServidor'
 import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
 import {
@@ -134,12 +137,19 @@ const CAMPOS_LEAD_ESCRITA_PERMITIDOS = new Set([
 export class AmbienteSupabase implements AmbienteWorkflow {
   private motor: Motor
   private db: SupabaseClient
+  private avisarEnvio?: (entrada: EntradaAvisoEnvio) => Promise<ResultadoAvisoResposta>
   constructor(
     public readonly organizacaoId: string,
-    opts: { simular?: boolean; client?: SupabaseClient; motor?: Motor } = {},
+    opts: {
+      simular?: boolean
+      client?: SupabaseClient
+      motor?: Motor
+      avisarEnvio?: (entrada: EntradaAvisoEnvio) => Promise<ResultadoAvisoResposta>
+    } = {},
   ) {
     this.simular = opts.simular ?? false
     this.db = opts.client ?? createSupabaseAdminClient()
+    this.avisarEnvio = opts.avisarEnvio
     // Motor real da org: Store (interações/leads/templates) + EmailProvider.
     // `motor` injetável serve ao teste do caminho de envio (sem rede).
     this.motor = opts.motor ?? criarMotorReal(organizacaoId)
@@ -175,7 +185,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
       lead_id: execucao.lead_id,
       origem: 'workflow',
       motivo,
-      link: execucao.lead_id ? `/leads/${execucao.lead_id}` : '/automacao',
+      link: execucao.lead_id ? `/leads/${execucao.lead_id}` : '/campanhas',
     })
     if (error) throw error
   }
@@ -317,7 +327,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     }
     // Variáveis e credenciais de nível-org: lidas de uma única consulta.
     //   {nome_servico}  → nomenclaturas.nome_servico || organizacoes.nome
-    //   email_conta_key → seleciona GMAIL_USER_<KEY> / GMAIL_APP_PASSWORD_<KEY>
+    //   remetente       → conta conectada pela org ou chave legada (lib/email/remetenteOrganizacao)
     const { data: orgRow } = await this.db
       .from('organizacoes')
       .select('nome, configuracoes')
@@ -334,13 +344,14 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     }
     const assunto = preencher(tpl.assunto ?? '{empresa}', lead, extras)
     const corpo = preencher(tpl.corpo, lead, extras)
-    // Provider de e-mail: conta específica da org (email_conta_key) ou a padrão.
-    const emailContaKey = orgNomenclaturas?.['email_conta_key']
-    const emailCred = emailContaKey ? lerCredenciaisGmail(emailContaKey) : null
-    if (emailContaKey && !emailCred && !this.simular) {
-      throw new Error(`Envio bloqueado: credencial Gmail dedicada '${emailContaKey}' não configurada.`)
+    // Provider de e-mail: conta da organização (conectada ou legada) ou a padrão.
+    // Conta configurada mas inutilizável bloqueia — nunca cai na padrão.
+    const situacaoRemetente = await situacaoRemetenteOrganizacao(this.db, this.organizacaoId, { config: workspaceConfig })
+    if (situacaoRemetente.estado === 'incompleto' && !this.simular) {
+      throw new Error(situacaoRemetente.mensagem)
     }
-    const emailProvider = emailCred ? new GmailProvider(emailCred) : this.motor.email
+    const remetenteOrg = situacaoRemetente.estado === 'pronto' ? situacaoRemetente.remetente : null
+    const emailProvider = remetenteOrg ? new GmailProvider(remetenteOrg.credenciais) : this.motor.email
 
     // Simulação (Fase 5): não envia nem grava — quem loga é o executor.
     if (this.simular) return { enviado: false, assunto }
@@ -354,10 +365,11 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     // dry_run=true (padrão) bloqueia o envio mesmo com MODO_ENSAIO=false em prod.
     let campanhaPublico: Record<string, unknown> | null = null
     let campanhaTipo: string | null = null
+    let campanhaNome = ''
     if (campanhaId) {
       const { data: camp, error: campanhaError } = await this.db
         .from('campanhas')
-        .select('dry_run, publico, tipo, status')
+        .select('dry_run, publico, tipo, status, nome')
         .eq('id', campanhaId)
         .eq('organizacao_id', this.organizacaoId)
         .maybeSingle()
@@ -370,6 +382,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
       }
       campanhaPublico = (camp as { publico?: Record<string, unknown> | null } | null)?.publico ?? null
       campanhaTipo = (camp as { tipo?: string | null } | null)?.tipo ?? null
+      campanhaNome = (camp as { nome?: string | null }).nome ?? ''
       if (campanhaTipo === 'prospeccao' && (camp as { status?: string }).status
         && !['ativa', 'concluida'].includes(String((camp as { status?: string }).status))) {
         return { enviado: false, assunto }
@@ -378,48 +391,49 @@ export class AmbienteSupabase implements AmbienteWorkflow {
         return { enviado: false, assunto }
     }
 
-    // TRAVA DE SEGURANÇA (Prospecção + Follow-up). Escopo estrito:
-    // campanhaTipo==='prospeccao' — não altera renovação nem os demais tipos
-    // (regra explícita desta entrega; ver lib/campanhas/prospeccaoEnvio.ts).
-    // Re-checa o lead no momento do efeito (mesmo princípio de
-    // lib/engine/flows/followUp.ts): opt-out/bounce/perdido/descartado podem
-    // ter acontecido DEPOIS que esta execução foi agendada, e mesmo assim não
-    // podem receber envio.
+    // TRAVA DE SEGURANÇA: opt-out/bounce/perdido/descartado bloqueiam qualquer
+    // envio de campanha, independente do tipo. Re-checa no momento do efeito —
+    // o lead pode ter sido marcado após o enrollment (ex.: bounce do 1º envio
+    // chega antes do FUP sair). Prospecção tem verificações adicionais: bloqueia
+    // também se o lead respondeu ou se a execução foi cancelada no intervalo.
     let leadProspeccaoAntes: Lead | null = null
-    if (campanhaId && campanhaTipo === 'prospeccao') {
-      leadProspeccaoAntes = await this.motor.store.buscarLead(leadId)
-      if (leadBloqueadoParaEnvioProspeccao(leadProspeccaoAntes)) {
-        log.aviso('Envio de prospecção bloqueado (opt-out/bounce/perdido/descartado).', { leadId, campanhaId })
+    if (campanhaId) {
+      const leadAtual = await this.motor.store.buscarLead(leadId)
+      if (leadBloqueadoParaEnvioProspeccao(leadAtual)) {
+        log.aviso('Envio bloqueado (opt-out/bounce/perdido/descartado).', { leadId, campanhaId, tipo: campanhaTipo })
         return { enviado: false, assunto }
       }
-      // A resposta cancela a execução pelo monitor Gmail. Esta checagem
-      // adicional cobre a janela em que a interação já existe e o cancelamento
-      // ainda não foi persistido.
-      const { data: resposta, error: respostaErro } = await this.db.from('interacoes')
-        .select('id').eq('organizacao_id', this.organizacaoId)
-        .eq('lead_id', leadId).eq('tipo', 'resposta').limit(1)
-      if (respostaErro) throw respostaErro
-      if (resposta?.length) return { enviado: false, assunto }
-      if (chaveEnvio) {
-        const execucaoId = chaveEnvio.split(':')[0]
-        const { data: execucaoAtual, error: execucaoErro } = await this.db
-          .from('workflow_execucoes').select('status, campanha_id')
-          .eq('organizacao_id', this.organizacaoId).eq('id', execucaoId).maybeSingle()
-        if (execucaoErro) throw execucaoErro
-        if (!execucaoAtual || execucaoAtual.status === 'cancelado'
-          || execucaoAtual.campanha_id !== campanhaId) return { enviado: false, assunto }
+      if (campanhaTipo === 'prospeccao') {
+        leadProspeccaoAntes = leadAtual
+        // A resposta cancela a execução pelo monitor Gmail. Esta checagem
+        // adicional cobre a janela em que a interação já existe e o cancelamento
+        // ainda não foi persistido.
+        const { data: resposta, error: respostaErro } = await this.db.from('interacoes')
+          .select('id').eq('organizacao_id', this.organizacaoId)
+          .eq('lead_id', leadId).eq('tipo', 'resposta').limit(1)
+        if (respostaErro) throw respostaErro
+        if (resposta?.length) return { enviado: false, assunto }
+        if (chaveEnvio) {
+          const execucaoId = chaveEnvio.split(':')[0]
+          const { data: execucaoAtual, error: execucaoErro } = await this.db
+            .from('workflow_execucoes').select('status, campanha_id')
+            .eq('organizacao_id', this.organizacaoId).eq('id', execucaoId).maybeSingle()
+          if (execucaoErro) throw execucaoErro
+          if (!execucaoAtual || execucaoAtual.status === 'cancelado'
+            || execucaoAtual.campanha_id !== campanhaId) return { enviado: false, assunto }
+        }
       }
     }
 
     // TRAVA DE REMETENTE (E-mail de prospecção). Escopo estrito a
-    // campanhaTipo==='prospeccao': exige `email_conta_key` explicitamente
-    // configurado nesta organização (Configurações > E-mail de prospecção) —
+    // campanhaTipo==='prospeccao': exige remetente explicitamente configurado
+    // nesta organização (Configurações > Distribuição > E-mail de envio) —
     // nunca cai no fallback silencioso 'followup'/conta global de outra
     // organização (ver lib/campanhas/opcoesServidor.ts). Renovação e os demais
     // tipos preservam o fallback existente (`emailProvider` acima). Depois do
     // gate de opt-out/bounce: um lead já bloqueado não precisa de remetente
     // configurado para ser corretamente ignorado.
-    if (campanhaId && campanhaTipo === 'prospeccao' && !emailContaKey) {
+    if (campanhaId && campanhaTipo === 'prospeccao' && !remetenteOrg) {
       throw new Error('Configure um remetente em Configurações antes de iniciar a campanha.')
     }
 
@@ -502,15 +516,17 @@ export class AmbienteSupabase implements AmbienteWorkflow {
     }
 
     // "Somente as respostas" na campanha: o e-mail sai sem o responsável em
-    // cópia (vale para os dois caminhos de CC abaixo).
+    // cópia (vale para os dois caminhos de CC abaixo). Suprime também quando o
+    // responsável e o remetente são a mesma conta — CC seria auto-cópia inútil.
     const copiarResponsavel = responsavelRecebeCopiaDosEnvios(campanhaPublico)
+      && responsavelAssinatura?.email?.trim().toLowerCase() !== remetenteOrg?.email?.trim().toLowerCase()
     // Envio real: usa a conta da org (emailProvider) se configurada; senão a padrão.
     try {
     if (campanhaId && ccRenovacaoAtivo) {
       const cc = copiarResponsavel
         ? resolverCcResponsavelRenovacao({
           para: lead.contato_email,
-          remetenteEmail: emailCred?.user,
+          remetenteEmail: remetenteOrg?.email,
           responsavelLead,
         })
         : undefined
@@ -521,7 +537,7 @@ export class AmbienteSupabase implements AmbienteWorkflow {
         assunto,
         corpo,
         html,
-        remetenteEmail: emailCred?.user,
+        remetenteEmail: remetenteOrg?.email,
         responsavelCampanha: contextoCampanha?.responsavel,
         responsavelLead,
         preferirResponsavelDoLead,
@@ -600,7 +616,48 @@ export class AmbienteSupabase implements AmbienteWorkflow {
         })
       }
     }
+    if (campanhaId && chaveEnvio) {
+      const avisoEnvio = avisoEnvioCampanha(campanhaPublico)
+      if (avisoEnvio) {
+        const indiceMensagem = mensagemConfigurada ? [inicial, ...followups].indexOf(mensagemConfigurada) : -1
+        const usarDaCampanha = !(preferirResponsavelDoLead && lead.responsavel_id)
+        const responsavelPerfil = usarDaCampanha && contextoCampanha?.responsavel
+          ? { id: contextoCampanha.responsavel.id, nome: contextoCampanha.responsavel.nome }
+          : null
+        await this.avisarEnvioSemFalhar({
+          organizacaoId: this.organizacaoId,
+          leadId,
+          eventoId: `envio:${chaveEnvio}`,
+          destinos: avisoEnvio.whatsapp,
+          grupoIdCampanha: avisoEnvio.grupoWhatsappId ?? null,
+          responsavelPerfil,
+          campanhaNome,
+          etapa: indiceMensagem > 0 ? `follow-up ${indiceMensagem}` : 'mensagem inicial',
+          assunto,
+        })
+      }
+    }
     return { enviado: true, assunto }
+  }
+
+  // O e-mail já saiu: falha no aviso fica no outbox (reprocessável) ou no log,
+  // nunca desfaz nem repete o envio.
+  private async avisarEnvioSemFalhar(entrada: EntradaAvisoEnvio): Promise<void> {
+    try {
+      const avisar = this.avisarEnvio
+        ?? (await import('@/lib/comercial/avisosResposta/composicao')).montarHookAvisoEnvio(this.db)
+      const r = await avisar(entrada)
+      log.info('Aviso de envio no WhatsApp processado.', {
+        leadId: entrada.leadId,
+        resultado: r.tipo,
+        ...(r.tipo === 'processado' ? { destinos: r.resultados.map((x) => x.tipo) } : {}),
+      })
+    } catch (erro) {
+      log.aviso('Falha ao avisar o envio no WhatsApp.', {
+        leadId: entrada.leadId,
+        erro: erro instanceof Error ? erro.message : String(erro),
+      })
+    }
   }
 
   async criarTarefa(leadId: string, titulo: string, responsavelId?: string | null, chave?: string | null): Promise<void> {

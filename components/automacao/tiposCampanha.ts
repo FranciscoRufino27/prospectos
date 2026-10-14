@@ -99,7 +99,15 @@ export interface AvisoRetorno {
   // Destinos no WhatsApp; vazio = sem WhatsApp.
   whatsapp: DestinoWhatsappRetorno[];
   // Grupo desta campanha (id Z-API "…-group"); ausente = grupo cadastrado em
-  // Configurações > Processo comercial > Distribuição.
+  // Configurações > Distribuição.
+  grupoWhatsappId?: string;
+}
+
+// Mensagem no WhatsApp a cada e-mail que a campanha envia (inicial e follow-ups).
+// Ausente ou sem destinos = desligado.
+export interface AvisoEnvio {
+  whatsapp: DestinoWhatsappRetorno[];
+  // Grupo do aviso de envio; ausente = grupo cadastrado em Configurações > Distribuição.
   grupoWhatsappId?: string;
 }
 
@@ -116,6 +124,7 @@ export interface OperacaoCampanha {
   // enviado ao cliente; 'somente_respostas' = os e-mails saem sem cópia e ele
   // só fica sabendo quando o cliente responde.
   responsavelRecebe?: ResponsavelRecebe;
+  avisoEnvio?: AvisoEnvio;
   resposta?: {
     // Ausente = campanha anterior à escolha: e-mail conforme
     // `notificarResponsavel` e WhatsApp só pela regra da organização.
@@ -170,8 +179,11 @@ export interface Campanha {
     total: number;
     emAndamento: number;
     aguardando: number;
+    aguardandoPrimeiroEnvio?: number;
+    jaContatados?: number;
     concluidas: number;
     canceladas: number;
+    devolvidos?: number;
     erros: number;
     emailsEnviados: number;
     respostas: number;

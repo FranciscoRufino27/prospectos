@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mesmaPessoa, resolverDecisorAutomatico, type DependenciasDecisor, type EmpresaParaDecisor } from '../decisorAutomatico'
 import type { AnaliseSalva } from '../decisores'
+import type { ProspeccaoConfig } from '@/lib/config/workspaceConfig'
 
 const EMPRESA: EmpresaParaDecisor = {
   cnpj: '12345678000199', porte: 'pequeno', mei: false,
@@ -43,18 +44,55 @@ describe('mesmaPessoa', () => {
 })
 
 describe('resolverDecisorAutomatico', () => {
-  it('sócio sugerido → e-mail (Anymail) → LinkedIn e cargo (Crustdata), tudo salvo', async () => {
+  it('sócio serve como decisor: e-mail pela Anymail e a Crustdata NÃO é chamada', async () => {
     const d = deps()
     const r = await resolverDecisorAutomatico(EMPRESA, undefined, null, d)
     expect(r).toMatchObject({
       status: 'completo',
       email: 'joao@hotelsol.com.br',
-      decisor: { nome: 'Joao Carlos da Silva Souza', cargo: 'CEO', linkedin: 'https://www.linkedin.com/in/joaosouza' },
+      decisor: { nome: 'Joao Carlos da Silva Souza', cargo: 'Sócio-Administrador' },
     })
+    expect(r.status === 'completo' && r.decisor.linkedin).toBeFalsy()
+    expect(d.buscarPessoas).not.toHaveBeenCalled()
     expect(d.buscarEmail).toHaveBeenCalledWith('Joao Carlos da Silva Souza', 'hotelsol.com.br')
     expect(d.salvarConsulta).toHaveBeenCalledOnce()
-    expect(d.salvarEnriquecimento).toHaveBeenCalledTimes(2)
-    expect(d.salvarDecisor).toHaveBeenCalledWith(expect.objectContaining({ nome: 'Joao Carlos da Silva Souza', cargo: 'CEO' }))
+    expect(d.salvarEnriquecimento).toHaveBeenCalledTimes(1)
+    expect(d.salvarDecisor).toHaveBeenCalledWith(expect.objectContaining({ nome: 'Joao Carlos da Silva Souza', cargo: 'Sócio-Administrador' }))
+  })
+
+  it('e-mail da Receita já é do decisor (nominal): nem Anymail nem Crustdata', async () => {
+    const d = deps()
+    const r = await resolverDecisorAutomatico({ ...EMPRESA, email: 'joao.souza@hotelsol.com.br' }, undefined, null, d)
+    expect(r).toMatchObject({ status: 'completo', email: 'joao.souza@hotelsol.com.br', decisor: { nome: 'Joao Carlos da Silva Souza' } })
+    expect(d.buscarEmail).not.toHaveBeenCalled()
+    expect(d.buscarPessoas).not.toHaveBeenCalled()
+  })
+
+  it('sócio fora do perfil (porte): Crustdata acha o decisor, Anymail o e-mail dele', async () => {
+    const perfil = { cnaes: ['5510801'], porteOutroDecisor: 'pequeno' } as ProspeccaoConfig
+    const d = deps()
+    const r = await resolverDecisorAutomatico(EMPRESA, perfil, null, d)
+    expect(d.buscarPessoas).toHaveBeenCalledOnce()
+    expect(d.buscarEmail).toHaveBeenCalledWith('Maria Lima', 'hotelsol.com.br')
+    expect(r).toMatchObject({ status: 'completo', decisor: { nome: 'Maria Lima', cargo: 'Gerente', linkedin: 'https://www.linkedin.com/in/maria' } })
+  })
+
+  it('Crustdata bloqueada pelo orçamento: SÓ esta empresa fica incompleta (bloqueado_crustdata), sem falha', async () => {
+    const perfil = { cnaes: ['5510801'], porteOutroDecisor: 'pequeno' } as ProspeccaoConfig
+    const d = deps({ buscarPessoas: vi.fn(async () => ({ ok: false as const, motivo: 'orcamento_esgotado' as const, detalhe: 'orçamento mensal de Crustdata esgotado: 10 de 10 créditos usados' })) })
+    const r = await resolverDecisorAutomatico(EMPRESA, perfil, null, d)
+    expect(r).toMatchObject({ status: 'incompleto', motivo: 'bloqueado_crustdata', bloqueio: { fonte: 'crustdata', motivo: 'orcamento_esgotado' } })
+    expect(r.status === 'incompleto' && r.bloqueio?.mensagem).toMatch(/10 de 10 créditos/)
+    expect(d.buscarEmail).not.toHaveBeenCalled()
+  })
+
+  it('Anymail desligada: decisor achado de graça, empresa incompleta (bloqueado_anymail), sem falha', async () => {
+    const d = deps({ buscarEmail: vi.fn(async () => ({ ok: false as const, motivo: 'pago_desligado' as const })) })
+    const r = await resolverDecisorAutomatico(EMPRESA, undefined, null, d)
+    expect(r).toMatchObject({ status: 'incompleto', motivo: 'bloqueado_anymail', bloqueio: { fonte: 'anymail', motivo: 'pago_desligado' } })
+    expect(r.status === 'incompleto' && r.bloqueio?.mensagem).toMatch(/desligado/)
+    expect(r.status === 'incompleto' && r.consulta?.sugerido?.nome).toBe('Joao Carlos da Silva Souza')
+    expect(d.buscarPessoas).not.toHaveBeenCalled()
   })
 
   it('sem domínio próprio não chama nenhuma API', async () => {
@@ -65,11 +103,17 @@ describe('resolverDecisorAutomatico', () => {
     expect(d.buscarEmail).not.toHaveBeenCalled()
   })
 
-  it('sem sócio na Receita: incompleto, sem gastar Anymail', async () => {
-    const d = deps({ consultarSocios: vi.fn(async () => ({ ok: true as const, socios: [] })) })
+  it('sem sócio na Receita: Crustdata acha o decisor; sem ninguém, incompleto sem gastar Anymail', async () => {
+    const semSocio = { consultarSocios: vi.fn(async () => ({ ok: true as const, socios: [] })) }
+    const d = deps(semSocio)
     const r = await resolverDecisorAutomatico(EMPRESA, undefined, null, d)
-    expect(r).toMatchObject({ status: 'incompleto', motivo: 'sem_socio' })
-    expect(d.buscarEmail).not.toHaveBeenCalled()
+    expect(d.buscarPessoas).toHaveBeenCalledOnce()
+    expect(r).toMatchObject({ status: 'completo', decisor: { nome: 'Maria Lima' } })
+
+    const vazio = deps({ ...semSocio, buscarPessoas: vi.fn(async () => ({ ok: true as const, candidatos: [] })) })
+    const r2 = await resolverDecisorAutomatico(EMPRESA, undefined, null, vazio)
+    expect(r2).toMatchObject({ status: 'incompleto', motivo: 'sem_socio' })
+    expect(vazio.buscarEmail).not.toHaveBeenCalled()
   })
 
   it('e-mail não encontrado ou arriscado: incompleto, sem pagar Crustdata', async () => {
@@ -116,16 +160,25 @@ describe('resolverDecisorAutomatico', () => {
     expect(r).toMatchObject({ status: 'completo', decisor: { nome: 'Ana Paula Ribeiro', cargo: 'Diretora' } })
   })
 
-  it('Crustdata fora do ar não derruba: completa com o cargo da Receita', async () => {
-    const d = deps({ buscarPessoas: vi.fn(async () => ({ ok: false as const, motivo: 'indisponivel' as const })) })
+  it('Crustdata fora do ar quando ela é necessária: falha honesta, sem inventar decisor', async () => {
+    const d = deps({
+      consultarSocios: vi.fn(async () => ({ ok: true as const, socios: [] })),
+      buscarPessoas: vi.fn(async () => ({ ok: false as const, motivo: 'indisponivel' as const })),
+    })
     const r = await resolverDecisorAutomatico(EMPRESA, undefined, null, d)
-    expect(r).toMatchObject({ status: 'completo', decisor: { nome: 'Joao Carlos da Silva Souza', cargo: 'Sócio-Administrador' } })
-    expect(r.status === 'completo' && r.decisor.linkedin).toBeFalsy()
+    expect(r).toMatchObject({ status: 'falha', httpStatus: 502 })
+    expect(d.buscarEmail).not.toHaveBeenCalled()
   })
 
-  it('Anymail sem crédito é falha (a tela para a busca)', async () => {
-    const d = deps({ buscarEmail: vi.fn(async () => ({ ok: false as const, motivo: 'sem_credito' as const })) })
-    const r = await resolverDecisorAutomatico(EMPRESA, undefined, null, d)
-    expect(r).toMatchObject({ status: 'falha', httpStatus: 402 })
+  it('Anymail sem crédito ou sem chave: bloqueio da fonte (incompleta), não da busca', async () => {
+    for (const motivo of ['sem_credito', 'sem_chave'] as const) {
+      const d = deps({ buscarEmail: vi.fn(async () => ({ ok: false as const, motivo })) })
+      expect(await resolverDecisorAutomatico(EMPRESA, undefined, null, d)).toMatchObject({ status: 'incompleto', motivo: 'bloqueado_anymail', bloqueio: { motivo } })
+    }
+  })
+
+  it('limite de requisições (429) continua sendo falha técnica (a tela para a busca)', async () => {
+    const d = deps({ buscarEmail: vi.fn(async () => ({ ok: false as const, motivo: 'limite' as const })) })
+    expect(await resolverDecisorAutomatico(EMPRESA, undefined, null, d)).toMatchObject({ status: 'falha', httpStatus: 429 })
   })
 })

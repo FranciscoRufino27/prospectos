@@ -1,23 +1,25 @@
 [
   {
     "title": "Renovação | Laudo Técnico + ART | Primeiro contato",
-    "subject": "⚠️ Renovação do Laudo Técnico e ART – {{empresa}}",
+    "subject": "Renovação do Laudo Técnico e ART – {{empresa}}",
     "file": "renovacao-primeiro-contato.html",
     "type": "email_html",
     "variables": [
-      "nome",
+      "saudacao_renovacao",
       "empresa",
+      "frase_validade",
       "data_validade"
     ]
   },
   {
     "title": "Renovação | Laudo Técnico + ART | Follow-up 1",
-    "subject": "⚠️ Renovação do Laudo Técnico e ART – {{empresa}}",
+    "subject": "Renovação do Laudo Técnico e ART – {{empresa}}",
     "file": "renovacao-follow-up-1.html",
     "type": "email_html",
     "variables": [
-      "nome",
+      "saudacao_renovacao",
       "empresa",
+      "frase_validade",
       "data_validade"
     ]
   },
@@ -27,7 +29,7 @@
     "file": "prospeccao-buffet-primeiro-contato.html",
     "type": "email_html",
     "variables": [
-      "nome",
+      "saudacao_renovacao",
       "empresa"
     ]
   },
@@ -37,7 +39,7 @@
     "file": "prospeccao-buffet-follow-up-1.html",
     "type": "email_html",
     "variables": [
-      "nome",
+      "saudacao_renovacao",
       "empresa"
     ]
   },
@@ -47,7 +49,7 @@
     "file": "prospeccao-buffet-follow-up-2.html",
     "type": "email_html",
     "variables": [
-      "nome",
+      "saudacao_renovacao",
       "empresa"
     ]
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { cifrar } from '@/lib/seguranca/criptografia'
-import { classificarParaIndice, consultarIndice, sincronizarIndice, termoBusca, resumirIndice, disponiveisEntre } from '../indice'
+import { classificarParaIndice, consultarIndice, sincronizarIndice, termoBusca, resumirIndice, disponiveisEntre, linhasDoFiltro } from '../indice'
 import { limparCacheLeitura } from '../leituraLote'
 import { supabaseFake, tocouSoOrg, type Chain } from './supabaseFake'
 
@@ -102,6 +102,28 @@ describe('consultarIndice — universo e filtros no banco', () => {
     const r = await resumirIndice(client, ORG, base, ['111'], [])
     expect(r).toMatchObject({ total: 2837, disponiveis: 1300, semResponsavel: 100, atualizadoEm: '2026-09-29T00:00:00Z', sincronizando: false })
     expect(r.porSituacao.cliente).toBe(100)
+  })
+
+  it('linhasDoFiltro: mesmos filtros e ordem da lista, lê em páginas de 1.000 até acabar', async () => {
+    const todas = Array.from({ length: 1500 }, (_, i) => ({ hubspot_company_id: String(i + 1), nome: i === 0 ? null : `Empresa ${i + 1}` }))
+    const { client, chains } = supabaseFake((_t, c) => ({ data: todas.slice(c.rangeCall![0], c.rangeCall![1] + 1) }))
+    const r = await linhasDoFiltro(client, ORG, { ...base, situacao: 'reativar' }, ['111'], [])
+    expect(r).toHaveLength(1500)
+    expect(r[0]).toEqual({ id: '1', nome: '(sem nome) #1' })
+    expect(chains.map((c) => c.rangeCall)).toEqual([[0, 999], [1000, 1999]])
+    for (const c of chains) {
+      expect(c.temEq('organizacao_id', ORG)).toBe(true)
+      expect(c.temEq('disponivel', true)).toBe(true)
+      expect(c.temEq('situacao', 'reativar')).toBe(true)
+      expect(c.inCalls).toContainEqual(['owner_id', ['111']])
+      expect(c.orderCalls.map(([col]) => col)).toEqual(['nome', 'hubspot_company_id'])
+    }
+  })
+
+  it('linhasDoFiltro: comercial não mapeado → vazio sem consultar', async () => {
+    const { client, chains } = supabaseFake()
+    expect(await linhasDoFiltro(client, ORG, { ...base, owner: '999' }, ['111'], [])).toEqual([])
+    expect(chains.every((c) => c.rangeCall === null)).toBe(true)
   })
 
   it('disponiveisEntre: filtra org, disponível, comercial mapeado e IDs pedidos', async () => {

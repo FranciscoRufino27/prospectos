@@ -16,6 +16,9 @@ export type ClassificacaoAviso = 'positivo' | 'negativo' | 'neutro' | 'indetermi
 // não consome tentativa e volta a tentar ao reprocessar.
 export type StatusAvisoResposta = 'pendente' | 'enviando' | 'enviada' | 'falhou' | 'configuracao_ausente'
 
+// 'envio' = e-mail de campanha enviado (publico.operacao.avisoEnvio), mesmo outbox.
+export type TipoAviso = 'resposta' | 'envio'
+
 // Congelado na resposta: reprocessar monta o MESMO texto. O número do
 // responsável NÃO fica aqui — é lido na hora de enviar (ele pode cadastrar
 // o número depois e o aviso pendente sai).
@@ -35,6 +38,10 @@ export interface DadosAvisoResposta {
   grupoId?: string | null
   responsavelNome: string
   link: string | null
+  // Só no aviso de envio.
+  campanhaNome?: string | null
+  etapa?: string | null
+  assunto?: string | null
 }
 
 export interface AvisoResposta {
@@ -42,6 +49,7 @@ export interface AvisoResposta {
   organizacaoId: string
   leadId: string
   eventoId: string
+  tipo: TipoAviso
   destinoTipo: DestinoAvisoResposta
   status: StatusAvisoResposta
   tentativas: number
@@ -82,4 +90,18 @@ export interface EntradaAvisoResposta {
   // quando é ele — e não o dono do lead — quem recebe. Mesma pessoa do e-mail
   // de retorno; ausente = responsável do lead.
   responsavelPerfil?: { id: string; nome: string } | null
+}
+
+// O que o motor informa sobre um e-mail de campanha que acabou de sair.
+export interface EntradaAvisoEnvio {
+  organizacaoId: string
+  leadId: string
+  // "envio:<chave do envio>" — a mesma chave que impede reenviar o e-mail.
+  eventoId: string
+  destinos: DestinoAvisoResposta[]
+  grupoIdCampanha?: string | null
+  responsavelPerfil?: { id: string; nome: string } | null
+  campanhaNome: string
+  etapa: string
+  assunto: string
 }

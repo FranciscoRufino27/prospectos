@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Settings, Users, Palette, Target, Plug } from 'lucide-react';
 import DistribuicaoComercialPanel from '@/components/configuracoes/DistribuicaoComercialPanel';
+import RemetenteEmailPanel from '@/components/configuracoes/RemetenteEmailPanel';
 import PersonalizacaoPanel from '@/components/configuracoes/PersonalizacaoPanel';
 import ObjetivosOperacaoPanel from '@/components/configuracoes/ObjetivosOperacaoPanel';
 import IntegracoesPanel from '@/components/configuracoes/IntegracoesPanel';
@@ -96,7 +97,13 @@ function Inner() {
     >
       <div className="animate-in">
         {aba === 'objetivos' && <ObjetivosOperacaoPanel />}
-        {aba === 'distribuicao' && <DistribuicaoComercialPanel />}
+        {aba === 'distribuicao' && (
+          <div className="space-y-4">
+            <DistribuicaoComercialPanel />
+            {/* Conta Gmail da organização (envio + leitura das respostas). */}
+            <RemetenteEmailPanel />
+          </div>
+        )}
         {aba === 'personalizacao' && <PersonalizacaoPanel />}
         {aba === 'integracoes' && <IntegracoesPanel />}
       </div>

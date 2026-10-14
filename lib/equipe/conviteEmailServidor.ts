@@ -2,15 +2,15 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
 import { engineConfig } from '@/lib/engine/config'
-import { GmailProvider, lerCredenciaisGmail } from '@/lib/engine/email/gmailProvider'
+import { GmailProvider } from '@/lib/engine/email/gmailProvider'
 import { montarEmailCampanhaHtml } from '@/lib/campanhas/emailCampanha'
 import { buscarRemetenteCampanha } from '@/lib/campanhas/opcoesServidor'
 
 // E-mail de convite de membro da equipe.
 //
 // O remetente é a conta Gmail DO WORKSPACE de quem convida — a mesma que
-// campanhas, Central e envio de teste usam (`buscarRemetenteCampanha`:
-// nomenclaturas.email_conta_key, ou a conta padrão quando a org não tem chave).
+// campanhas, Central e envio de teste usam (`buscarRemetenteCampanha`: conta
+// conectada pela org, chave legada, ou a padrão quando a org não tem nenhuma).
 // Nunca a conta padrão fixa: isso fazia um convite da Laudos sair pela conta da
 // Inovacode (e o mailer do Supabase, antes, mandava tudo por um remetente só).
 // Chave dedicada sem credencial BLOQUEIA o envio; não cai na conta de outra org.
@@ -55,7 +55,7 @@ export async function enviarEmailConvite(
     return { emailEnviado: false, simulado: false, motivo: 'falha_envio', remetente: null }
   }
 
-  const credenciais = remetente ? lerCredenciaisGmail(remetente.conta) : null
+  const credenciais = remetente?.credenciais ?? null
   if (!remetente || !credenciais || credenciais.user.toLowerCase() !== remetente.email.toLowerCase()) {
     console.error('[equipe/convidar] conta Gmail do workspace sem credencial — convite criado, e-mail não enviado.', {
       org,

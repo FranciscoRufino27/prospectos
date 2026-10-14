@@ -44,6 +44,8 @@ export function supabaseFake(dados: (t: string, c: Chain) => Resultado = () => (
   const chains: Chain[] = []
   const client = {
     from(table: string) { const c = new Chain(table, dados); chains.push(c); return c },
+    // RPC vira uma chain de tabela "rpc:<nome>" com os argumentos em `payload`.
+    rpc(nome: string, args: unknown) { const c = new Chain(`rpc:${nome}`, dados); c.payload = args; chains.push(c); return c },
   } as unknown as SupabaseClient
   return { client, chains }
 }

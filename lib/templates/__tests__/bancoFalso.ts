@@ -10,7 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type Linha = Record<string, unknown>
 
-type OperadorFiltro = 'eq' | 'neq' | 'is' | 'not_is' | 'in' | 'ilike'
+type OperadorFiltro = 'eq' | 'neq' | 'is' | 'not_is' | 'in' | 'ilike' | 'gte' | 'gt' | 'lte'
 export interface Filtro {
   op: OperadorFiltro
   coluna: string
@@ -35,7 +35,9 @@ interface Resultado {
   count?: number | null
 }
 
-const TABELAS_SEM_ORGANIZACAO = new Set(['organizacoes'])
+// Tabelas globais por desenho (sem organizacao_id): o cache de inteligência
+// (enriquecimento_cache, 0056/0064) guarda fatos, não dados de uma org.
+const TABELAS_SEM_ORGANIZACAO = new Set(['organizacoes', 'enriquecimento_cache'])
 
 export class BancoFalso {
   private readonly tabelas = new Map<string, Linha[]>()
@@ -60,8 +62,25 @@ export class BancoFalso {
     return this.operacoes.filter((op) => op.tipo !== 'select' && (!tabela || op.tabela === tabela))
   }
 
+  /** Funções do banco simuladas; outras devolvem erro (como função inexistente). */
+  falharRpc = false
+
   cliente(): SupabaseClient {
-    return { from: (tabela: string) => new ConsultaFalsa(this, tabela) } as unknown as SupabaseClient
+    return {
+      from: (tabela: string) => new ConsultaFalsa(this, tabela),
+      rpc: async (nome: string, args: Record<string, unknown>) => {
+        if (!this.falharRpc && nome === 'prospeccao_consumo_mes') {
+          // Mesma regra da migration 0065: soma do custo via API da org/fonte desde a data.
+          const desde = new Date(String(args.p_desde)).getTime()
+          const soma = this.linhas('prospeccao_consumo')
+            .filter((l) => l.organizacao_id === args.p_org && l.fonte === args.p_fonte && l.origem === 'api'
+              && new Date(String(l.criado_em ?? l.created_at)).getTime() >= desde)
+            .reduce((t, l) => t + Number(l.custo ?? 0), 0)
+          return { data: soma, error: null }
+        }
+        return { data: null, error: { message: `function ${nome} does not exist`, code: '42883' } }
+      },
+    } as unknown as SupabaseClient
   }
 }
 
@@ -84,6 +103,7 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
   private payload: unknown
   private modo: 'lista' | 'single' | 'maybe' = 'lista'
   private limite: number | null = null
+  private intervalo: [number, number] | null = null
   private readonly ordens: { coluna: string; asc: boolean }[] = []
   private conflito: string[] = []
 
@@ -111,6 +131,11 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
   is(coluna: string, valor: unknown) { this.filtros.push({ op: 'is', coluna, valor }); return this }
   in(coluna: string, valor: unknown[]) { this.filtros.push({ op: 'in', coluna, valor }); return this }
   ilike(coluna: string, valor: string) { this.filtros.push({ op: 'ilike', coluna, valor }); return this }
+  gte(coluna: string, valor: unknown) { this.filtros.push({ op: 'gte', coluna, valor }); return this }
+  gt(coluna: string, valor: unknown) { this.filtros.push({ op: 'gt', coluna, valor }); return this }
+  lte(coluna: string, valor: unknown) { this.filtros.push({ op: 'lte', coluna, valor }); return this }
+  /** Paginação do PostgREST: [de, ate] inclusivo. */
+  range(de: number, ate: number) { this.intervalo = [de, ate]; return this }
   not(coluna: string, operador: string, valor: unknown) {
     if (operador !== 'is') throw new Error(`BancoFalso: not(${operador}) não suportado`)
     this.filtros.push({ op: 'not_is', coluna, valor })
@@ -141,6 +166,9 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
         case 'not_is': return valor === null ? atual !== null && atual !== undefined : atual !== valor
         case 'in': return Array.isArray(valor) && valor.includes(atual)
         case 'ilike': return casaIlike(atual, valor)
+        case 'gte': return atual !== null && atual !== undefined && (atual as number | string) >= (valor as number | string)
+        case 'gt': return atual !== null && atual !== undefined && (atual as number | string) > (valor as number | string)
+        case 'lte': return atual !== null && atual !== undefined && (atual as number | string) <= (valor as number | string)
       }
     })
   }
@@ -179,6 +207,7 @@ class ConsultaFalsa implements PromiseLike<Resultado> {
         })
       }
       const total = linhas.length
+      if (this.intervalo) linhas = linhas.slice(this.intervalo[0], this.intervalo[1] + 1)
       if (this.limite !== null) linhas = linhas.slice(0, this.limite)
       if (this.contar) {
         return { data: this.somenteContagem ? null : linhas.map((l) => this.projetar(l)), count: total, error: null }

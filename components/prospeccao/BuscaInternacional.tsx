@@ -135,7 +135,8 @@ export default function BuscaInternacional({ pedido, nichos = [], paisesPerfil =
           if (corpo.status === 'incompleto') {
             const pessoa = corpo.candidatos?.[0];
             if (pessoa) semEmail.set(empresa.id, { nome: pessoa.nome, cargo: pessoa.cargo, ...(pessoa.linkedin ? { linkedin: pessoa.linkedin } : {}) });
-            return { tipo: 'pulado', motivo: corpo.motivo };
+            // Fonte paga bloqueada: só esta empresa fica de fora; a busca segue.
+            return { tipo: 'pulado', motivo: corpo.motivo, erro: corpo.bloqueio?.mensagem };
           }
           return { tipo: 'pulado', motivo: 'erro' };
         },

@@ -207,7 +207,9 @@ export function nivelDoCargo(cargo: string): number {
   return i === -1 ? NIVEL_CARGO.length : i
 }
 
-export type FalhaEnriquecimento = 'sem_chave' | 'sem_credito' | 'limite' | 'indisponivel'
+// pago_desligado / orcamento_esgotado: travas de custo da organização
+// (lib/prospeccao/travasCusto.ts) — a fonte nem é chamada.
+export type FalhaEnriquecimento = 'sem_chave' | 'sem_credito' | 'limite' | 'indisponivel' | 'pago_desligado' | 'orcamento_esgotado'
 
 export async function buscarDecisoresCrustdata(
   alvo: AlvoPessoas,
@@ -312,4 +314,7 @@ export const MENSAGEM_FALHA_ENRIQUECIMENTO: Record<FalhaEnriquecimento, { texto:
   sem_credito: { texto: 'A conta está sem crédito para esta consulta.', status: 402 },
   limite: { texto: 'Muitas consultas seguidas. Aguarde um minuto e tente de novo.', status: 429 },
   indisponivel: { texto: 'Serviço indisponível no momento. Tente de novo.', status: 502 },
+  // 503 e 402 fazem a busca automática parar (a tela trata como falha fatal).
+  pago_desligado: { texto: 'Enriquecimento pago desligado para esta organização.', status: 503 },
+  orcamento_esgotado: { texto: 'Orçamento do enriquecimento pago esgotado.', status: 402 },
 }

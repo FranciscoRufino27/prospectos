@@ -154,7 +154,7 @@ export default function ImportarProspeccaoModal({
               </Link>
               {leadIds.length > 0 && (
                 <Link
-                  href={`/automacao/campanhas/nova?tipo=prospeccao&leads=${encodeURIComponent(leadIds.join(','))}`}
+                  href={`/campanhas/nova?tipo=prospeccao&leads=${encodeURIComponent(leadIds.join(','))}`}
                   className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 focus-ring"
                 >
                   <Rocket size={14} /> Iniciar prospecção ({leadIds.length})

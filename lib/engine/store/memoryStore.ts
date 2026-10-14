@@ -35,6 +35,19 @@ export class MemoryStore implements Store {
     )
   }
 
+  async buscarLeadsPorEmail(email: string): Promise<Lead[]> {
+    const e = email.trim().toLowerCase()
+    return this.leads.filter((l) => l.contato_email?.toLowerCase() === e)
+  }
+
+  // Lista de e-mails inválidos da org (migration 0062): e-mail → motivo.
+  public emailsInvalidos = new Map<string, string | null>()
+
+  async registrarEmailInvalido(email: string, motivo: string | null): Promise<void> {
+    const e = email.trim().toLowerCase()
+    if (e && !this.emailsInvalidos.has(e)) this.emailsInvalidos.set(e, motivo)
+  }
+
   async buscarLeadPorDominio(dominio: string): Promise<Lead | null> {
     const d = dominio.trim().toLowerCase()
     if (!d) return null

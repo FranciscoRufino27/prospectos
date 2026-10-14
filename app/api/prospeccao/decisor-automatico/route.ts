@@ -5,10 +5,11 @@
 import { NextResponse } from 'next/server'
 import { resolverAcesso } from '@/lib/rbac/servidor'
 import { parseWorkspaceConfig } from '@/lib/config/workspaceConfig'
-import { consultarSocios } from '@/lib/prospeccao/socios'
-import { buscarDecisoresCrustdata, buscarEmailAnymail } from '@/lib/prospeccao/enriquecimento'
+import { buscarDecisoresCrustdata, buscarEmailAnymail, LIMITE_CANDIDATOS } from '@/lib/prospeccao/enriquecimento'
+import { buscarEmailComCache, buscarPessoasComCache, consultarSociosComCache } from '@/lib/prospeccao/inteligencia'
 import { carregarAnalises, salvarConsulta, salvarDecisor, salvarEnriquecimento } from '@/lib/prospeccao/decisoresServidor'
 import { resolverDecisorAutomatico } from '@/lib/prospeccao/decisorAutomatico'
+import { travasDaConfig } from '@/lib/prospeccao/travasCusto'
 import type { AnaliseSalva } from '@/lib/prospeccao/decisores'
 
 export const runtime = 'nodejs'
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
     // Só CNPJ do catálogo: a rota não é um proxy aberto das APIs pagas.
     if (!empresa.data) return NextResponse.json({ erro: 'CNPJ fora do catálogo.' }, { status: 404 })
 
-    const perfil = parseWorkspaceConfig(orgRow.data?.configuracoes).prospeccao
+    const config = parseWorkspaceConfig(orgRow.data?.configuracoes)
+    const perfil = config.prospeccao
     // Sem o salvo (falha de leitura), segue consultando: só perde o reaproveitamento.
     const analises = await carregarAnalises(admin, org, [cnpj]).catch((e) => {
       console.error('[prospeccao/decisor-automatico] sem análise salva:', e)
@@ -41,10 +43,15 @@ export async function POST(req: Request) {
     })
     const salvo = analises[cnpj] ?? null
 
+    // Toda consulta externa passa antes pelo cache de inteligência (global).
+    // Travas de custo da org (liga/desliga + orçamento) valem para Crustdata e Anymail.
+    const intel = { admin, organizacaoId: org, travas: travasDaConfig(config.enriquecimentoPago), usuarioId: user.id }
     const r = await resolverDecisorAutomatico(empresa.data, perfil, salvo, {
-      consultarSocios: (c) => consultarSocios(c),
-      buscarEmail: (nome, dominio) => buscarEmailAnymail(nome, dominio, process.env.ANYMAILFINDER_API_KEY),
-      buscarPessoas: (dominio, titulos) => buscarDecisoresCrustdata(dominio, titulos, process.env.CRUSTDATA_API_KEY),
+      consultarSocios: (c) => consultarSociosComCache(intel, c),
+      buscarEmail: (nome, dominio) => buscarEmailComCache(intel, nome, dominio,
+        () => buscarEmailAnymail(nome, dominio, process.env.ANYMAILFINDER_API_KEY)),
+      buscarPessoas: (alvo, titulos) => buscarPessoasComCache(intel, alvo, titulos, LIMITE_CANDIDATOS,
+        () => buscarDecisoresCrustdata(alvo, titulos, process.env.CRUSTDATA_API_KEY)),
       salvarConsulta: (consulta) => salvarConsulta(admin, org, cnpj, consulta),
       salvarEnriquecimento: async (parte) => { await salvarEnriquecimento(admin, org, cnpj, parte) },
       salvarDecisor: (d) => salvarDecisor(admin, org, user.id, { cnpj, nome: d.nome, cargo: d.cargo || null, linkedin: d.linkedin ?? null }),

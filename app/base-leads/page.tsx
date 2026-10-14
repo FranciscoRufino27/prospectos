@@ -129,8 +129,8 @@ export default function BaseLeadsPage() {
   useEffect(() => { carregar(); }, [carregar, reloadKey]);
 
   const todosDaPaginaSelecionados = data.length > 0 && data.every((lead) => selecionadosCampanha.has(lead.id));
-  const hrefProspeccao = `/automacao/campanhas/nova?tipo=prospeccao&leads=${encodeURIComponent([...selecionadosCampanha].join(','))}`;
-  const hrefComunicado = `/automacao/campanhas/nova?tipo=novidade_clientes&leads=${encodeURIComponent([...selecionadosCampanha].join(','))}`;
+  const hrefProspeccao = `/campanhas/nova?tipo=prospeccao&leads=${encodeURIComponent([...selecionadosCampanha].join(','))}`;
+  const hrefComunicado = `/campanhas/nova?tipo=novidade_clientes&leads=${encodeURIComponent([...selecionadosCampanha].join(','))}`;
 
   const alternarSelecao = useCallback((id: string) => {
     setSelecionadosCampanha((atuais) => {

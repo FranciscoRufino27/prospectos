@@ -1,14 +1,16 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AvisoRespostaRepository } from './repository'
-import type { AvisoResposta, ClassificacaoAviso, DadosAvisoResposta, DestinoAvisoResposta, StatusAvisoResposta } from './types'
+import type {
+  AvisoResposta, ClassificacaoAviso, DadosAvisoResposta, DestinoAvisoResposta, StatusAvisoResposta, TipoAviso,
+} from './types'
 
-// Implementação Supabase do outbox (migration 0053). Client admin (service_role
-// BYPASSA RLS) → toda leitura/escrita filtra e grava organizacao_id.
+// Implementação Supabase do outbox (migrations 0053/0067). Client admin
+// (service_role BYPASSA RLS) → toda leitura/escrita filtra e grava organizacao_id.
 
 const TABELA = 'avisos_resposta_cliente'
 const COLS =
-  'id, organizacao_id, lead_id, evento_id, destino_tipo, status, tentativas, ultimo_erro, dados, ' +
+  'id, organizacao_id, lead_id, evento_id, tipo, destino_tipo, status, tentativas, ultimo_erro, dados, ' +
   'destino, provider_message_id, enviado_em, criado_em'
 
 type Linha = {
@@ -16,6 +18,7 @@ type Linha = {
   organizacao_id: string
   lead_id: string
   evento_id: string
+  tipo?: TipoAviso | null
   destino_tipo: DestinoAvisoResposta
   status: StatusAvisoResposta
   tentativas: number
@@ -28,6 +31,7 @@ type Linha = {
 }
 
 const CLASSIFICACOES: ClassificacaoAviso[] = ['positivo', 'negativo', 'neutro', 'indeterminado']
+const textoOuNull = (v: unknown) => (typeof v === 'string' && v ? v : null)
 
 export function mapearAviso(l: Linha): AvisoResposta {
   const d = l.dados ?? {}
@@ -36,6 +40,7 @@ export function mapearAviso(l: Linha): AvisoResposta {
     organizacaoId: l.organizacao_id,
     leadId: l.lead_id,
     eventoId: l.evento_id,
+    tipo: l.tipo === 'envio' ? 'envio' : 'resposta',
     destinoTipo: l.destino_tipo,
     status: l.status,
     tentativas: Number(l.tentativas ?? 0),
@@ -46,9 +51,16 @@ export function mapearAviso(l: Linha): AvisoResposta {
       canal: d.canal === 'whatsapp' ? 'whatsapp' : 'email',
       classificacao: CLASSIFICACOES.includes(d.classificacao ?? null) ? (d.classificacao as ClassificacaoAviso) : null,
       trecho: String(d.trecho ?? ''),
-      responsavelId: typeof d.responsavelId === 'string' && d.responsavelId ? d.responsavelId : null,
+      responsavelId: textoOuNull(d.responsavelId),
+      // Sem estes dois, o grupo e o responsável escolhidos na campanha se
+      // perdiam ao reler a linha e o aviso caía na regra da organização.
+      responsavelPerfilId: textoOuNull(d.responsavelPerfilId),
+      grupoId: textoOuNull(d.grupoId),
       responsavelNome: String(d.responsavelNome ?? ''),
-      link: typeof d.link === 'string' && d.link ? d.link : null,
+      link: textoOuNull(d.link),
+      campanhaNome: textoOuNull(d.campanhaNome),
+      etapa: textoOuNull(d.etapa),
+      assunto: textoOuNull(d.assunto),
     },
     destino: l.destino ?? null,
     providerMessageId: l.provider_message_id ?? null,
@@ -62,12 +74,15 @@ const RECLAMAVEIS: StatusAvisoResposta[] = ['pendente', 'falhou', 'configuracao_
 export class SupabaseAvisoRespostaRepository implements AvisoRespostaRepository {
   constructor(private readonly admin: SupabaseClient) {}
 
-  async registrar(org: string, e: { leadId: string; eventoId: string; destinoTipo: DestinoAvisoResposta; dados: DadosAvisoResposta }): Promise<AvisoResposta> {
+  async registrar(org: string, e: { leadId: string; eventoId: string; destinoTipo: DestinoAvisoResposta; dados: DadosAvisoResposta; tipo?: TipoAviso }): Promise<AvisoResposta> {
     // ignoreDuplicates: o índice único (org, evento, destino) segura a corrida.
     const { error } = await this.admin
       .from(TABELA)
       .upsert(
-        { organizacao_id: org, lead_id: e.leadId, evento_id: e.eventoId, destino_tipo: e.destinoTipo, status: 'pendente', dados: e.dados },
+        {
+          organizacao_id: org, lead_id: e.leadId, evento_id: e.eventoId, tipo: e.tipo ?? 'resposta',
+          destino_tipo: e.destinoTipo, status: 'pendente', dados: e.dados,
+        },
         { onConflict: 'organizacao_id,evento_id,destino_tipo', ignoreDuplicates: true },
       )
     if (error) throw new Error(error.message)
@@ -92,7 +107,8 @@ export class SupabaseAvisoRespostaRepository implements AvisoRespostaRepository 
 
   async existeDesde(org: string, leadId: string, desdeISO: string): Promise<boolean> {
     const { data, error } = await this.admin
-      .from(TABELA).select('id').eq('organizacao_id', org).eq('lead_id', leadId).gte('criado_em', desdeISO).limit(1)
+      .from(TABELA).select('id').eq('organizacao_id', org).eq('lead_id', leadId).eq('tipo', 'resposta')
+      .gte('criado_em', desdeISO).limit(1)
     if (error) throw new Error(error.message)
     return (data?.length ?? 0) > 0
   }

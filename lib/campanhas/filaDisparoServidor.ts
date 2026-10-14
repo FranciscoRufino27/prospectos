@@ -1,6 +1,7 @@
 import 'server-only'
 import { send } from '@vercel/queue'
 import type { WorkflowStore } from '@/lib/workflows'
+import { encaixarNaJanela, type JanelaCampanha } from './agenda'
 
 export const TOPICO_FILA_CAMPANHA = 'campanhas-email-v1'
 export const INTERVALO_ENVIO_CAMPANHA_SEGUNDOS = 120
@@ -58,17 +59,23 @@ export function montarAgendaDisparoCampanha(
   campanhaId: string,
   execucaoIds: string[],
   agora: Date = new Date(),
+  janela?: JanelaCampanha | null,
+  sufixoChave?: string,
 ): ItemAgendaCampanha[] {
   const ids = [...new Set(execucaoIds.filter(valorNaoVazio))]
-  return ids.map((execucaoId, indice) => {
-    const delaySeconds = indice * INTERVALO_ENVIO_CAMPANHA_SEGUNDOS
+  // Um envio a cada INTERVALO, sempre dentro da janela da campanha (dias +
+  // horário de Brasília): o que não cabe hoje continua na próxima abertura.
+  let cursor = agora.getTime()
+  return ids.map((execucaoId) => {
+    const slot = encaixarNaJanela(new Date(cursor), janela).getTime()
+    cursor = slot + INTERVALO_ENVIO_CAMPANHA_SEGUNDOS * 1_000
     return {
       organizacaoId,
       campanhaId,
       execucaoId,
-      agendadoPara: new Date(agora.getTime() + delaySeconds * 1_000).toISOString(),
-      delaySeconds,
-      idempotencyKey: `campanha:${campanhaId}:execucao:${execucaoId}`,
+      agendadoPara: new Date(slot).toISOString(),
+      delaySeconds: Math.max(0, Math.round((slot - agora.getTime()) / 1_000)),
+      idempotencyKey: `campanha:${campanhaId}:execucao:${execucaoId}${sufixoChave ? `:${sufixoChave}` : ''}`,
     }
   })
 }
@@ -78,7 +85,14 @@ export async function agendarExecucoesCampanha(
   organizacaoId: string,
   campanhaId: string,
   execucaoIds: string[],
-  opcoes: { agora?: Date; enfileirar?: Enfileirar } = {},
+  opcoes: {
+    agora?: Date
+    enfileirar?: Enfileirar
+    /** Janela da campanha (publico.agenda). Sem ela, agenda sem restrição de horário. */
+    janela?: JanelaCampanha | null
+    /** Reagendamento (ex.: ao retomar): chave nova para a fila não deduplicar. */
+    sufixoChave?: string
+  } = {},
 ): Promise<{
   agendadas: number
   ignoradas: number
@@ -90,7 +104,7 @@ export async function agendarExecucoesCampanha(
   }
   const agora = opcoes.agora ?? new Date()
   const enfileirar = opcoes.enfileirar ?? send
-  const agenda = montarAgendaDisparoCampanha(organizacaoId, campanhaId, execucaoIds, agora)
+  const agenda = montarAgendaDisparoCampanha(organizacaoId, campanhaId, execucaoIds, agora, opcoes.janela, opcoes.sufixoChave)
   let agendadas = 0
   let ignoradas = 0
   let primeiraExecucaoEm: string | null = null
@@ -142,4 +156,43 @@ export async function agendarExecucoesCampanha(
   }
 
   return { agendadas, ignoradas, primeiraExecucaoEm, ultimaExecucaoEm }
+}
+
+/**
+ * Ao RETOMAR uma campanha pausada: quem ainda não recebeu o 1º e-mail
+ * (aguardando, passo 0, nunca agendado como espera) volta para a fila, na ordem
+ * original e dentro da janela. Sem isso, o que venceu durante a pausa ficava
+ * parado para sempre (o callback pausado não reenfileira). Chave nova na fila;
+ * mensagens antigas ainda em voo não enviam antes do novo horário (o executor
+ * só age com o vencimento gravado e a prospecção exige claim atômico).
+ */
+export async function reagendarPrimeirosEnviosAoRetomar(
+  store: WorkflowStore,
+  admin: import('@supabase/supabase-js').SupabaseClient,
+  organizacaoId: string,
+  campanhaId: string,
+  janela: JanelaCampanha | null,
+  opcoes: { agora?: Date; enfileirar?: Enfileirar } = {},
+) {
+  const { data, error } = await admin
+    .from('workflow_execucoes')
+    .select('id, agendamento_geracao')
+    .eq('organizacao_id', organizacaoId)
+    .eq('campanha_id', campanhaId)
+    .eq('status', 'aguardando')
+    .eq('passo_atual', 0)
+    .order('proxima_verificacao_em', { ascending: true })
+    .order('id', { ascending: true })
+  if (error) throw error
+  const ids = (data ?? [])
+    .filter((ex) => !((ex as { agendamento_geracao?: number | null }).agendamento_geracao ?? 0))
+    .map((ex) => (ex as { id: string }).id)
+  if (!ids.length) return { agendadas: 0, ignoradas: 0, primeiraExecucaoEm: null, ultimaExecucaoEm: null }
+  const agora = opcoes.agora ?? new Date()
+  return agendarExecucoesCampanha(store, organizacaoId, campanhaId, ids, {
+    ...opcoes,
+    agora,
+    janela,
+    sufixoChave: `retomada:${agora.getTime()}`,
+  })
 }

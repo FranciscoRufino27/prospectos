@@ -16,7 +16,7 @@ vi.mock('@/lib/comercial/avisosResposta/composicao', () => ({
   lerWhatsappResponsavel: async (_admin: unknown, _org: string, id: string) => numeros.usuario.get(id) ?? null,
 }))
 
-import { exigirAvisoRetornoPronto, perfisComWhatsappAvisos } from '../retornoWhatsappServidor'
+import { exigirAvisoEnvioPronto, exigirAvisoRetornoPronto, perfisComWhatsappAvisos } from '../retornoWhatsappServidor'
 
 const ORG = 'org-a'
 const OUTRA = 'org-b'
@@ -146,5 +146,44 @@ describe('exigirAvisoRetornoPronto', () => {
 describe('perfisComWhatsappAvisos', () => {
   it('só perfis da organização, com aviso ligado e número válido', async () => {
     expect(await perfisComWhatsappAvisos(banco().cliente(), ORG)).toEqual(['p-aline'])
+  })
+})
+
+describe('exigirAvisoEnvioPronto', () => {
+  const envAnterior: Record<string, string | undefined> = {}
+  beforeEach(() => {
+    numeros.perfil.clear()
+    for (const [k, v] of Object.entries(ENV_ZAPI)) { envAnterior[k] = process.env[k]; process.env[k] = v }
+  })
+  afterEach(() => {
+    for (const k of Object.keys(ENV_ZAPI)) {
+      if (envAnterior[k] === undefined) delete process.env[k]
+      else process.env[k] = envAnterior[k]
+    }
+  })
+  const comEnvio = (avisoEnvio: Record<string, unknown>) => normalizarPublicoCampanha({
+    responsavel_id: 'p-aline', operacao: { avisoEnvio },
+  })
+
+  it('campanha sem aviso de envio passa', async () => {
+    await expect(exigirAvisoEnvioPronto(banco().cliente(), ORG, normalizarPublicoCampanha({}), ['l1'])).resolves.toBeUndefined()
+  })
+
+  it('exige a Z-API configurada', async () => {
+    delete process.env.ZAPI_TOKEN
+    await expect(exigirAvisoEnvioPronto(banco().cliente(), ORG, comEnvio({ whatsapp: ['grupo'] }), ['l1'])).rejects.toThrow('Z-API')
+  })
+
+  it('grupo marcado sem grupo na campanha nem na conta bloqueia; com o da conta passa', async () => {
+    await expect(exigirAvisoEnvioPronto(banco({ grupoConta: null }).cliente(), ORG, comEnvio({ whatsapp: ['grupo'] }), ['l1']))
+      .rejects.toThrow('não há grupo')
+    await expect(exigirAvisoEnvioPronto(banco().cliente(), ORG, comEnvio({ whatsapp: ['grupo'] }), ['l1'])).resolves.toBeUndefined()
+  })
+
+  it('responsável marcado sem WhatsApp de avisos bloqueia', async () => {
+    await expect(exigirAvisoEnvioPronto(banco().cliente(), ORG, comEnvio({ whatsapp: ['responsavel'] }), ['l1']))
+      .rejects.toThrow('Aline ainda não ligou')
+    numeros.perfil.set('p-aline', '5521988887777')
+    await expect(exigirAvisoEnvioPronto(banco().cliente(), ORG, comEnvio({ whatsapp: ['responsavel'] }), ['l1'])).resolves.toBeUndefined()
   })
 })

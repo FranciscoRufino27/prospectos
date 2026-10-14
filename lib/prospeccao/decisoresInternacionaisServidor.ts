@@ -1,4 +1,4 @@
-// Cache do decisor internacional por (organizacao_id, dominio), migration 0061.
+// Cache do decisor internacional por (organizacao_id, dominio), migration 0063.
 // Client admin (service_role ignora RLS): TODA operação filtra/grava
 // organizacao_id da sessão, recebido da rota — nunca do corpo da requisição.
 
@@ -9,7 +9,7 @@ import type { SalvoInternacional } from './decisorAutomatico'
 
 const TABELA = 'prospeccao_decisores_internacionais'
 
-/** Domínio aceito (o mesmo check da 0061): minúsculo, com TLD. */
+/** Domínio aceito (o mesmo check da 0063): minúsculo, com TLD. */
 export function dominioValido(v: unknown): string | null {
   if (typeof v !== 'string') return null
   const d = v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '')

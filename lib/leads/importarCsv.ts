@@ -119,7 +119,11 @@ const ALIASES: Record<keyof Omit<LeadPadrao, never>, string[]> = {
   contato_nome: ['nome', 'name', 'contato', 'nome do contato', 'nome completo'],
   contato_email: ['email', 'e-mail', 'e mail', 'mail'],
   empresa: ['empresa', 'company', 'organizacao', 'razao social', 'associated company'],
-  segmento: ['nicho', 'segmento', 'setor', 'industry', 'mercado'],
+  // 'nicho/segmento' cobre o header composto que o próprio modal anuncia como
+  // coluna opcional aceita (ImportarLeadsModal.tsx) — sem isso, o casamento
+  // exato de mapearColunas não batia com nenhum alias isolado e a coluna
+  // chegava sempre vazia.
+  segmento: ['nicho', 'segmento', 'nicho/segmento', 'setor', 'industry', 'mercado'],
   // 'contact owner'/'lead owner' cobrem a exportação do HubSpot sem renomear
   // coluna na mão; 'proprietario' é como o HubSpot BR traduz.
   responsavel: [

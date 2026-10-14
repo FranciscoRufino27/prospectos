@@ -13,6 +13,15 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/propostas/**': ['./public/proposta/**/*'],
   },
+  // O módulo Campanhas mudou de /automacao para /campanhas. Links antigos
+  // (favoritos, e-mails e notificações já enviados) continuam funcionando;
+  // a query (?tab=...) é repassada pelo Next.
+  async redirects() {
+    return [
+      { source: '/automacao', destination: '/campanhas', permanent: false },
+      { source: '/automacao/campanhas/:path*', destination: '/campanhas/:path*', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -16,13 +16,21 @@ function dbFake(org: unknown) {
     eq: (col: string, v: unknown) => { eqs.push([col, v]); return q },
     maybeSingle: async () => ({ data: org, error: null }),
   }
+  // Conta conectada pela tela (0066): nenhuma nestes casos — vale a chave legada.
+  const eqsRemetente: Array<[string, unknown]> = []
+  const qRemetente = {
+    select: () => qRemetente,
+    eq: (col: string, v: unknown) => { eqsRemetente.push([col, v]); return qRemetente },
+    maybeSingle: async () => ({ data: null, error: null }),
+  }
   const client = {
     from: (t: string) => {
+      if (t === 'organizacao_remetentes_email') return qRemetente
       if (t !== 'organizacoes') throw new Error('tabela inesperada: ' + t)
       return q
     },
   } as unknown as SupabaseClient
-  return { client, eqs }
+  return { client, eqs, eqsRemetente }
 }
 
 describe('resolverContaEmailOrganizacao', () => {

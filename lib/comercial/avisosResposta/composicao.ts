@@ -9,10 +9,10 @@ import { lerConfigZapi, sendText } from '@/lib/whatsapp/zapi'
 import { enviadorGrupoZapi, lerGrupoComercialDaOrg } from '../handoff/composicao'
 import { SupabaseAvisoRespostaRepository } from './supabaseRepository'
 import {
-  avisarRespostaCliente, reprocessarAvisosResposta,
+  avisarEnvioCampanha, avisarRespostaCliente, reprocessarAvisosResposta,
   type ContextoLeadAviso, type DepsAvisoResposta, type ResultadoAvisoResposta,
 } from './servico'
-import type { EntradaAvisoResposta, EnviadorAviso } from './types'
+import type { EntradaAvisoEnvio, EntradaAvisoResposta, EnviadorAviso } from './types'
 import { numeroWhatsappAvisos } from './numero'
 import { resolverAuthIdDoResponsavel } from '@/lib/leads/responsavelServer'
 
@@ -97,6 +97,13 @@ export type HookAvisoResposta = (entrada: EntradaAvisoResposta) => Promise<Resul
 export function montarHookAvisoResposta(admin: SupabaseClient): HookAvisoResposta {
   const deps = montarDepsAvisoResposta(admin)
   return (entrada) => avisarRespostaCliente(deps, entrada)
+}
+
+export type HookAvisoEnvio = (entrada: EntradaAvisoEnvio) => Promise<ResultadoAvisoResposta>
+
+export function montarHookAvisoEnvio(admin: SupabaseClient): HookAvisoEnvio {
+  const deps = montarDepsAvisoResposta(admin)
+  return (entrada) => avisarEnvioCampanha(deps, entrada)
 }
 
 export function reprocessarAvisosRespostaDaOrg(admin: SupabaseClient, organizacaoId: string) {

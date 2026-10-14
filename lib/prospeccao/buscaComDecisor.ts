@@ -34,6 +34,8 @@ export const ROTULO_PULO: Record<MotivoPulo, string> = {
   sem_socio: 'sem sócio pessoa física na Receita',
   sem_decisor: 'ninguém com cargo-alvo encontrado',
   sem_email: 'e-mail do decisor não encontrado',
+  bloqueado_crustdata: 'decisor não buscado: Crustdata bloqueada (enriquecimento pago)',
+  bloqueado_anymail: 'e-mail não buscado: Anymail bloqueada (enriquecimento pago)',
   ja_na_base: 'já na base',
   erro: 'falha na consulta',
 }
@@ -65,6 +67,13 @@ export interface ResumoBuscaComDecisor {
   tentativas: number
   parada: MotivoParada
   erro: string | null
+  // Sempre preenchidos por buscarComDecisor (opcionais só para resumos montados à mão, ex.: cancelamento).
+  /** Empresas completas: empresa + decisor + e-mail (prontas para importar). */
+  prontas?: number
+  /** Empresas não completas, por motivo (sem decisor, sem e-mail, bloqueadas…). */
+  porMotivo?: Partial<Record<MotivoPulo, number>>
+  /** Fonte paga bloqueada nesta busca → mensagem do motivo (a primeira vista). */
+  bloqueios?: Partial<Record<'crustdata' | 'anymail', string>>
 }
 
 export async function buscarComDecisor<T extends CandidatoComDecisor, C>(o: OpcoesBuscaComDecisor<T, C>): Promise<ResumoBuscaComDecisor> {
@@ -80,9 +89,19 @@ export async function buscarComDecisor<T extends CandidatoComDecisor, C>(o: Opco
   // quando uma delas termina: se ficou incompleta, a vaga volta.
   let acordar: (() => void)[] = []
   const aceita = o.aceitaIncompletas === true
+  let prontas = 0
+  const porMotivo: Partial<Record<MotivoPulo, number>> = {}
+  const bloqueios: Partial<Record<'crustdata' | 'anymail', string>> = {}
+  const contar = (motivo: MotivoPulo, erro?: string) => {
+    porMotivo[motivo] = (porMotivo[motivo] ?? 0) + 1
+    const fonte = motivo === 'bloqueado_crustdata' ? 'crustdata' : motivo === 'bloqueado_anymail' ? 'anymail' : null
+    if (fonte && erro && !bloqueios[fonte]) bloqueios[fonte] = erro
+  }
   // Pulada sem custo (já na base / sem domínio): conta na meta se entrar na lista.
   const registrar = (item: T, d: Exclude<Desfecho<C>, { tipo: 'falha' }>) => {
     if (entraNaLista(d, aceita)) completos++
+    if (d.tipo === 'completo') prontas++
+    else contar(d.motivo, d.erro)
     o.aoDesfecho(item, d)
   }
   const liberar = () => { const a = acordar; acordar = []; a.forEach((f) => f()) }
@@ -161,6 +180,7 @@ export async function buscarComDecisor<T extends CandidatoComDecisor, C>(o: Opco
       if (o.cancelado()) { parar('cancelado'); return }
       if (desfecho.tipo === 'falha') {
         if (desfecho.fatal) { parar('falha', desfecho.erro); return }
+        contar('erro')
         o.aoDesfecho(item, { tipo: 'pulado', motivo: 'erro', erro: desfecho.erro })
       } else {
         registrar(item, desfecho)
@@ -171,5 +191,5 @@ export async function buscarComDecisor<T extends CandidatoComDecisor, C>(o: Opco
   }
 
   await Promise.all(Array.from({ length: Math.max(1, Math.min(o.concorrencia, o.meta)) }, trabalhador))
-  return { completos, tentativas, parada: parada ?? (completos >= o.meta ? 'meta' : 'fim'), erro }
+  return { completos, tentativas, parada: parada ?? (completos >= o.meta ? 'meta' : 'fim'), erro, prontas, porMotivo, bloqueios }
 }

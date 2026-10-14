@@ -25,6 +25,13 @@ export interface Store {
   buscarLead(id: string): Promise<Lead | null>
   // Casa pelo e-mail EXATO do contato (case-insensitive).
   buscarLeadPorEmail(email: string): Promise<Lead | null>
+  // Bounce é do ENDEREÇO, não de um lead: TODOS os leads da org com este e-mail
+  // exato, qualquer owner (lead importado fora do motor também recebe campanha).
+  buscarLeadsPorEmail?(email: string): Promise<Lead[]>
+  // Guarda o endereço na lista de e-mails inválidos da org (migration 0062).
+  // Sobrevive à exclusão/reimportação do lead: o trigger da 0062 marca como
+  // bounced quem entrar depois com o mesmo e-mail. Best-effort — não lança.
+  registrarEmailInvalido?(email: string, motivo: string | null): Promise<void>
   // Casa pelo domínio da empresa (resposta encaminhada). Usa coluna `dominio`
   // e, como fallback, o domínio do contato_email.
   buscarLeadPorDominio(dominio: string): Promise<Lead | null>

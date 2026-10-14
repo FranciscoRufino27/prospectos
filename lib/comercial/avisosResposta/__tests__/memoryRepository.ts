@@ -1,7 +1,7 @@
 // Fake em memória do outbox de avisos (mesmas regras do Supabase: unique
 // org+evento+destino, compare-and-swap em tentativas, escopo por org).
 import type { AvisoRespostaRepository } from '../repository'
-import type { AvisoResposta, DadosAvisoResposta, DestinoAvisoResposta, StatusAvisoResposta } from '../types'
+import type { AvisoResposta, DadosAvisoResposta, DestinoAvisoResposta, StatusAvisoResposta, TipoAviso } from '../types'
 
 const RECLAMAVEIS = new Set<StatusAvisoResposta>(['pendente', 'falhou', 'configuracao_ausente'])
 
@@ -11,11 +11,11 @@ export class MemoryAvisoRespostaRepository implements AvisoRespostaRepository {
   // Relógio das linhas criadas (o serviço compara com a janela anti-spam).
   agora = () => new Date('2026-09-28T12:00:00Z')
 
-  async registrar(org: string, e: { leadId: string; eventoId: string; destinoTipo: DestinoAvisoResposta; dados: DadosAvisoResposta }): Promise<AvisoResposta> {
+  async registrar(org: string, e: { leadId: string; eventoId: string; destinoTipo: DestinoAvisoResposta; dados: DadosAvisoResposta; tipo?: TipoAviso }): Promise<AvisoResposta> {
     const existente = this.linhas.find((a) => a.organizacaoId === org && a.eventoId === e.eventoId && a.destinoTipo === e.destinoTipo)
     if (existente) return { ...existente }
     const novo: AvisoResposta = {
-      id: `a${++this.seq}`, organizacaoId: org, leadId: e.leadId, eventoId: e.eventoId, destinoTipo: e.destinoTipo,
+      id: `a${++this.seq}`, organizacaoId: org, leadId: e.leadId, eventoId: e.eventoId, tipo: e.tipo ?? 'resposta', destinoTipo: e.destinoTipo,
       status: 'pendente', tentativas: 0, ultimoErro: null, dados: { ...e.dados }, destino: null,
       providerMessageId: null, enviadoEm: null, criadoEm: this.agora().toISOString(),
     }
@@ -28,7 +28,7 @@ export class MemoryAvisoRespostaRepository implements AvisoRespostaRepository {
   }
 
   async existeDesde(org: string, leadId: string, desdeISO: string) {
-    return this.linhas.some((a) => a.organizacaoId === org && a.leadId === leadId && a.criadoEm >= desdeISO)
+    return this.linhas.some((a) => a.organizacaoId === org && a.leadId === leadId && a.tipo === 'resposta' && a.criadoEm >= desdeISO)
   }
 
   async buscar(org: string, id: string) {

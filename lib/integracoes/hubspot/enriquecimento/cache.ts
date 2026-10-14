@@ -1,20 +1,27 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Cache persistente de fontes PÚBLICAS (tabela global enriquecimento_cache,
-// migration 0056 — exceção documentada ao isolamento por organização, só
-// service_role). Evita consultar o mesmo CNPJ/domínio de novo dentro da
-// validade. Resultado "falha" expira rápido para não travar uma nova tentativa.
+// Cache GLOBAL de inteligência (tabela enriquecimento_cache, migrations 0056 e
+// 0064 — exceção documentada ao isolamento por organização, só service_role):
+// fatos sobre empresas e pessoas, não decisões comerciais. Evita consultar o
+// mesmo CNPJ/domínio/pessoa de novo dentro da validade, inclusive quando a
+// fonte NÃO achou (cache negativo). Resultado "falha" expira rápido para não
+// travar uma nova tentativa.
 
-export type TipoCache = 'opencnpj' | 'site_dominio'
+export type TipoCache = 'opencnpj' | 'site_dominio' | 'crustdata_pessoas' | 'anymail_email'
 export type StatusCache = 'ok' | 'nao_encontrado' | 'falha'
 
 const HORA = 3_600_000
 const DIA = 24 * HORA
-export const VALIDADE_MS: Record<StatusCache, number> = {
-  ok: 30 * DIA,
-  nao_encontrado: 7 * DIA,
-  falha: HORA / 6, // 10 min: falha passageira não trava nova tentativa por muito tempo
+const FALHA = HORA / 6 // 10 min: falha passageira não trava nova tentativa por muito tempo
+
+// Validade por fonte: positivo = quanto o dado vale; negativo = quando vale
+// tentar de novo (retry). Pago dura mais: refazer custa crédito.
+export const VALIDADE_MS: Record<TipoCache, Record<StatusCache, number>> = {
+  opencnpj: { ok: 30 * DIA, nao_encontrado: 7 * DIA, falha: FALHA },
+  site_dominio: { ok: 30 * DIA, nao_encontrado: 7 * DIA, falha: FALHA },
+  crustdata_pessoas: { ok: 90 * DIA, nao_encontrado: 30 * DIA, falha: FALHA },
+  anymail_email: { ok: 180 * DIA, nao_encontrado: 60 * DIA, falha: FALHA },
 }
 
 export interface EntradaCache<T> {
@@ -22,29 +29,54 @@ export interface EntradaCache<T> {
   resultado: T
 }
 
-export async function lerCache<T>(admin: SupabaseClient, tipo: TipoCache, chave: string, agora: number): Promise<EntradaCache<T> | null> {
+/** Entrada lida, com a data em que a fonte foi consultada. */
+export interface EntradaCacheLida<T> extends EntradaCache<T> {
+  consultadoEm: string
+}
+
+/** Auditoria de uma consulta (não decide nada): créditos e quem disparou. */
+export interface OrigemConsulta {
+  custo?: number | null
+  organizacaoId?: string | null
+}
+
+export async function lerCache<T>(admin: SupabaseClient, tipo: TipoCache, chave: string, agora: number): Promise<EntradaCacheLida<T> | null> {
   const { data } = await admin
     .from('enriquecimento_cache')
-    .select('status, resultado, expira_em')
+    .select('status, resultado, consultado_em, expira_em')
     .eq('tipo', tipo)
     .eq('chave', chave)
     .maybeSingle()
   if (!data || new Date(String(data.expira_em)).getTime() <= agora) return null
-  return { status: data.status as StatusCache, resultado: data.resultado as T }
+  return { status: data.status as StatusCache, resultado: data.resultado as T, consultadoEm: String(data.consultado_em) }
 }
 
-export async function gravarCache<T>(admin: SupabaseClient, tipo: TipoCache, chave: string, entrada: EntradaCache<T>, agora: number): Promise<void> {
-  await admin.from('enriquecimento_cache').upsert(
+export async function gravarCache<T>(
+  admin: SupabaseClient,
+  tipo: TipoCache,
+  chave: string,
+  entrada: EntradaCache<T>,
+  agora: number,
+  origem: OrigemConsulta = {},
+): Promise<string | null> {
+  // Devolve a mensagem de erro (null = gravou). A Central HubSpot ignora, como
+  // sempre fez; o cache de inteligência registra no log.
+  const { error } = await admin.from('enriquecimento_cache').upsert(
     {
       tipo,
       chave,
       status: entrada.status,
       resultado: entrada.resultado,
       consultado_em: new Date(agora).toISOString(),
-      expira_em: new Date(agora + VALIDADE_MS[entrada.status]).toISOString(),
+      expira_em: new Date(agora + VALIDADE_MS[tipo][entrada.status]).toISOString(),
+      // Só vai no upsert quando informado: a Central HubSpot (fonte pública,
+      // sem custo) continua gravando exatamente as colunas de antes.
+      ...(origem.custo !== undefined ? { custo: origem.custo } : {}),
+      ...(origem.organizacaoId !== undefined ? { pago_por_organizacao: origem.organizacaoId } : {}),
     },
     { onConflict: 'tipo,chave' },
   )
+  return error ? error.message : null
 }
 
 // Lê do cache; se ausente/expirado, consulta e grava. `consultar` devolve a
@@ -58,7 +90,7 @@ export function criarConsultaComCache(admin: SupabaseClient, agora: number) {
     if (!p) {
       p = (async () => {
         const hit = await lerCache<T>(admin, tipo, chave, agora)
-        if (hit) return { entrada: hit as EntradaCache<unknown>, doCache: true }
+        if (hit) return { entrada: { status: hit.status, resultado: hit.resultado } as EntradaCache<unknown>, doCache: true }
         const entrada = await consultar()
         await gravarCache(admin, tipo, chave, entrada, agora)
         return { entrada: entrada as EntradaCache<unknown>, doCache: false }

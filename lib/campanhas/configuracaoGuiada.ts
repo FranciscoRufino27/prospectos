@@ -1,10 +1,18 @@
-import type { Publico, MensagemCampanha, FollowupCampanha, AvisoRetorno } from '@/components/automacao/tiposCampanha'
+import type { Publico, MensagemCampanha, FollowupCampanha, AvisoRetorno, AvisoEnvio } from '@/components/automacao/tiposCampanha'
 import type { CamposModeloEmail } from './modelosEmail'
 import type { DefinicaoWorkflow } from '@/lib/workflows/types'
 
 export const LIMITE_CONFIRMACAO_CAMPANHA = 100
 export const LIMITE_PUBLICO_CAMPANHA = 2000
 export const LIMITE_HTML_CAMPANHA = 200_000
+// Follow-ups além da mensagem inicial. A mesma regra decide o botão do wizard
+// (podeAdicionarFollowup) e o que o servidor aceita (normalizarFollowups).
+export const LIMITE_FOLLOWUPS_CAMPANHA = 6
+const MENSAGEM_LIMITE_FOLLOWUPS = `A campanha aceita no máximo ${LIMITE_FOLLOWUPS_CAMPANHA} follow-ups.`
+
+export function podeAdicionarFollowup(quantidadeAtual: number): boolean {
+  return quantidadeAtual < LIMITE_FOLLOWUPS_CAMPANHA
+}
 
 export const TIPOS_CAMPANHA = [
   { id: 'prospeccao', label: 'Prospectar novos leads', descricao: 'Iniciar uma nova abordagem comercial.' },
@@ -221,8 +229,12 @@ function normalizarMensagem(raw: unknown): MensagemCampanha | undefined {
 
 function normalizarFollowups(raw: unknown): FollowupCampanha[] | undefined {
   if (!Array.isArray(raw)) return undefined
+  // Acima do limite a requisição é recusada inteira (as rotas respondem 400
+  // antes de gravar): cortar o excedente em silêncio publicaria a campanha com
+  // menos follow-ups do que o usuário montou.
+  if (raw.length > LIMITE_FOLLOWUPS_CAMPANHA) throw new Error(MENSAGEM_LIMITE_FOLLOWUPS)
   const itens: FollowupCampanha[] = []
-  for (const item of raw.slice(0, 4)) {
+  for (const item of raw) {
     const mensagem = normalizarMensagem(item)
     const diasApos = item && typeof item === 'object' && !Array.isArray(item)
       ? numeroPositivo((item as Record<string, unknown>).diasApos)
@@ -266,7 +278,7 @@ function operacaoCrua(publico: unknown): Record<string, unknown> {
 
 /** false = os e-mails da campanha saem sem o responsável em cópia (CC). */
 export function responsavelRecebeCopiaDosEnvios(publico: unknown): boolean {
-  return operacaoCrua(publico).responsavelRecebe !== 'somente_respostas'
+  return operacaoCrua(publico).responsavelRecebe === 'envios_e_respostas'
 }
 
 /** Aviso de resposta escolhido na campanha; null = campanha antiga. */
@@ -275,6 +287,21 @@ export function avisoRetornoCampanha(publico: unknown): AvisoRetorno | null {
   return resposta && typeof resposta === 'object' && !Array.isArray(resposta)
     ? lerAvisoRetorno(resposta as Record<string, unknown>)
     : null
+}
+
+function lerAvisoEnvio(bruto: unknown): AvisoEnvio | null {
+  if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return null
+  const a = bruto as Record<string, unknown>
+  const destinos = Array.isArray(a.whatsapp) ? a.whatsapp : []
+  const whatsapp = (['responsavel', 'grupo'] as const).filter((d) => destinos.includes(d))
+  if (!whatsapp.length) return null
+  const grupo = whatsapp.includes('grupo') && typeof a.grupoWhatsappId === 'string' ? a.grupoWhatsappId.trim() : ''
+  return { whatsapp, ...(grupo ? { grupoWhatsappId: grupo } : {}) }
+}
+
+/** Aviso no WhatsApp a cada envio; null = desligado. */
+export function avisoEnvioCampanha(publico: unknown): AvisoEnvio | null {
+  return lerAvisoEnvio(operacaoCrua(publico).avisoEnvio)
 }
 
 export function normalizarPublicoCampanha(raw: unknown): Publico {
@@ -302,6 +329,7 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
     ? respostaRaw.pararCadencia
     : typeof agendaRaw.pararAoResponder === 'boolean' ? agendaRaw.pararAoResponder : true
   const aviso = lerAvisoRetorno(respostaRaw)
+  const avisoEnvio = lerAvisoEnvio(operacaoRaw.avisoEnvio)
 
   return {
     objetivo: texto(obj.objetivo),
@@ -353,7 +381,8 @@ export function normalizarPublicoCampanha(raw: unknown): Publico {
       remetenteEmail: texto(operacaoRaw.remetenteEmail),
       mensagemInicial: normalizarMensagem(operacaoRaw.mensagemInicial),
       followups: normalizarFollowups(operacaoRaw.followups),
-      responsavelRecebe: operacaoRaw.responsavelRecebe === 'somente_respostas' ? 'somente_respostas' : 'envios_e_respostas',
+      responsavelRecebe: operacaoRaw.responsavelRecebe === 'envios_e_respostas' ? 'envios_e_respostas' : 'somente_respostas',
+      ...(avisoEnvio ? { avisoEnvio } : {}),
       resposta: {
         ...(aviso ? { aviso } : {}),
         pararCadencia,
@@ -410,6 +439,10 @@ export function validarCampanhaGuiada(publico: Publico): string[] {
   if (aviso?.grupoWhatsappId && !FORMATO_GRUPO_WHATSAPP.test(aviso.grupoWhatsappId)) {
     erros.push('O grupo do WhatsApp precisa estar no formato 120363019502650977-group.')
   }
+  const avisoEnvio = op?.avisoEnvio
+  if (avisoEnvio?.grupoWhatsappId && !FORMATO_GRUPO_WHATSAPP.test(avisoEnvio.grupoWhatsappId)) {
+    erros.push('O grupo do aviso de envio precisa estar no formato 120363019502650977-group.')
+  }
   if (op?.resposta?.notificarResponsavel !== false && !op?.resposta?.emailAssunto) {
     erros.push('Informe o assunto do e-mail de resposta ao responsável.')
   }
@@ -420,6 +453,7 @@ export function validarCampanhaGuiada(publico: Publico): string[] {
   if (!inicial?.corpo) erros.push('Escreva a mensagem inicial ou escolha um template.')
   if ((inicial?.html?.length ?? 0) > LIMITE_HTML_CAMPANHA) erros.push('O HTML da mensagem inicial excede 200 KB.')
   if (!urlPermitida(inicial?.link)) erros.push('O link da mensagem inicial precisa usar http ou https.')
+  if ((op?.followups?.length ?? 0) > LIMITE_FOLLOWUPS_CAMPANHA) erros.push(MENSAGEM_LIMITE_FOLLOWUPS)
   for (const [indice, followup] of (op?.followups ?? []).entries()) {
     if (!followup.assunto || !followup.corpo || !followup.diasApos) {
       erros.push(`Complete a mensagem e o intervalo do follow-up ${indice + 1}.`)

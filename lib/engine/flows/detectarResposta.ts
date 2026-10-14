@@ -11,9 +11,11 @@
 //    Sem os hooks (scripts locais/testes antigos) toda resposta vale como interesse.
 //  - avisa a equipe no WhatsApp (responsável/grupo, conforme a org) de TODA
 //    resposta humana registrada — lib/comercial/avisosResposta
-// Quando um BOUNCE SMTP é detectado (migration 0027):
-//  - marca o lead como bounced=true
-//  - cancela todas as workflow_execucoes ativas do lead
+// Quando um BOUNCE SMTP é detectado (migrations 0027 e 0062):
+//  - guarda o endereço na lista de e-mails inválidos da organização
+//  - marca TODOS os leads da org com esse e-mail como bounced=true
+//  - cancela todas as workflow_execucoes ativas desses leads (sai da campanha)
+//  - aviso só de atraso (Action: delayed) não é bounce: o servidor segue tentando
 import { OWNER_ENGINE } from '../config'
 import { log } from '../logger'
 import { ESTAGIOS_EM_CADENCIA, dominioDoLead } from '../templates'
@@ -541,61 +543,104 @@ async function casarLead(store: Store, de: string): Promise<Lead | null> {
   return lead
 }
 
-// Bounce SMTP: casa o lead pelo DESTINATÁRIO (campo "To" não disponível na
-// mensagem recebida — casamos pelo endereço no corpo do bounce ou por domínio).
-// Como o bounce vem do mailer-daemon, o campo `de` não é o lead — precisa
-// extrair o email original do assunto/corpo.
-// Estratégia pragmática: busca qualquer lead que tenha sido o DESTINATÁRIO;
-// o bounce geralmente inclui o endereço original no corpo ou no assunto.
+// Bounce SMTP. O `de` é o mailer-daemon, não o lead: o destinatário que falhou
+// vem da parte delivery-status do aviso (msg.falhaEntrega, lida pelo provedor)
+// e, quando o servidor não a manda, do primeiro endereço citado no texto.
+// Devolve true se algum lead da org tinha o endereço devolvido.
 async function tratarBounce(store: Store, msg: MensagemRecebida): Promise<boolean> {
-  // Extrai endereço de e-mail do corpo/assunto do bounce.
-  const alvo = `${msg.assunto} ${msg.corpo}`
-  const match = alvo.match(/[\w.+%-]+@[\w.-]+\.[a-z]{2,}/i)
-  if (!match) {
+  const falha = msg.falhaEntrega ?? null
+  // Só ATRASO: o servidor ainda está tentando. Marcar agora tiraria da campanha
+  // um endereço possivelmente válido; se a entrega falhar de vez, chega outro
+  // aviso (Action: failed) e aí ele é tratado.
+  if (falha?.somenteAtraso) {
+    log.info('Aviso de atraso na entrega (não é falha definitiva). Ignorado.', {
+      destinatarios: falha.destinatarios,
+      status: falha.status,
+    })
+    return false
+  }
+
+  const enderecos = falha?.destinatarios.length ? falha.destinatarios : enderecoCitadoNoAviso(msg)
+  if (enderecos.length === 0) {
     log.aviso('Bounce sem e-mail identificável no corpo.', { de: msg.de, assunto: msg.assunto })
     return false
   }
-  const emailOriginal = match[0].toLowerCase()
-  const lead = await store.buscarLeadPorEmail(emailOriginal)
-  if (!lead) {
+  const motivo = falha?.status.length ? falha.status.join(', ') : null
+
+  let casou = false
+  for (const email of enderecos) {
+    if (await marcarEnderecoInvalido(store, email, motivo, msg.assunto)) casou = true
+  }
+  return casou
+}
+
+// Aviso sem delivery-status: o primeiro endereço do texto que não seja do
+// próprio sistema de entrega (o corpo costuma assinar como mailer-daemon).
+function enderecoCitadoNoAviso(msg: MensagemRecebida): string[] {
+  const citados = `${msg.assunto} ${msg.corpo}`.match(/[\w.+%-]+@[\w.-]+\.[a-z]{2,}/gi) ?? []
+  const alvo = citados
+    .map((e) => e.toLowerCase())
+    .find((e) => !PADROES_BOUNCE_REMETENTE.some((p) => e.startsWith(p)))
+  return alvo ? [alvo] : []
+}
+
+async function marcarEnderecoInvalido(
+  store: Store,
+  emailOriginal: string,
+  motivo: string | null,
+  assunto: string,
+): Promise<boolean> {
+  // A lista da organização vem ANTES de procurar o lead: o endereço segue
+  // inválido mesmo sem lead hoje, e o trigger da migration 0062 marca quem for
+  // importado depois com ele.
+  await store.registrarEmailInvalido?.(emailOriginal, motivo)
+
+  const leads = store.buscarLeadsPorEmail
+    ? await store.buscarLeadsPorEmail(emailOriginal)
+    : [await store.buscarLeadPorEmail(emailOriginal)].filter((l): l is Lead => l !== null)
+  if (leads.length === 0) {
     log.aviso('Bounce: e-mail não casa com nenhum lead.', { emailOriginal })
     return false
   }
 
-  // Idempotência: a busca de mensagens varre uma JANELA de dias e não depende da
-  // flag \Seen, então o mesmo bounce reaparece a cada passada do monitor (a cada
-  // INTERVALO_MONITOR_RESPOSTAS_SEGUNDOS). Sem esta guarda, cada passada remarca
-  // o lead e grava outra nota — foi assim que 3 leads acumularam ~2.400 notas
-  // cada. Já tratado é sucesso: contabiliza como bounce, não escreve de novo.
-  if (lead.bounced === true) {
-    log.info('Bounce já tratado para este lead — ignorado (idempotência).', {
+  for (const lead of leads) {
+    // Idempotência: a busca de mensagens varre uma JANELA de dias e não depende
+    // da flag \Seen, então o mesmo bounce reaparece a cada passada do monitor (a
+    // cada INTERVALO_MONITOR_RESPOSTAS_SEGUNDOS). Sem esta guarda, cada passada
+    // remarca o lead e grava outra nota — foi assim que 3 leads acumularam
+    // ~2.400 notas cada. Já tratado é sucesso: conta como bounce, não reescreve.
+    if (lead.bounced === true) {
+      log.info('Bounce já tratado para este lead — ignorado (idempotência).', {
+        leadId: lead.id,
+        emailOriginal,
+      })
+      continue
+    }
+
+    // Marca o lead como bounced e cancela as execuções ativas: é isso que o
+    // tira da campanha. Toda seleção de público e todo envio checam `bounced`.
+    await store.atualizarLead(lead.id, {
+      bounced: true,
+      bounced_em: new Date().toISOString(),
+      proxima_acao: null,
+      proxima_acao_data: null,
+    })
+    await store.cancelarExecucoesWorkflow(lead.id)
+    // O prefixo "Bounce SMTP detectado" é a chave do índice único da 0032.
+    await store.registrarInteracao({
+      lead_id: lead.id,
+      tipo: 'nota',
+      canal: 'sistema',
+      descricao: `Bounce SMTP detectado: e-mail devolvido pelo servidor${motivo ? ` (status ${motivo})` : ''}. Lead marcado como bounced — removido da cadência automática e das campanhas. Assunto original: "${assunto}"`,
+      origem_acao: 'ia',
+      responsavel_id: lead.responsavel_id ?? null,
+    })
+    log.ok('BOUNCE detectado — lead marcado e cadência cancelada.', {
       leadId: lead.id,
+      empresa: lead.empresa,
       emailOriginal,
     })
-    return true
   }
-
-  // Marca o lead como bounced e cancela as execuções ativas.
-  await store.atualizarLead(lead.id, {
-    bounced: true,
-    bounced_em: new Date().toISOString(),
-    proxima_acao: null,
-    proxima_acao_data: null,
-  })
-  await store.cancelarExecucoesWorkflow(lead.id)
-  await store.registrarInteracao({
-    lead_id: lead.id,
-    tipo: 'nota',
-    canal: 'sistema',
-    descricao: `Bounce SMTP detectado: e-mail devolvido pelo servidor. Lead marcado como bounced — removido da cadência automática. Assunto original: "${msg.assunto}"`,
-    origem_acao: 'ia',
-    responsavel_id: lead.responsavel_id ?? null,
-  })
-  log.ok('BOUNCE detectado — lead marcado e cadência cancelada.', {
-    leadId: lead.id,
-    empresa: lead.empresa,
-    emailOriginal,
-  })
   return true
 }
 

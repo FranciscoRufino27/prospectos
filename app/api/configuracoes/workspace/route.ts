@@ -3,8 +3,7 @@
 // workspace.configure. Sempre org-scoped (organizacoes where id = org da sessão).
 import { NextResponse } from 'next/server'
 import { resolverAcesso, exigirPermissao } from '@/lib/rbac/servidor'
-import { parseWorkspaceConfig, mesclarWorkspaceConfig, type WorkspaceConfigEditavel } from '@/lib/config/workspaceConfig'
-import { statusRemetenteProspeccaoDeConfig } from '@/lib/campanhas/opcoesServidor'
+import { parseWorkspaceConfig, mesclarWorkspaceConfig, validarEnriquecimentoPago, type WorkspaceConfigEditavel } from '@/lib/config/workspaceConfig'
 
 export const runtime = 'nodejs'
 
@@ -21,8 +20,6 @@ export async function GET() {
     // variável exatamente como o motor materializaria.
     organizacao: { nome: typeof data?.nome === 'string' ? data.nome : '' },
     podeEditar: acc.acesso.permissoes.has('workspace.configure'),
-    // Status do remetente dedicado (Configurações > E-mail de prospecção).
-    remetenteProspeccao: statusRemetenteProspeccaoDeConfig(config),
   })
 }
 
@@ -31,10 +28,25 @@ export async function PUT(req: Request) {
   if ('erro' in acc) return acc.erro
   const { admin, org } = acc.acesso
   const b = (await req.json()) as WorkspaceConfigEditavel
+  // Travas de custo: valor inválido é recusado (não descartado em silêncio).
+  if (b.enriquecimentoPago !== undefined) {
+    const invalido = validarEnriquecimentoPago(b.enriquecimentoPago)
+    if (invalido) return NextResponse.json({ erro: invalido }, { status: 400 })
+  }
   const { data } = await admin.from('organizacoes').select('configuracoes').eq('id', org).maybeSingle()
   const atual = parseWorkspaceConfig(data?.configuracoes)
+  // email_conta_key apontava para credenciais do ambiente de QUALQUER
+  // organização: o navegador não cria nem troca mais essa chave (o remetente é
+  // conectado em /api/configuracoes/remetente-email). O valor salvo é mantido.
+  let nomenclaturas: Record<string, string> | undefined
+  if (b.nomenclaturas && typeof b.nomenclaturas === 'object') {
+    nomenclaturas = { ...b.nomenclaturas }
+    delete nomenclaturas.email_conta_key
+    const chaveAtual = atual.nomenclaturas?.email_conta_key
+    if (chaveAtual !== undefined) nomenclaturas.email_conta_key = chaveAtual
+  }
   const novo = mesclarWorkspaceConfig(atual, {
-    nomenclaturas: b.nomenclaturas && typeof b.nomenclaturas === 'object' ? b.nomenclaturas : undefined,
+    nomenclaturas,
     modulos: b.modulos && typeof b.modulos === 'object' ? b.modulos : undefined,
     renovacaoAntecedenciaDias: typeof b.renovacaoAntecedenciaDias === 'number' ? b.renovacaoAntecedenciaDias : undefined,
     roiCustoMensal: typeof b.roiCustoMensal === 'number' ? b.roiCustoMensal : undefined,
@@ -58,10 +70,16 @@ export async function PUT(req: Request) {
     comercialAvisoResposta: typeof b.comercialAvisoResposta === 'string' || b.comercialAvisoResposta === null
       ? b.comercialAvisoResposta
       : undefined,
+    // Grupos do WhatsApp salvos com nome: lista substitui (validada no parse); null limpa.
+    comercialGruposWhatsapp: Array.isArray(b.comercialGruposWhatsapp) || b.comercialGruposWhatsapp === null
+      ? b.comercialGruposWhatsapp
+      : undefined,
     camposUI: Array.isArray(b.camposUI) ? b.camposUI : undefined,
     operacao: b.operacao && typeof b.operacao === 'object' ? b.operacao : undefined,
     // Perfil de busca da prospecção: objeto substitui (validado no parse); null limpa.
     prospeccao: b.prospeccao === null || (b.prospeccao && typeof b.prospeccao === 'object') ? b.prospeccao : undefined,
+    // Travas de custo do enriquecimento pago (validadas no parse); null desliga.
+    enriquecimentoPago: b.enriquecimentoPago === null || (b.enriquecimentoPago && typeof b.enriquecimentoPago === 'object') ? b.enriquecimentoPago : undefined,
   })
   // Um grupo comercial pertence a NO MÁXIMO uma organização: o callback de
   // grupo resolve a org pelo grupo, então a ambiguidade tem de ser barrada
@@ -79,5 +97,5 @@ export async function PUT(req: Request) {
     const conflito = error.message.includes('uniq_organizacoes_grupo_comercial')
     return NextResponse.json({ erro: conflito ? 'Este grupo já está configurado em outra organização.' : error.message }, { status: conflito ? 409 : 400 })
   }
-  return NextResponse.json({ ok: true, config: novo, remetenteProspeccao: statusRemetenteProspeccaoDeConfig(novo) })
+  return NextResponse.json({ ok: true, config: novo })
 }

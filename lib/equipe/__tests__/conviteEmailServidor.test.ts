@@ -70,9 +70,15 @@ beforeEach(() => {
   vi.resetAllMocks()
   mocks.modoEnsaio = false
   mocks.credUsada.length = 0
+  // Como o resolvedor real (lib/email/remetenteOrganizacao): a conta já vem com
+  // as credenciais; conta configurada sem credencial → null (bloqueia).
   mocks.buscarRemetenteCampanha.mockImplementation(async (_admin: unknown, org: string) => {
     const c = CONTAS[org]
-    return c ? { conta: c.conta, email: c.email } : null
+    if (!c) return null
+    const credenciais = mocks.lerCredenciaisGmail(c.conta)
+    return credenciais
+      ? { fonte: c.conta === 'followup' ? 'padrao' : 'legada', conta: c.conta, email: c.email, credenciais }
+      : null
   })
   mocks.lerCredenciaisGmail.mockImplementation((conta: string) => CREDENCIAIS[conta] ?? null)
   mocks.enviar.mockResolvedValue(undefined)

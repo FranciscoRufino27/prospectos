@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   aplicarRegraPublicoPorTipo,
   campanhaEhDisparoUnico,
+  avisoEnvioCampanha,
   avisoRetornoCampanha,
   corpoComLink,
   montarDefinicaoCampanha,
@@ -217,21 +218,22 @@ describe('acompanhamento do responsável e aviso de resposta da campanha', () =>
     operacao: { remetenteEmail: 'time@empresa.com', mensagemInicial: { assunto: 'Oi', corpo: 'Olá' }, resposta: { aviso, ...resto } },
   })
 
-  it('campanha anterior às opções: cópia ligada, sem aviso próprio, e-mail de retorno como antes', () => {
+  it('campanha sem configuração de cópia: default é somente_respostas (CC só em respostas)', () => {
     const publico = normalizarPublicoCampanha({ responsavel_id: 'perfil-1' })
-    expect(publico.operacao?.responsavelRecebe).toBe('envios_e_respostas')
+    expect(publico.operacao?.responsavelRecebe).toBe('somente_respostas')
     expect(publico.operacao?.resposta?.aviso).toBeUndefined()
     expect(publico.operacao?.resposta?.notificarResponsavel).toBe(true)
-    expect(responsavelRecebeCopiaDosEnvios({})).toBe(true)
-    expect(responsavelRecebeCopiaDosEnvios(null)).toBe(true)
+    expect(responsavelRecebeCopiaDosEnvios({})).toBe(false)
+    expect(responsavelRecebeCopiaDosEnvios(null)).toBe(false)
     expect(avisoRetornoCampanha({ operacao: { resposta: {} } })).toBeNull()
   })
 
-  it('"somente as respostas" desliga a cópia dos envios; valor desconhecido cai no padrão', () => {
-    const cru = { operacao: { responsavelRecebe: 'somente_respostas' } }
-    expect(normalizarPublicoCampanha(cru).operacao?.responsavelRecebe).toBe('somente_respostas')
-    expect(responsavelRecebeCopiaDosEnvios(cru)).toBe(false)
-    expect(normalizarPublicoCampanha({ operacao: { responsavelRecebe: 'nunca' } }).operacao?.responsavelRecebe).toBe('envios_e_respostas')
+  it('"envios_e_respostas" liga a cópia; valor desconhecido cai no padrão (somente_respostas)', () => {
+    const cru = { operacao: { responsavelRecebe: 'envios_e_respostas' } }
+    expect(normalizarPublicoCampanha(cru).operacao?.responsavelRecebe).toBe('envios_e_respostas')
+    expect(responsavelRecebeCopiaDosEnvios(cru)).toBe(true)
+    expect(normalizarPublicoCampanha({ operacao: { responsavelRecebe: 'nunca' } }).operacao?.responsavelRecebe).toBe('somente_respostas')
+    expect(responsavelRecebeCopiaDosEnvios({ operacao: { responsavelRecebe: 'somente_respostas' } })).toBe(false)
   })
 
   it('só e-mail, só WhatsApp ou os dois; destinos desconhecidos/duplicados são descartados', () => {
@@ -271,5 +273,30 @@ describe('acompanhamento do responsável e aviso de resposta da campanha', () =>
     expect(avisoRetornoCampanha({ operacao: { resposta: { canais: 'email_whatsapp' } } })).toEqual({ email: true, whatsapp: ['responsavel'] })
     const soWhatsapp = normalizarPublicoCampanha({ operacao: { resposta: { canais: 'whatsapp' } } })
     expect(soWhatsapp.operacao?.resposta).toMatchObject({ aviso: { email: false, whatsapp: ['responsavel'] }, notificarResponsavel: false })
+  })
+})
+
+describe('aviso de envio (operacao.avisoEnvio)', () => {
+  it('preserva destinos válidos e só guarda o grupo quando o grupo está marcado', () => {
+    const p = normalizarPublicoCampanha({
+      operacao: { avisoEnvio: { whatsapp: ['grupo', 'x', 'responsavel'], grupoWhatsappId: ' 120363000000000001-group ' } },
+    })
+    expect(p.operacao?.avisoEnvio).toEqual({ whatsapp: ['responsavel', 'grupo'], grupoWhatsappId: '120363000000000001-group' })
+    const semGrupo = normalizarPublicoCampanha({
+      operacao: { avisoEnvio: { whatsapp: ['responsavel'], grupoWhatsappId: '120363000000000001-group' } },
+    })
+    expect(semGrupo.operacao?.avisoEnvio).toEqual({ whatsapp: ['responsavel'] })
+  })
+
+  it('sem destinos ou ausente = desligado', () => {
+    expect(normalizarPublicoCampanha({ operacao: { avisoEnvio: { whatsapp: [] } } }).operacao?.avisoEnvio).toBeUndefined()
+    expect(normalizarPublicoCampanha({}).operacao?.avisoEnvio).toBeUndefined()
+    expect(avisoEnvioCampanha({ operacao: { avisoEnvio: { whatsapp: ['grupo'] } } })).toEqual({ whatsapp: ['grupo'] })
+    expect(avisoEnvioCampanha(null)).toBeNull()
+  })
+
+  it('valida o formato do grupo do aviso de envio', () => {
+    const p = normalizarPublicoCampanha({ operacao: { avisoEnvio: { whatsapp: ['grupo'], grupoWhatsappId: 'grupo-errado' } } })
+    expect(validarCampanhaGuiada(p).join(' ')).toContain('O grupo do aviso de envio precisa estar no formato')
   })
 })

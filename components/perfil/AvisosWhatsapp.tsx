@@ -6,7 +6,7 @@ import { estilosModulo as m, TituloSecao } from '@/components/tema/Modulo';
 
 // Número de WhatsApp em que o usuário recebe "cliente respondeu" dos leads
 // dele (/api/perfil/avisos). Só vale se a organização mandar avisos ao
-// responsável (Configurações > Processo comercial > Distribuição).
+// responsável (Configurações > Distribuição).
 export default function AvisosWhatsapp() {
   const [carregado, setCarregado] = useState(false);
   const [indisponivel, setIndisponivel] = useState<string | null>(null);

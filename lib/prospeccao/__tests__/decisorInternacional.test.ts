@@ -97,9 +97,21 @@ describe('resolverDecisorInternacional', () => {
     expect(d.buscarEmail).not.toHaveBeenCalled()
   })
 
-  it('Crustdata sem crédito é falha (a tela para a busca)', async () => {
+  it('Crustdata sem crédito: empresa incompleta (bloqueado_crustdata), a busca segue', async () => {
     const d = deps({ buscarPessoas: vi.fn(async () => ({ ok: false as const, motivo: 'sem_credito' as const })) })
-    expect(await resolverDecisorInternacional('hotel.pt', undefined, null, d)).toMatchObject({ status: 'falha', httpStatus: 402 })
+    expect(await resolverDecisorInternacional('hotel.pt', undefined, null, d)).toMatchObject({ status: 'incompleto', motivo: 'bloqueado_crustdata', bloqueio: { fonte: 'crustdata', motivo: 'sem_credito' } })
+  })
+
+  it('Anymail bloqueada pelo orçamento: decisor achado, empresa incompleta (bloqueado_anymail)', async () => {
+    const d = deps({ buscarEmail: vi.fn(async () => ({ ok: false as const, motivo: 'orcamento_esgotado' as const, detalhe: 'orçamento mensal de Anymail esgotado: 5 de 5 créditos usados' })) })
+    const r = await resolverDecisorInternacional('hotel.pt', undefined, null, d)
+    expect(r).toMatchObject({ status: 'incompleto', motivo: 'bloqueado_anymail', bloqueio: { fonte: 'anymail' } })
+    expect(r.status === 'incompleto' && r.candidatos.length).toBeGreaterThan(0)
+  })
+
+  it('limite (429) da Crustdata continua sendo falha técnica', async () => {
+    const d = deps({ buscarPessoas: vi.fn(async () => ({ ok: false as const, motivo: 'limite' as const })) })
+    expect(await resolverDecisorInternacional('hotel.pt', undefined, null, d)).toMatchObject({ status: 'falha', httpStatus: 429 })
   })
 })
 

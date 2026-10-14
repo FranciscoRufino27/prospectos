@@ -11,6 +11,9 @@ export interface ControleExecucaoCampanha {
   // que permite ao motor restringir efeitos (ex.: modo de teste da espera) a um
   // tipo específico de campanha sem reconsultar o banco por bloco.
   tipo?: string | null
+  // Horário da agenda (Brasília). Opcional pelo mesmo motivo de `tipo`.
+  horarioInicio?: unknown
+  horarioFim?: unknown
 }
 
 // Leitura mínima usada pelo processador antes de qualquer ação externa. Como o
@@ -40,6 +43,8 @@ export async function buscarControleExecucaoCampanha(
   return {
     status: typeof data.status === 'string' ? data.status : '',
     diasSemana: agenda?.diasSemana,
+    horarioInicio: agenda?.horarioInicio,
+    horarioFim: agenda?.horarioFim,
     disparoUnico: operacao?.modoEnvio === 'disparo_unico'
       || campanhaEhDisparoUnico(typeof data.tipo === 'string' ? data.tipo : null),
     tipo: typeof data.tipo === 'string' ? data.tipo : null,

@@ -17,7 +17,7 @@
 import { PAISES_INTERNACIONAL, type CodigoPais } from '@/lib/prospeccao/crustdata'
 
 // Suba este número ao mudar o formato do blob, e adicione o passo em `migrar()`.
-export const WORKSPACE_CONFIG_SCHEMA_VERSION = 10
+export const WORKSPACE_CONFIG_SCHEMA_VERSION = 12
 
 // Objetivos que o produto já consegue medir de ponta a ponta. Novos objetivos
 // só entram nesta allowlist quando houver dado operacional real para dashboard,
@@ -131,6 +131,36 @@ export interface ComercialConfig {
   // acima) ou 'ambos'. Ausente = DESLIGADO — nenhuma org passa a receber
   // mensagem sem escolher.
   avisoResposta?: ModoAvisoResposta
+  // Grupos do WhatsApp salvos com nome (Configurações > Distribuição), para a
+  // tela escolher pelo nome em vez do id. Não decide envio: o grupo usado
+  // continua sendo `grupoWhatsappId` / o grupo da campanha.
+  gruposWhatsapp?: GrupoWhatsappSalvo[]
+}
+
+export interface GrupoWhatsappSalvo {
+  id: string // id da Z-API, ex.: 120363019502650977-group
+  nome: string
+}
+
+export const LIMITE_GRUPOS_WHATSAPP = 30
+export const FORMATO_ID_GRUPO_WHATSAPP = /^\d{10,30}-group$/
+
+// Lista de grupos salvos: id no formato da Z-API, nome obrigatório (até 80
+// caracteres), sem id repetido (vale o primeiro), no máximo LIMITE_GRUPOS_WHATSAPP.
+export function parseGruposWhatsapp(bruto: unknown): GrupoWhatsappSalvo[] {
+  if (!Array.isArray(bruto)) return []
+  const vistos = new Set<string>()
+  const out: GrupoWhatsappSalvo[] = []
+  for (const g of bruto) {
+    if (!ehObjeto(g)) continue
+    const id = typeof g.id === 'string' ? g.id.trim() : ''
+    const nome = typeof g.nome === 'string' ? g.nome.replace(/\s+/g, ' ').trim().slice(0, 80) : ''
+    if (!FORMATO_ID_GRUPO_WHATSAPP.test(id) || !nome || vistos.has(id)) continue
+    vistos.add(id)
+    out.push({ id, nome })
+    if (out.length >= LIMITE_GRUPOS_WHATSAPP) break
+  }
+  return out
 }
 
 export const MODOS_AVISO_RESPOSTA = ['responsavel', 'grupo', 'ambos'] as const
@@ -350,8 +380,59 @@ export interface WorkspaceConfig {
   operacao?: OperacaoConfig
   roi?: RoiConfig
   comercial?: ComercialConfig
+  // Travas de custo do enriquecimento pago da Prospecção. Ausência = DESLIGADO.
+  enriquecimentoPago?: EnriquecimentoPagoConfig
   // Configuração de campos por workspace (Personalização > Campos). Ausência = todos no padrão.
   camposUI?: CampoUI[]
+}
+
+// Enriquecimento pago da Prospecção (Crustdata, Anymail): liga/desliga e
+// orçamento mensal em créditos POR FONTE. Fonte sem orçamento definido não
+// gasta nada. As chaves das APIs são da plataforma; esta configuração decide
+// se ESTA organização pode gastá-las e quanto.
+export const FONTES_PAGAS = ['crustdata', 'anymail'] as const
+export type FontePaga = (typeof FONTES_PAGAS)[number]
+export const ORCAMENTO_MAXIMO_CREDITOS = 100_000
+
+export interface EnriquecimentoPagoConfig {
+  ativo?: boolean
+  orcamentoMensal?: Partial<Record<FontePaga, number>>
+}
+
+export function parseEnriquecimentoPago(bruto: unknown): EnriquecimentoPagoConfig | undefined {
+  if (!ehObjeto(bruto)) return undefined
+  const out: EnriquecimentoPagoConfig = {}
+  if (typeof bruto.ativo === 'boolean') out.ativo = bruto.ativo
+  if (ehObjeto(bruto.orcamentoMensal)) {
+    const orc: Partial<Record<FontePaga, number>> = {}
+    for (const fonte of FONTES_PAGAS) {
+      const v = bruto.orcamentoMensal[fonte]
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= ORCAMENTO_MAXIMO_CREDITOS) orc[fonte] = Math.round(v * 100) / 100
+    }
+    if (Object.keys(orc).length) out.orcamentoMensal = orc
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+/**
+ * Validação ESTRITA do que a tela envia (o parse acima descarta em silêncio,
+ * o que é certo ao LER o blob, mas esconderia erro de quem está editando).
+ * null = válido. Orçamento ausente/null = fonte sem orçamento (bloqueada).
+ */
+export function validarEnriquecimentoPago(bruto: unknown): string | null {
+  if (bruto === null) return null
+  if (!ehObjeto(bruto)) return 'Configuração de enriquecimento pago inválida.'
+  if (bruto.ativo !== undefined && typeof bruto.ativo !== 'boolean') return 'O liga/desliga do enriquecimento pago precisa ser verdadeiro ou falso.'
+  if (bruto.orcamentoMensal === undefined || bruto.orcamentoMensal === null) return null
+  if (!ehObjeto(bruto.orcamentoMensal)) return 'Orçamento mensal inválido.'
+  for (const [fonte, v] of Object.entries(bruto.orcamentoMensal)) {
+    if (!(FONTES_PAGAS as readonly string[]).includes(fonte)) return `Fonte desconhecida no orçamento: ${fonte}.`
+    if (v === null || v === undefined) continue
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > ORCAMENTO_MAXIMO_CREDITOS) {
+      return `Orçamento de ${fonte} inválido: use um número de 0 a ${ORCAMENTO_MAXIMO_CREDITOS.toLocaleString('pt-BR')} créditos.`
+    }
+  }
+  return null
 }
 
 // Chaves de feature conhecidas (tipadas). Só estas são aceitas na leitura do
@@ -397,10 +478,14 @@ function migrar(bruto: Record<string, unknown>): Record<string, unknown> {
   if (v < 7) cfg = { ...cfg, _schema_version: 7 }
   // v7 -> v8: adiciona prospeccao.porteOutroDecisor. Ausência = sem corte por porte.
   if (v < 8) cfg = { ...cfg, _schema_version: 8 }
-  // v8 -> v9: adiciona prospeccao.paises (busca internacional). Ausência = nenhum país-alvo.
+  // v8 -> v9: adiciona comercial.gruposWhatsapp (grupos salvos com nome). Ausência = nenhum.
   if (v < 9) cfg = { ...cfg, _schema_version: 9 }
-  // v9 -> v10: adiciona prospeccaoNichos (nichos criados pela org). Ausência = nenhum.
+  // v9 -> v10: adiciona prospeccao.paises (busca internacional). Ausência = nenhum país-alvo.
   if (v < 10) cfg = { ...cfg, _schema_version: 10 }
+  // v10 -> v11: adiciona enriquecimentoPago (travas de custo). Ausência = desligado.
+  if (v < 11) cfg = { ...cfg, _schema_version: 11 }
+  // v11 -> v12: adiciona prospeccaoNichos (nichos criados pela org). Ausência = nenhum.
+  if (v < 12) cfg = { ...cfg, _schema_version: 12 }
   return cfg
 }
 
@@ -452,6 +537,8 @@ export function parseWorkspaceConfig(bruto: unknown): WorkspaceConfig {
     if (typeof c.avisoResposta === 'string' && (MODOS_AVISO_RESPOSTA as readonly string[]).includes(c.avisoResposta)) {
       comercial.avisoResposta = c.avisoResposta as ModoAvisoResposta
     }
+    const grupos = parseGruposWhatsapp(c.gruposWhatsapp)
+    if (grupos.length) comercial.gruposWhatsapp = grupos
     if (Object.keys(comercial).length > 0) out.comercial = comercial
   }
   if (Array.isArray(obj.camposUI)) {
@@ -506,6 +593,8 @@ export function parseWorkspaceConfig(bruto: unknown): WorkspaceConfig {
   if (prospeccao) out.prospeccao = prospeccao
   const pesquisas = parsePesquisasSalvas(obj.prospeccaoPesquisas)
   if (pesquisas) out.prospeccaoPesquisas = pesquisas
+  const pago = parseEnriquecimentoPago(obj.enriquecimentoPago)
+  if (pago) out.enriquecimentoPago = pago
   const nichos = parseNichosPersonalizados(obj.prospeccaoNichos)
   if (nichos) out.prospeccaoNichos = nichos
   return out
@@ -556,12 +645,16 @@ export interface WorkspaceConfigEditavel {
   comercialRodizioHandoff?: boolean | null
   // Aviso de resposta do cliente. null (ou valor inválido) DESLIGA.
   comercialAvisoResposta?: ModoAvisoResposta | null
+  // Grupos do WhatsApp salvos com nome. Substitui a lista inteira; lista vazia/null LIMPA.
+  comercialGruposWhatsapp?: GrupoWhatsappSalvo[] | null
   camposUI?: CampoUI[]
   operacao?: OperacaoConfig
   // Perfil de busca da prospecção. Substitui o perfil inteiro; null LIMPA.
   prospeccao?: ProspeccaoConfig | null
   // Pesquisas salvas. Substitui a lista inteira; lista vazia/null LIMPA.
   prospeccaoPesquisas?: PesquisaSalva[] | null
+  // Travas de custo do enriquecimento pago. Substitui a seção inteira; null DESLIGA (limpa).
+  enriquecimentoPago?: EnriquecimentoPagoConfig | null
   // Nichos personalizados. Substitui a lista inteira; lista vazia/null LIMPA.
   prospeccaoNichos?: NichoPersonalizado[] | null
 }
@@ -602,6 +695,11 @@ export function mesclarWorkspaceConfig(atual: WorkspaceConfig, patch: WorkspaceC
     const modo = patch.comercialAvisoResposta
     next.comercial = modo && (MODOS_AVISO_RESPOSTA as readonly string[]).includes(modo) ? { ...resto, avisoResposta: modo } : resto
   }
+  if (patch.comercialGruposWhatsapp !== undefined) {
+    const { gruposWhatsapp: _anterior, ...resto } = next.comercial ?? atual.comercial ?? {}
+    const grupos = parseGruposWhatsapp(patch.comercialGruposWhatsapp)
+    next.comercial = grupos.length ? { ...resto, gruposWhatsapp: grupos } : resto
+  }
   if (Array.isArray(patch.camposUI)) next.camposUI = patch.camposUI
   if (patch.operacao) next.operacao = patch.operacao
   if (patch.prospeccao !== undefined) {
@@ -613,6 +711,11 @@ export function mesclarWorkspaceConfig(atual: WorkspaceConfig, patch: WorkspaceC
     const lista = patch.prospeccaoPesquisas === null ? undefined : parsePesquisasSalvas(patch.prospeccaoPesquisas)
     if (lista) next.prospeccaoPesquisas = lista
     else delete next.prospeccaoPesquisas
+  }
+  if (patch.enriquecimentoPago !== undefined) {
+    const pago = patch.enriquecimentoPago === null ? undefined : parseEnriquecimentoPago(patch.enriquecimentoPago)
+    if (pago) next.enriquecimentoPago = pago
+    else delete next.enriquecimentoPago
   }
   if (patch.prospeccaoNichos !== undefined) {
     const lista = patch.prospeccaoNichos === null ? undefined : parseNichosPersonalizados(patch.prospeccaoNichos)

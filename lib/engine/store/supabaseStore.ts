@@ -48,6 +48,35 @@ export class SupabaseStore implements Store {
     return (data?.[0] as Lead) ?? null
   }
 
+  async buscarLeadsPorEmail(email: string): Promise<Lead[]> {
+    const e = email.trim().toLowerCase()
+    if (!e) return []
+    // ilike só para ignorar maiúsculas: % e _ (comum em endereços) escapados,
+    // senão "a_b@x.com" casaria também "axb@x.com".
+    const { data, error } = await this.db
+      .from('leads')
+      .select('*')
+      .eq('organizacao_id', this.organizacaoId)
+      .ilike('contato_email', e.replace(/[\\%_]/g, (c) => `\\${c}`))
+      .limit(50)
+    if (error) throw error
+    return (data ?? []) as Lead[]
+  }
+
+  async registrarEmailInvalido(email: string, motivo: string | null): Promise<void> {
+    const e = email.trim().toLowerCase()
+    if (!e) return
+    const { error } = await this.db
+      .from('emails_invalidos')
+      .upsert(
+        { organizacao_id: this.organizacaoId, email: e, motivo, origem: 'bounce' },
+        { onConflict: 'organizacao_id,email', ignoreDuplicates: true },
+      )
+    // A marcação do lead (logo em seguida, no fluxo) é o que tira da campanha;
+    // a lista é a memória para leads futuros. Falha aqui não pode impedir aquilo.
+    if (error) log.aviso('Não consegui registrar o e-mail na lista de inválidos.', { email: e, erro: error.message })
+  }
+
   async buscarLeadPorDominio(dominio: string): Promise<Lead | null> {
     const d = dominio.trim().toLowerCase()
     if (!d) return null

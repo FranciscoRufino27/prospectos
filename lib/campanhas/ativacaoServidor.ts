@@ -8,12 +8,11 @@ import {
   normalizarPublicoCampanha,
   validarCampanhaGuiada,
 } from './configuracaoGuiada'
-import { exigirAvisoRetornoPronto } from './retornoWhatsappServidor'
+import { exigirAvisoEnvioPronto, exigirAvisoRetornoPronto } from './retornoWhatsappServidor'
 import { buscarPreviaPublicoCampanha } from './publicoServidor'
 import { exigirEnvioRealCampanhaDisponivel } from './opcoesServidor'
-import { restaurarLeadImportadoForaDoMotor, transferirLeadImportadoParaMotor } from './carteiraServidor'
+import { inscreverLeadsNoWorkflow } from './inscricaoLeadsServidor'
 import {
-  inscreverLeadManual,
   publicar,
   retomar,
   SupabaseWorkflowStore,
@@ -144,6 +143,7 @@ export async function inscreverCampanhaReal(
   // sem e-mail a resposta tem de chegar a alguém pelo WhatsApp — não sai do
   // ensaio sem isso.
   await exigirAvisoRetornoPronto(admin, org, normalizarPublicoCampanha(campanha.publico), previa.idsElegiveis)
+  await exigirAvisoEnvioPronto(admin, org, normalizarPublicoCampanha(campanha.publico), previa.idsElegiveis)
 
   // Só sai do dry-run depois de público e workflow terem sido revalidados.
   if (campanha.dry_run !== false) {
@@ -170,33 +170,9 @@ export async function inscreverCampanhaReal(
     }
   }
 
-  let inscritos = 0
-  let jaInscritos = 0
-  let falhas = 0
-  const execucoesProcessaveis: string[] = []
-  for (const leadId of previa.idsElegiveis) {
-    let assumidoPelaCampanha = false
-    try {
-      // Leads importados ficam fora do motor (`n8n`) até este ponto. A ação
-      // explícita e numericamente confirmada do gestor transfere somente os
-      // selecionados desta campanha para o motor.
-      assumidoPelaCampanha = await transferirLeadImportadoParaMotor(admin, org, leadId)
+  const resultado = await inscreverLeadsNoWorkflow(admin, org, store, workflow.id, campanhaId, previa.idsElegiveis)
 
-      const resultado = await inscreverLeadManual(store, workflow.id, leadId, campanhaId)
-      if (resultado.jaInscrito) jaInscritos += 1
-      else {
-        inscritos += 1
-      }
-      if (resultado.execucaoId) execucoesProcessaveis.push(resultado.execucaoId)
-    } catch {
-      falhas += 1
-      if (assumidoPelaCampanha) {
-        await restaurarLeadImportadoForaDoMotor(admin, org, leadId)
-      }
-    }
-  }
-
-  if (falhas > 0 && inscritos + jaInscritos === 0) {
+  if (resultado.falhas > 0 && resultado.inscritos + resultado.ja_inscritos === 0) {
     await atualizarCampanha(admin, org, campanhaId, { dry_run: true })
     throw new Error('Nenhum contato pôde ser inscrito; o modo ensaio foi mantido.')
   }
@@ -206,10 +182,7 @@ export async function inscreverCampanhaReal(
     workflow_id: workflow.id,
     dry_run: false,
     publico: previa.elegiveis,
-    inscritos,
-    ja_inscritos: jaInscritos,
-    falhas,
-    execucoes_criadas: execucoesProcessaveis,
+    ...resultado,
   }
 }
 

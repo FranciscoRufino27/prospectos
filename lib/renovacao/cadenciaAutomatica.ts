@@ -4,7 +4,7 @@ import {
   inscreverLeadManual,
 } from '@/lib/workflows'
 import { agendarExecucoesCampanha } from '@/lib/campanhas/filaDisparoServidor'
-import { agendaPermiteProcessar } from '@/lib/campanhas/agenda'
+import { agendaPermiteProcessar, janelaDoPublico } from '@/lib/campanhas/agenda'
 import { buscarPreviaPublicoCampanha } from '@/lib/campanhas/publicoServidor'
 import { aplicarRegraPublicoPorTipo } from '@/lib/campanhas/configuracaoGuiada'
 import type { Publico } from '@/components/automacao/tiposCampanha'
@@ -148,6 +148,7 @@ export class CadenciaRenovacaoAutomatica {
       this.org,
       this.campanha.id,
       execucaoIds.slice(0, this.campanha.limiteDiario),
+      { janela: janelaDoPublico(this.campanha.publico) },
     )
   }
 }
@@ -175,7 +176,7 @@ export async function alertarConfiguracaoRenovacao(
     mensagem: mensagem.slice(0, 500),
     origem: 'renovacao',
     motivo,
-    link: '/automacao',
+    link: '/campanhas',
   })
   if (error) throw error
 }
