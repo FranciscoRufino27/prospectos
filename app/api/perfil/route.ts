@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { createSupabaseAdminClient } from '@/lib/supabase-admin';
+import { ehDonoPlataforma } from '@/lib/rbac/plataforma';
 
 // GET — buscar perfil do usuário logado
 export async function GET() {
@@ -16,7 +17,10 @@ export async function GET() {
       .eq('id', user.id)
       .single();
 
-    return NextResponse.json({ perfil: perfil || null, email: user.email });
+    // Só decide o que a tela oferece; as rotas /api/plataforma/** conferem de novo.
+    const donoPlataforma = await ehDonoPlataforma(admin, user.id);
+
+    return NextResponse.json({ perfil: perfil || null, email: user.email, donoPlataforma });
   } catch {
     return NextResponse.json({ erro: 'Erro interno' }, { status: 500 });
   }

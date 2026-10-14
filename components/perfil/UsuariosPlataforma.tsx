@@ -1,12 +1,14 @@
 'use client';
 
-// Aba "Usuários da plataforma" do Meu perfil (só admin). Lista quem tem acesso
-// à organização e deixa o admin mandar link de redefinição de senha e
-// bloquear/desbloquear o login. A senha nunca é exibida: o Supabase só guarda
-// o hash. Toda regra vale no servidor (/api/equipe/[id]/acesso); aqui só se
-// evita oferecer o que o backend recusaria (o próprio bloqueio).
+// Aba "Usuários da plataforma" do Meu perfil. O admin vê quem tem acesso à
+// própria organização; o dono da plataforma (migration 0069) também alterna
+// para "Plataforma inteira", com os usuários de todas as organizações. Ambos
+// mandam link de redefinição de senha e bloqueiam/desbloqueiam o login. A
+// senha nunca é exibida: o Supabase só guarda o hash. Toda regra vale no
+// servidor (/api/equipe/** e /api/plataforma/**); aqui só se evita oferecer o
+// que o backend recusaria (o próprio bloqueio, usuário sem organização).
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Ban, Check, Copy, KeyRound, LockOpen, Search, Shield, ShieldCheck, Users, UserX } from 'lucide-react';
+import { Ban, Building2, Check, Copy, Globe, KeyRound, LockOpen, Search, Shield, ShieldCheck, Users, UserX } from 'lucide-react';
 import { estilosModulo as m, IndicadorModulo, TituloSecao } from '@/components/tema/Modulo';
 import { EsqueletoLinhas } from '@/components/ui/Esqueleto';
 
@@ -20,7 +22,12 @@ interface Membro {
   created_at: string;
   avatar_url: string | null;
   bloqueado: boolean;
+  // Só na visão "Plataforma inteira".
+  organizacao_id?: string | null;
+  organizacao_nome?: string | null;
 }
+
+type Escopo = 'organizacao' | 'plataforma';
 
 type Acao = 'redefinir_senha' | 'bloquear' | 'desbloquear';
 
@@ -54,46 +61,88 @@ function StatusAcesso({ membro }: { membro: Membro }) {
   return <span className="flex items-center gap-1.5 text-xs text-green-400"><span className="h-2 w-2 rounded-full bg-green-500" />Ativo</span>;
 }
 
-export default function UsuariosPlataforma({ emailProprio }: { emailProprio: string }) {
+export default function UsuariosPlataforma({ emailProprio, donoPlataforma, ehAdminOrg }: {
+  emailProprio: string;
+  donoPlataforma: boolean;
+  ehAdminOrg: boolean;
+}) {
+  const [escopo, setEscopo] = useState<Escopo>(donoPlataforma ? 'plataforma' : 'organizacao');
+  const plataforma = escopo === 'plataforma';
   const [membros, setMembros] = useState<Membro[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [filtroOrg, setFiltroOrg] = useState('');
   const [confirmando, setConfirmando] = useState<{ membro: Membro; acao: Acao } | null>(null);
   const [executando, setExecutando] = useState(false);
   const [retorno, setRetorno] = useState<(Retorno & { membroId: string }) | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
 
-  async function carregar() {
+  // `ignorar` evita que a resposta de um escopo antigo sobrescreva a do atual.
+  async function carregar(alvo: Escopo, ignorar: () => boolean = () => false) {
     setErroLista(null);
     try {
-      const res = await fetch('/api/equipe/listar');
+      const res = await fetch(alvo === 'plataforma' ? '/api/plataforma/usuarios' : '/api/equipe/listar');
       const data = await res.json();
+      if (ignorar()) return;
       if (!res.ok) throw new Error(data.erro || 'Não foi possível carregar os usuários.');
-      setMembros(data.membros ?? []);
+      setMembros((alvo === 'plataforma' ? data.usuarios : data.membros) ?? []);
     } catch (e) {
+      if (ignorar()) return;
       setErroLista(e instanceof Error ? e.message : 'Não foi possível carregar os usuários.');
     } finally {
-      setCarregando(false);
+      if (!ignorar()) setCarregando(false);
     }
   }
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    let cancelado = false;
+    setCarregando(true);
+    setMembros([]);
+    setRetorno(null);
+    setFiltroOrg('');
+    carregar(escopo, () => cancelado);
+    return () => { cancelado = true; };
+  }, [escopo]);
+
+  const organizacoes = useMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const x of membros) if (x.organizacao_id) mapa.set(x.organizacao_id, x.organizacao_nome || 'Sem nome');
+    return [...mapa.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  }, [membros]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    const lista = q
-      ? membros.filter((x) => (x.nome ?? '').toLowerCase().includes(q) || x.email.toLowerCase().includes(q))
+    let lista = q
+      ? membros.filter((x) =>
+          (x.nome ?? '').toLowerCase().includes(q)
+          || x.email.toLowerCase().includes(q)
+          || (x.organizacao_nome ?? '').toLowerCase().includes(q))
       : membros;
-    return [...lista].sort((a, b) => (a.nome || a.email).localeCompare(b.nome || b.email, 'pt-BR'));
-  }, [membros, busca]);
+    if (plataforma && filtroOrg) {
+      lista = lista.filter((x) => (filtroOrg === 'sem' ? !x.organizacao_id : x.organizacao_id === filtroOrg));
+    }
+    // Na visão da plataforma, agrupa por organização (sem organização por último).
+    const porNome = (a: Membro, b: Membro) => (a.nome || a.email).localeCompare(b.nome || b.email, 'pt-BR');
+    const porOrg = (a: Membro, b: Membro) => {
+      if (!a.organizacao_nome !== !b.organizacao_nome) return a.organizacao_nome ? -1 : 1;
+      return (a.organizacao_nome ?? '').localeCompare(b.organizacao_nome ?? '', 'pt-BR');
+    };
+    return [...lista].sort((a, b) => (plataforma ? porOrg(a, b) : 0) || porNome(a, b));
+  }, [membros, busca, filtroOrg, plataforma]);
 
-  const totais = useMemo(() => ({
-    total: membros.length,
-    admins: membros.filter((x) => x.role === 'admin').length,
-    pendentes: membros.filter((x) => !x.confirmed_at && !x.bloqueado).length,
-    bloqueados: membros.filter((x) => x.bloqueado).length,
-  }), [membros]);
+  // Totais seguem o filtro de organização (sem a busca de texto).
+  const totais = useMemo(() => {
+    const base = plataforma && filtroOrg
+      ? membros.filter((x) => (filtroOrg === 'sem' ? !x.organizacao_id : x.organizacao_id === filtroOrg))
+      : membros;
+    return {
+      total: base.length,
+      admins: base.filter((x) => x.role === 'admin').length,
+      pendentes: base.filter((x) => !x.confirmed_at && !x.bloqueado).length,
+      bloqueados: base.filter((x) => x.bloqueado).length,
+    };
+  }, [membros, plataforma, filtroOrg]);
 
   async function copiar(texto: string, chave: string) {
     try {
@@ -108,7 +157,7 @@ export default function UsuariosPlataforma({ emailProprio }: { emailProprio: str
     const { membro, acao } = confirmando;
     setExecutando(true);
     try {
-      const res = await fetch(`/api/equipe/${membro.id}/acesso`, {
+      const res = await fetch(plataforma ? `/api/plataforma/usuarios/${membro.id}/acesso` : `/api/equipe/${membro.id}/acesso`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ acao }),
@@ -155,10 +204,32 @@ export default function UsuariosPlataforma({ emailProprio }: { emailProprio: str
     },
   };
 
+  const colunas = ['Usuário', ...(plataforma ? ['Organização'] : []), 'E-mail de acesso', 'Função', 'Status', 'Último acesso', 'Senha', 'Acesso'];
+
   return (
     <div className="grid gap-4">
+      {donoPlataforma && ehAdminOrg && (
+        <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Quais usuários mostrar">
+          {([
+            { id: 'plataforma', label: 'Plataforma inteira', Icon: Globe },
+            { id: 'organizacao', label: 'Minha organização', Icon: Building2 },
+          ] as const).map((o) => (
+            <button
+              key={o.id} type="button" role="radio" aria-checked={escopo === o.id}
+              onClick={() => setEscopo(o.id)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors focus-ring ${escopo === o.id
+                ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300'
+                : 'border-[var(--border)] text-slate-400 hover:text-slate-200'}`}
+            >
+              <o.Icon size={14} aria-hidden="true" />{o.label}
+            </button>
+          ))}
+          {plataforma && <span className="text-xs text-slate-500">Visível só para donos da plataforma.</span>}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <IndicadorModulo icone={Users} rotulo="Usuários" valor={totais.total} detalhe="Com acesso à organização" tom="cyan" />
+        <IndicadorModulo icone={Users} rotulo="Usuários" valor={totais.total} detalhe={plataforma ? (filtroOrg ? 'Na organização filtrada' : 'Em todas as organizações') : 'Com acesso à organização'} tom="cyan" />
         <IndicadorModulo icone={Shield} rotulo="Administradores" valor={totais.admins} detalhe="Acesso total" tom="violet" />
         <IndicadorModulo icone={KeyRound} rotulo="Convites pendentes" valor={totais.pendentes} detalhe="Ainda não definiram senha" tom="amber" />
         <IndicadorModulo icone={UserX} rotulo="Bloqueados" valor={totais.bloqueados} detalhe="Sem login liberado" tom="blue" />
@@ -166,16 +237,35 @@ export default function UsuariosPlataforma({ emailProprio }: { emailProprio: str
 
       <section className={m.painel}>
         <div className={`${m.painelBarra} flex flex-wrap items-center justify-between gap-3`}>
-          <TituloSecao icone={ShieldCheck} titulo="Usuários da plataforma" subtitulo="Quem acessa esta organização. Senhas não são visíveis: use a redefinição." />
+          <TituloSecao
+            icone={ShieldCheck}
+            titulo="Usuários da plataforma"
+            subtitulo={plataforma
+              ? 'Todos os logins, de todas as organizações. Senhas não são visíveis: use a redefinição.'
+              : 'Quem acessa esta organização. Senhas não são visíveis: use a redefinição.'}
+          />
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          {plataforma && (
+            <select
+              value={filtroOrg} onChange={(e) => setFiltroOrg(e.target.value)}
+              aria-label="Filtrar por organização"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:w-56"
+            >
+              <option value="">Todas as organizações ({organizacoes.length})</option>
+              {organizacoes.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+              {membros.some((x) => !x.organizacao_id) && <option value="sem">Sem organização</option>}
+            </select>
+          )}
           <label className="relative block w-full sm:w-64">
             <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden="true" />
             <input
               type="search" value={busca} onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por nome ou e-mail"
+              placeholder={plataforma ? 'Buscar por nome, e-mail ou organização' : 'Buscar por nome ou e-mail'}
               aria-label="Buscar usuário"
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-card)] py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </label>
+          </div>
         </div>
 
         {carregando ? (
@@ -183,16 +273,16 @@ export default function UsuariosPlataforma({ emailProprio }: { emailProprio: str
         ) : erroLista ? (
           <div className="p-6 text-sm text-red-400">
             ✗ {erroLista}{' '}
-            <button type="button" onClick={() => { setCarregando(true); carregar(); }} className="text-indigo-400 hover:underline">Tentar de novo</button>
+            <button type="button" onClick={() => { setCarregando(true); carregar(escopo); }} className="text-indigo-400 hover:underline">Tentar de novo</button>
           </div>
         ) : filtrados.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">{busca ? 'Nenhum usuário encontrado para essa busca.' : 'Nenhum usuário na organização.'}</p>
+          <p className="p-6 text-sm text-slate-400">{busca || filtroOrg ? 'Nenhum usuário encontrado para esse filtro.' : plataforma ? 'Nenhum usuário na plataforma.' : 'Nenhum usuário na organização.'}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-[var(--border)] bg-[var(--bg-base)]">
                 <tr>
-                  {['Usuário', 'E-mail de acesso', 'Função', 'Status', 'Último acesso', 'Senha', 'Acesso'].map((h) => (
+                  {colunas.map((h) => (
                     <th key={h} className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-400">{h}</th>
                   ))}
                 </tr>
@@ -201,6 +291,8 @@ export default function UsuariosPlataforma({ emailProprio }: { emailProprio: str
                 {filtrados.map((x) => {
                   const ehVoce = x.email.toLowerCase() === emailProprio.toLowerCase();
                   const ret = retorno?.membroId === x.id ? retorno : null;
+                  // As ações exigem o perfil numa organização (o servidor recusa sem ela).
+                  const semOrg = plataforma && !x.organizacao_id;
                   return (
                     <Fragment key={x.id}>
                     <tr className="align-top transition-colors hover:bg-[var(--bg-base)]">
@@ -213,6 +305,13 @@ export default function UsuariosPlataforma({ emailProprio }: { emailProprio: str
                           </div>
                         </div>
                       </td>
+                      {plataforma && (
+                        <td className="px-5 py-3 text-xs">
+                          {x.organizacao_id
+                            ? <span className="flex items-center gap-1.5 text-slate-200"><Building2 size={13} className="text-slate-500" />{x.organizacao_nome || 'Sem nome'}</span>
+                            : <span className="italic text-slate-500">Sem organização</span>}
+                        </td>
+                      )}
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-1.5">
                           <span className="text-slate-200">{x.email}</span>
@@ -237,15 +336,16 @@ export default function UsuariosPlataforma({ emailProprio }: { emailProprio: str
                         <button
                           type="button"
                           onClick={() => { setRetorno(null); setConfirmando({ membro: x, acao: 'redefinir_senha' }); }}
-                          disabled={x.bloqueado}
-                          title={x.bloqueado ? 'Desbloqueie o acesso antes de redefinir a senha' : undefined}
+                          disabled={x.bloqueado || semOrg}
+                          title={semOrg ? 'Usuário sem organização: conclua o cadastro antes'
+                            : x.bloqueado ? 'Desbloqueie o acesso antes de redefinir a senha' : undefined}
                           className="flex items-center gap-1 whitespace-nowrap text-xs text-indigo-400 hover:underline disabled:cursor-not-allowed disabled:text-slate-600 disabled:no-underline"
                         >
                           <KeyRound size={12} />Redefinir senha
                         </button>
                       </td>
                       <td className="px-5 py-3">
-                        {ehVoce ? (
+                        {ehVoce || semOrg ? (
                           <span className="text-xs text-slate-500">—</span>
                         ) : x.bloqueado ? (
                           <button type="button" onClick={() => { setRetorno(null); setConfirmando({ membro: x, acao: 'desbloquear' }); }}
@@ -262,7 +362,7 @@ export default function UsuariosPlataforma({ emailProprio }: { emailProprio: str
                     </tr>
                     {ret && (
                     <tr>
-                      <td colSpan={7} className="px-5 pb-3">
+                      <td colSpan={colunas.length} className="px-5 pb-3">
                         <div className={`rounded-lg px-3 py-2 text-sm ${ret.tipo === 'sucesso' ? 'bg-green-500/10 text-green-400' : ret.tipo === 'aviso' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
                           <p>{ret.tipo === 'sucesso' ? '✓' : ret.tipo === 'aviso' ? '⚠' : '✗'} {ret.msg}</p>
                           {ret.link && (

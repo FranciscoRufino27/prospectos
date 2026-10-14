@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import type { User } from '@supabase/supabase-js';
+import { listarTodosUsuariosAuth } from '@/lib/equipe/usuariosAuthServidor';
 import { createSupabaseAdminClient } from '@/lib/supabase-admin';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { estaBloqueado } from '@/lib/equipe/acesso';
@@ -19,16 +19,9 @@ export async function GET() {
     const org = convidante?.organizacao_id as string | undefined;
     if (!org) return NextResponse.json({ erro: 'Usuário sem organização' }, { status: 400 });
 
-    // listUsers é paginado sobre TODAS as organizações (padrão: 50 por página).
-    // Sem percorrer as páginas, membros desta org além do 50º login da
-    // plataforma sumiam da lista.
-    const usuariosAuth: User[] = [];
-    for (let page = 1; ; page++) {
-      const { data: pagina, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
-      if (error) return NextResponse.json({ erro: error.message }, { status: 400 });
-      usuariosAuth.push(...pagina.users);
-      if (pagina.users.length < 1000) break;
-    }
+    const todos = await listarTodosUsuariosAuth(supabaseAdmin);
+    if ('erro' in todos) return NextResponse.json({ erro: todos.erro }, { status: 400 });
+    const usuariosAuth = todos.usuarios;
 
     const { data: perfis } = await supabaseAdmin
       .from('perfis').select('id, nome, role, nicho, avatar_url').eq('organizacao_id', org);

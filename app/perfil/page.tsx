@@ -45,12 +45,17 @@ export default function PerfilPage() {
   // Aba "Usuários da plataforma": só admin vê (as rotas também exigem
   // workspace.configure — esconder aqui não é a proteção).
   const [aba, setAba] = useState<'perfil' | 'usuarios'>('perfil');
+  // Dono da plataforma (migration 0069) também vê a aba, com a visão de todas
+  // as organizações; as rotas /api/plataforma/** conferem de novo.
+  const [donoPlataforma, setDonoPlataforma] = useState(false);
+  const veUsuarios = role === 'admin' || donoPlataforma;
 
   useEffect(() => {
     fetch('/api/perfil')
       .then(r => r.json())
       .then(data => {
         setEmail(data.email || '');
+        setDonoPlataforma(data.donoPlataforma === true);
         if (data.perfil) {
           setNome(data.perfil.nome || '');
           setTelefone(data.perfil.telefone || '');
@@ -127,10 +132,10 @@ export default function PerfilPage() {
     <PaginaModulo
       grupo="Conta"
       titulo="Meu perfil"
-      subtitulo={role === 'admin'
+      subtitulo={veUsuarios
         ? 'Gerencie suas informações e o acesso dos usuários da plataforma.'
         : 'Gerencie suas informações e credenciais de acesso.'}
-      abas={role === 'admin' ? (
+      abas={veUsuarios ? (
         <AbasModulo
           rotulo="Seções do perfil"
           ativa={aba}
@@ -142,8 +147,8 @@ export default function PerfilPage() {
         />
       ) : undefined}
     >
-    {role === 'admin' && aba === 'usuarios' ? (
-      <UsuariosPlataforma emailProprio={email} />
+    {veUsuarios && aba === 'usuarios' ? (
+      <UsuariosPlataforma emailProprio={email} donoPlataforma={donoPlataforma} ehAdminOrg={role === 'admin'} />
     ) : (
     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
 
