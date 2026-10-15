@@ -194,8 +194,12 @@ export class SupabaseStore implements Store {
       .from('workflow_execucoes')
       .select('lead_id')
       .eq('organizacao_id', this.organizacaoId)
-      .in('status', ['em_andamento', 'aguardando'])
       .in('lead_id', leads.map((l) => l.id))
+      // Execução ativa (qualquer origem) OU qualquer execução de campanha, em
+      // qualquer status: campanha pausada/cancelada/concluída não devolve o lead
+      // ao texto genérico do motor legado — ele ignora o HTML, os intervalos e o
+      // remetente definidos na campanha.
+      .or('status.in.(em_andamento,aguardando),campanha_id.not.is.null')
     if (error) throw error
     const ocupados = new Set((data ?? []).map((e) => e.lead_id as string))
     return ocupados.size === 0 ? leads : leads.filter((l) => !ocupados.has(l.id))
